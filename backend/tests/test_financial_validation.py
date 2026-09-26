@@ -1,10 +1,16 @@
-import pytest
-from decimal import Decimal
-from app.ingestion.normalization import NormalizationService, normalize_financial_facts
-from app.ingestion.validation import FinancialFactValidator, validate_financial_facts, ValidationSeverity
-from app.models.financial import FactStatus, FactType, FinancialFact
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from decimal import Decimal
+
+import pytest
+
+from app.ingestion.normalization import NormalizationService, normalize_financial_facts
+from app.ingestion.validation import (
+    FinancialFactValidator,
+    ValidationSeverity,
+    validate_financial_facts,
+)
+from app.models.financial import FactStatus, FactType, FinancialFact
 
 
 class TestNormalizationService:
@@ -28,9 +34,9 @@ class TestNormalizationService:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.service.normalize_fact(fact)
@@ -55,9 +61,9 @@ class TestNormalizationService:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.service.normalize_fact(fact)
@@ -81,9 +87,9 @@ class TestNormalizationService:
             status=FactStatus.REPORTED,
             source_page="10",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.service.normalize_fact(fact)
@@ -109,9 +115,9 @@ class TestNormalizationService:
                 status=FactStatus.REPORTED,
                 source_page="15",
                 source_line=None,
-                reported_at=datetime.now(timezone.utc),
+                reported_at=datetime.now(UTC),
                 normalized_at=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
             FinancialFact(
                 id=uuid.uuid4(),
@@ -129,9 +135,9 @@ class TestNormalizationService:
                 status=FactStatus.REPORTED,
                 source_page="45",
                 source_line=None,
-                reported_at=datetime.now(timezone.utc),
+                reported_at=datetime.now(UTC),
                 normalized_at=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
         ]
 
@@ -162,9 +168,9 @@ class TestFinancialFactValidator:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.validator.validate(fact)
@@ -188,9 +194,9 @@ class TestFinancialFactValidator:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.validator.validate(fact)
@@ -216,9 +222,9 @@ class TestFinancialFactValidator:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.validator.validate(fact)
@@ -243,9 +249,9 @@ class TestFinancialFactValidator:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.validator.validate(fact)
@@ -270,9 +276,9 @@ class TestFinancialFactValidator:
             status=FactStatus.REPORTED,
             source_page="15",
             source_line=None,
-            reported_at=datetime.now(timezone.utc),
+            reported_at=datetime.now(UTC),
             normalized_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
         result = self.validator.validate(fact)
@@ -297,9 +303,9 @@ class TestFinancialFactValidator:
                 status=FactStatus.REPORTED,
                 source_page="15",
                 source_line=None,
-                reported_at=datetime.now(timezone.utc),
+                reported_at=datetime.now(UTC),
                 normalized_at=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
             FinancialFact(
                 id=uuid.uuid4(),
@@ -317,9 +323,9 @@ class TestFinancialFactValidator:
                 status=FactStatus.REPORTED,
                 source_page="45",
                 source_line=None,
-                reported_at=datetime.now(timezone.utc),
+                reported_at=datetime.now(UTC),
                 normalized_at=None,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             ),
         ]
 

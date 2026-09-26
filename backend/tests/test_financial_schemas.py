@@ -1,11 +1,7 @@
-import pytest
 from app.models.financial import (
     DocumentStatus,
     FactStatus,
     FactType,
-    FinancialDocument,
-    FinancialFact,
-    FinancialPeriod,
     ReportingPeriodType,
 )
 from app.schemas.financial import (

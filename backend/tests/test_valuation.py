@@ -1,10 +1,8 @@
 """Tests for valuation models."""
 
-import pytest
 from decimal import Decimal
 
 from app.valuation.models import (
-    ValuationModel,
     ValuationStatus,
     calculate_dcf_valuation,
     calculate_ev_ebitda_valuation,

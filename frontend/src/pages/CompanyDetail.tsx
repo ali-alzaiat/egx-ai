@@ -21,24 +21,18 @@ export default function CompanyDetail() {
   if (!company) return <div className="loading">Company not found</div>
 
   return (
-    <div>
+    <div className="page">
       <div className="page-header">
-        <h1>
-          {company.ticker} — {company.name}
-        </h1>
-        {company.name_ar && <p style={{ color: 'var(--text-secondary)' }}>{company.name_ar}</p>}
-        <Link to={`/companies/${ticker}/financials`} className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-          View Financial Data
-        </Link>
-        <Link to={`/companies/${ticker}/metrics`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
-          View Financial Metrics
-        </Link>
-        <Link to={`/companies/${ticker}/technical`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
-          Technical Analysis
-        </Link>
-        <Link to={`/companies/${ticker}/ai`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
-          AI Insights
-        </Link>
+        <div>
+          <h1>{company.ticker} — {company.name}</h1>
+          {company.name_ar && <p className="subtitle">{company.name_ar}</p>}
+        </div>
+        <div className="company-actions">
+          <Link to={`/companies/${ticker}/financials`} className="btn btn-primary">Financial Data</Link>
+          <Link to={`/companies/${ticker}/metrics`} className="btn btn-primary">Metrics</Link>
+          <Link to={`/companies/${ticker}/technical`} className="btn btn-primary">Technical</Link>
+          <Link to={`/companies/${ticker}/ai`} className="btn btn-primary">AI Insights</Link>
+        </div>
       </div>
 
       <div className="card-grid">
@@ -71,7 +65,7 @@ export default function CompanyDetail() {
       </div>
 
       {latestPrice && (
-        <div className="card-grid" style={{ marginTop: '1rem' }}>
+        <div className="card-grid">
           <div className="card">
             <div className="card-label">Latest Close</div>
             <div className="card-value">{latestPrice.close}</div>
@@ -96,8 +90,8 @@ export default function CompanyDetail() {
         </div>
       )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>Historical Prices</h2>
+      <div>
+        <h2 className="section-title">Historical Prices</h2>
         {loadingPrices && <div className="loading">Loading prices...</div>}
         {pricesData && pricesData.items.length > 0 && (
           <div className="table-container">
@@ -134,3 +128,4 @@ export default function CompanyDetail() {
     </div>
   )
 }
+

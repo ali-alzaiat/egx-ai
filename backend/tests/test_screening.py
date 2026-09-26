@@ -1,8 +1,8 @@
 """Tests for Shariah screening rules and service."""
 
-import pytest
 from decimal import Decimal
 
+from app.screening.methodology import DEFAULT_METHODOLOGY
 from app.screening.rules import (
     ScreeningVerdict,
     screen_cash_and_securities,
@@ -10,7 +10,6 @@ from app.screening.rules import (
     screen_industry,
     screen_interest_income,
 )
-from app.screening.methodology import DEFAULT_METHODOLOGY
 
 
 class TestDebtRatioScreening:

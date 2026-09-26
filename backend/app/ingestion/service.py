@@ -3,12 +3,11 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ingestion.provider import MarketDataProvider
-from app.models.market import CompanyStatus, DataSourceType
+from app.ingestion.provider import CompanyData, DailyPriceData, MarketDataProvider
+from app.models.market import DataSourceType
 from app.repositories.company import CompanyRepository
 from app.repositories.data_source import DataSourceRepository
 from app.repositories.price import PriceRepository
-from app.schemas.company import CompanyCreate
 from app.schemas.price import DailyPriceCreate
 
 logger = logging.getLogger(__name__)
@@ -43,46 +42,9 @@ class MarketDataIngestionService:
         self.source_type = source_type
 
     async def ingest_companies(self) -> int:
-        """Ingest companies from the provider."""
-        await self.source_repo.get_or_create(
-            name=self.source_name,
-            source_type=self.source_type,
-        )
+        """Ingest companies from the provider, refreshing existing metadata."""
         companies = await self.provider.get_companies()
-        count = 0
-
-        for c in companies:
-            existing = await self.company_repo.get_by_ticker(c.ticker)
-            if existing:
-                continue
-
-            status_map = {
-                "ACTIVE": CompanyStatus.ACTIVE,
-                "SUSPENDED": CompanyStatus.SUSPENDED,
-                "DELISTED": CompanyStatus.DELISTED,
-            }
-            status = status_map.get(c.status, CompanyStatus.UNKNOWN)
-
-            await self.company_repo.create(
-                CompanyCreate(
-                    ticker=c.ticker,
-                    isin=c.isin,
-                    name=c.name,
-                    name_ar=c.name_ar,
-                    sector=c.sector,
-                    industry=c.industry,
-                    currency=c.currency,
-                    shares_outstanding=c.shares_outstanding,
-                    free_float=c.free_float,
-                    listing_date=c.listing_date,
-                    status=status,
-                )
-            )
-            count += 1
-
-        await self.session.commit()
-        logger.info("Ingested %d companies from %s", count, self.source_name)
-        return count
+        return await self.upsert_companies(companies)
 
     async def ingest_prices(
         self,
@@ -90,7 +52,23 @@ class MarketDataIngestionService:
         start_date: date | None = None,
         end_date: date | None = None,
     ) -> int:
-        """Ingest daily prices for a ticker. Returns count of records upserted."""
+        """Fetch and persist daily prices for a ticker. Returns rows upserted."""
+        price_data = await self.provider.get_daily_prices(ticker, start_date, end_date)
+        return await self.write_prices(ticker, price_data)
+
+    async def write_prices(
+        self,
+        ticker: str,
+        price_data: list[DailyPriceData],
+    ) -> int:
+        """Persist already-fetched price rows for a ticker.
+
+        Split out from :meth:`ingest_prices` so callers can do the slow network
+        fetch concurrently and then write from a single session.
+        """
+        if not price_data:
+            return 0
+
         company = await self.company_repo.get_by_ticker(ticker)
         if not company:
             raise ValueError(f"Company with ticker '{ticker}' not found")
@@ -100,29 +78,53 @@ class MarketDataIngestionService:
             source_type=self.source_type,
         )
 
-        price_data = await self.provider.get_daily_prices(ticker, start_date, end_date)
-        if not price_data:
-            return 0
-
-        records = []
-        for p in price_data:
-            records.append(
-                DailyPriceCreate(
-                    company_id=company.id,
-                    date=p.date,
-                    open=p.open,
-                    high=p.high,
-                    low=p.low,
-                    close=p.close,
-                    adjusted_close=p.adjusted_close,
-                    volume=p.volume,
-                    value_traded=p.value_traded,
-                    trades=p.trades,
-                    source_id=data_source.id,
-                )
+        records = [
+            DailyPriceCreate(
+                company_id=company.id,
+                date=p.date,
+                open=p.open,
+                high=p.high,
+                low=p.low,
+                close=p.close,
+                adjusted_close=p.adjusted_close,
+                volume=p.volume,
+                value_traded=p.value_traded,
+                trades=p.trades,
+                source_id=data_source.id,
             )
+            for p in price_data
+        ]
 
         count = await self.price_repo.bulk_upsert(records)
         await self.session.commit()
-        logger.info("Ingested %d price records for %s from %s", count, ticker, self.source_name)
+        logger.debug("Wrote %d price records for %s", count, ticker)
+        return count
+
+    async def upsert_companies(self, companies: list[CompanyData]) -> int:
+        """Create or refresh company metadata from provider data."""
+        if not companies:
+            return 0
+        await self.source_repo.get_or_create(
+            name=self.source_name,
+            source_type=self.source_type,
+        )
+        rows = [
+            {
+                "ticker": c.ticker,
+                "isin": c.isin,
+                "name": c.name,
+                "name_ar": c.name_ar,
+                "sector": c.sector,
+                "industry": c.industry,
+                "currency": c.currency,
+                "shares_outstanding": c.shares_outstanding,
+                "free_float": c.free_float,
+                "listing_date": c.listing_date,
+                "status": c.status,
+            }
+            for c in companies
+        ]
+        count = await self.company_repo.upsert_many(rows)
+        await self.session.commit()
+        logger.info("Upserted %d companies from %s", count, self.source_name)
         return count

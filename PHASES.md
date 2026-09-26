@@ -25,10 +25,28 @@ Status: COMPLETE
 Status: COMPLETE
 
 ## Phase 9 — Opportunity Detection
-Status: NOT_STARTED
+Status: COMPLETE
+The full EGX universe (229 equities) is ranked using the versioned
+cross‑sectional momentum / risk model. Scores, tiers and coverage are
+persisted and exposed via the `/api/signals` surface. Coverage is
+explicitly disclosed (199/229 have price data).
 
 ## Phase 10 — Backtesting
-Status: NOT_STARTED
+Status: IN_PROGRESS
+Historical backtesting will require a price-history store; the current
+priceprovider (Yahoo) supplies daily closes but a structured OHLCV
+archive is needed for rolling-window strategies.
+
+## Phase 11 — Alerts & Monitoring
+Status: PENDING
+Watchlist subscriptions and threshold alerts can be built on top of the
+persisted `MarketSignal` rows and `SignalRun` history.
+
+## Phase 12 — Production Hardening
+Status: PENDING
+Production hardening includes rate‑limits, request signing, read‑only
+mode for the API, and a formal migration plan for the `model_version`
+field so that versioned scores remain comparable across deploys.
 
 ## Phase 11 — Alerts & Monitoring
 Status: NOT_STARTED

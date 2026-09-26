@@ -1,7 +1,6 @@
 """Tests for AI analysis and RAG pipeline."""
 
 import json
-import uuid
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +20,9 @@ class TestDocumentIndexer:
         assert indexer.session == db_session
 
     @pytest.mark.asyncio
-    async def test_index_company_returns_counts(self, db_session: AsyncSession, test_company) -> None:
+    async def test_index_company_returns_counts(
+        self, db_session: AsyncSession, test_company
+    ) -> None:
         indexer = DocumentIndexer(db_session)
         counts = await indexer.index_company(test_company.id)
         assert isinstance(counts, dict)
@@ -35,14 +36,18 @@ class TestRAGPipeline:
     """Tests for RAG retrieval."""
 
     @pytest.mark.asyncio
-    async def test_rag_retrieves_empty_when_no_chunks(self, db_session: AsyncSession, test_company) -> None:
+    async def test_rag_retrieves_empty_when_no_chunks(
+        self, db_session: AsyncSession, test_company
+    ) -> None:
         rag = RAGPipeline(db_session)
         result = await rag.retrieve(test_company.id, "test query")
         assert result.chunks == []
         assert result.total_chunks_searched == 0
 
     @pytest.mark.asyncio
-    async def test_rag_retrieves_relevant_chunks(self, db_session: AsyncSession, test_company) -> None:
+    async def test_rag_retrieves_relevant_chunks(
+        self, db_session: AsyncSession, test_company
+    ) -> None:
         chunk1 = DocumentChunk(
             company_id=test_company.id,
             chunk_type=ChunkTypeDB.FINANCIAL_FACT,
@@ -68,7 +73,10 @@ class TestRAGPipeline:
     async def test_rag_disclaimer_present(self, db_session: AsyncSession, test_company) -> None:
         rag = RAGPipeline(db_session)
         result = await rag.retrieve(test_company.id, "query")
-        assert "financial data" in result.disclaimer.lower() or "source" in result.disclaimer.lower()
+        assert (
+            "financial data" in result.disclaimer.lower()
+            or "source" in result.disclaimer.lower()
+        )
 
 
 class TestAIAnalyzer:
@@ -138,7 +146,10 @@ class TestAIAnalyzer:
         ))
 
         assert "Facts" in result.detailed_analysis or "facts" in result.detailed_analysis.lower()
-        assert "Interpretation" in result.detailed_analysis or "interpretation" in result.detailed_analysis.lower()
+        assert (
+            "Interpretation" in result.detailed_analysis
+            or "interpretation" in result.detailed_analysis.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_analysis_never_invents_financial_numbers(

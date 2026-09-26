@@ -1,6 +1,5 @@
 """Tests for technical indicators."""
 
-import pytest
 from decimal import Decimal
 
 from app.technical.indicators import (

@@ -1,7 +1,8 @@
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.market import Company, CompanyStatus
@@ -17,6 +18,70 @@ class CompanyRepository:
         self.session.add(company)
         await self.session.flush()
         return company
+
+    async def upsert_many(self, rows: Sequence[dict]) -> int:
+        """Insert or update many companies by ticker.
+
+        ``name`` and ``status`` always come from the source. Optional descriptive
+        fields use COALESCE so a source that cannot supply them (a price-only
+        feed, for example) never erases values curated elsewhere.
+        """
+        if not rows:
+            return 0
+
+        payload = [
+            {
+                "ticker": str(row["ticker"]).upper(),
+                "name": row.get("name") or str(row["ticker"]).upper(),
+                "isin": row.get("isin"),
+                "name_ar": row.get("name_ar"),
+                "sector": row.get("sector"),
+                "industry": row.get("industry"),
+                "currency": row.get("currency") or "EGP",
+                "shares_outstanding": row.get("shares_outstanding"),
+                "free_float": row.get("free_float"),
+                "listing_date": row.get("listing_date"),
+                "status": CompanyStatus(row.get("status") or CompanyStatus.ACTIVE),
+            }
+            for row in rows
+        ]
+
+        stmt = pg_insert(Company).values(payload)
+        stmt = stmt.on_conflict_do_update(
+            constraint="uq_company_ticker",
+            set_={
+                "name": stmt.excluded.name,
+                "status": stmt.excluded.status,
+                "currency": stmt.excluded.currency,
+                "isin": func.coalesce(stmt.excluded.isin, Company.isin),
+                "name_ar": func.coalesce(stmt.excluded.name_ar, Company.name_ar),
+                "sector": func.coalesce(stmt.excluded.sector, Company.sector),
+                "industry": func.coalesce(stmt.excluded.industry, Company.industry),
+                "shares_outstanding": func.coalesce(
+                    stmt.excluded.shares_outstanding, Company.shares_outstanding
+                ),
+                "free_float": func.coalesce(stmt.excluded.free_float, Company.free_float),
+                "listing_date": func.coalesce(stmt.excluded.listing_date, Company.listing_date),
+                "updated_at": func.now(),
+            },
+        )
+        await self.session.execute(stmt)
+        return len(payload)
+
+    async def mark_absent_as(self, present_tickers: Sequence[str],
+                             status: CompanyStatus = CompanyStatus.DELISTED) -> int:
+        """Flag companies absent from the current universe snapshot.
+
+        A company missing from a complete listing snapshot is no longer actively
+        traded. This keeps the universe self-correcting when a name is delisted,
+        rather than letting stale rows linger and get scored forever.
+        """
+        tickers = [t.upper() for t in present_tickers]
+        query = update(Company).where(Company.status != status)
+        if tickers:
+            query = query.where(Company.ticker.notin_(tickers))
+        result = await self.session.execute(query)
+        return result.rowcount or 0
 
     async def get_by_id(self, company_id: uuid.UUID) -> Company | None:
         return await self.session.get(Company, company_id)

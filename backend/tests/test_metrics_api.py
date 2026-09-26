@@ -1,17 +1,15 @@
 """Tests for metrics API endpoints."""
 
-import pytest
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from httpx import AsyncClient, ASGITransport
+
+import pytest
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.main import app
+from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
 from app.models.market import Company
-from app.models.financial import FinancialPeriod, FinancialDocument, FinancialFact
-from app.models.metrics import FinancialMetric, MetricStatusDB
-from app.repositories.metrics import MetricRepository
 
 
 @pytest.fixture
@@ -55,8 +53,9 @@ async def sample_document(
     sample_period: FinancialPeriod,
 ) -> FinancialDocument:
     """Create a sample financial document."""
-    from app.models.market import DataSource
     import uuid as uuid_mod
+
+    from app.models.market import DataSource
 
     source_name = f"Test Source {uuid_mod.uuid4().hex[:8]}"
     source = DataSource(

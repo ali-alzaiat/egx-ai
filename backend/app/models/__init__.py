@@ -11,6 +11,13 @@ from app.models.financial import (
 from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
 from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
 from app.models.screening import ScreeningRuleResultDB, ScreeningStatusDB, ShariahScreeningResult
+from app.models.signals import (
+    MarketSignal,
+    SignalRun,
+    SignalStatusDB,
+    SignalTierDB,
+    UniverseCoverageSnapshot,
+)
 from app.models.technical import IndicatorStatusDB, IndicatorTypeDB, TechnicalIndicator
 from app.models.valuation import ValuationModelDB, ValuationResult, ValuationStatusDB
 
@@ -35,12 +42,17 @@ __all__ = [
     "FinancialPeriod",
     "IndicatorStatusDB",
     "IndicatorTypeDB",
+    "MarketSignal",
     "MetricStatusDB",
     "ReportingPeriodType",
     "ScreeningRuleResultDB",
     "ScreeningStatusDB",
     "ShariahScreeningResult",
+    "SignalRun",
+    "SignalStatusDB",
+    "SignalTierDB",
     "TechnicalIndicator",
+    "UniverseCoverageSnapshot",
     "ValuationModelDB",
     "ValuationResult",
     "ValuationStatusDB",

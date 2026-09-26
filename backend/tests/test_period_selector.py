@@ -1,10 +1,10 @@
 """Tests for period selection logic."""
 
-import pytest
-from datetime import date
-from app.metrics.period_selector import PeriodSelector, PeriodPair
-from app.models.financial import FinancialPeriod, ReportingPeriodType
 import uuid
+from datetime import date
+
+from app.metrics.period_selector import PeriodSelector
+from app.models.financial import FinancialPeriod, ReportingPeriodType
 
 
 def create_period(

@@ -138,3 +138,81 @@ export interface CalculateIndicatorsResponse {
 export interface ApiError {
   detail: string
 }
+
+
+// Signal ranking types
+export type SignalTier = 'STRONGEST' | 'STRONG' | 'NEUTRAL' | 'WEAK' | 'WEAKEST'
+
+export interface MarketSignal {
+  ticker: string
+  name: string | null
+  as_of: string
+  model: string
+  status: 'SCORED' | 'INSUFFICIENT_HISTORY' | 'NO_PRICE_DATA' | 'NOT_ACTIVE'
+  tier: SignalTier | null
+  score: number | null
+  rank: number | null
+  universe_size: number | null
+  data_coverage: number | null
+  percentiles: Record<string, number>
+  factors: Record<string, number>
+  excluded_factors: string[]
+  rationale: string | null
+  reason: string | null
+  sector?: string | null
+  industry?: string | null
+}
+
+export interface UniverseCoverage {
+  universe_total: number
+  active_total: number
+  with_price_data: number
+  priced_of_active: number
+  min_history_days: number
+  analyzable: number
+  unscorable: number
+  unpriced_tickers: string[]
+  thin_history_tickers: string[]
+}
+
+export interface SignalsResponse {
+  as_of: string | null
+  model: string | null
+  total: number
+  count: number
+  results: MarketSignal[]
+  coverage: UniverseCoverage
+  disclaimer?: string
+  notice?: string
+}
+
+export interface SignalRun {
+  as_of: string
+  model: string
+  universe_total: number
+  scored_count: number
+  unscorable_count: number
+  coverage_ratio: number
+}
+
+export interface UnscorableCompany {
+  ticker: string | null
+  name: string | null
+  status: string
+  reason: string | null
+}
+
+export interface ScoringFactor {
+  key: string
+  label: string
+  weight: number
+  direction: 'HIGHER_IS_BETTER' | 'LOWER_IS_BETTER'
+}
+
+export interface ScoringModelInfo {
+  name: string
+  version: string
+  description: string
+  min_history_days: number
+  factors: ScoringFactor[]
+}

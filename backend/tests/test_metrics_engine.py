@@ -1,28 +1,27 @@
 """Comprehensive tests for the financial metrics engine."""
 
-import pytest
 from decimal import Decimal
 
+from app.metrics.definitions import MetricStatus
 from app.metrics.engine import (
-    calculate_revenue_growth_yoy,
-    calculate_net_income_growth_yoy,
-    calculate_eps_growth_yoy,
-    calculate_gross_margin,
-    calculate_operating_margin,
-    calculate_net_margin,
-    calculate_roe,
-    calculate_roa,
-    calculate_debt_to_equity,
-    calculate_debt_to_assets,
+    calculate_book_value_per_share,
     calculate_current_ratio,
-    calculate_quick_ratio,
-    calculate_operating_cash_flow_margin,
+    calculate_debt_to_assets,
+    calculate_debt_to_equity,
+    calculate_eps,
+    calculate_eps_growth_yoy,
     calculate_free_cash_flow,
     calculate_free_cash_flow_margin,
-    calculate_eps,
-    calculate_book_value_per_share,
+    calculate_gross_margin,
+    calculate_net_income_growth_yoy,
+    calculate_net_margin,
+    calculate_operating_cash_flow_margin,
+    calculate_operating_margin,
+    calculate_quick_ratio,
+    calculate_revenue_growth_yoy,
+    calculate_roa,
+    calculate_roe,
 )
-from app.metrics.definitions import MetricStatus
 
 
 class TestRevenueGrowth:

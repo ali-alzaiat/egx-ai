@@ -1,21 +1,33 @@
-from collections.abc import AsyncGenerator
 import uuid
+from collections.abc import AsyncGenerator
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import async_session_factory, get_session
+from app.db.session import engine, get_session
 from app.main import app
 from app.models.market import Company, CompanyStatus
 
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide a clean database session for direct repository tests."""
-    async with async_session_factory() as session:
+    """Provide a database session that is fully rolled back after the test.
+
+    Services under test call ``session.commit()`` internally, which would
+    normally persist their writes. Binding the session to an externally managed
+    transaction means those commits only release an inner savepoint, so rolling
+    back the outer transaction discards every row the test created.
+    """
+    connection = await engine.connect()
+    transaction = await connection.begin()
+    session = AsyncSession(bind=connection, expire_on_commit=False)
+    try:
         yield session
-        await session.rollback()
+    finally:
+        await session.close()
+        await transaction.rollback()
+        await connection.close()
 
 
 @pytest_asyncio.fixture

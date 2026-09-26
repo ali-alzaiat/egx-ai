@@ -3,7 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/companies', label: 'Companies' },
-  { to: '/screener', label: 'Screener' },
+  { to: '/rankings', label: 'Screener' },
   { to: '/watchlist', label: 'Watchlist' },
   { to: '/research', label: 'Research' },
   { to: '/alerts', label: 'Alerts' },
