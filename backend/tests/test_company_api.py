@@ -82,7 +82,7 @@ async def test_get_company_prices_invalid_date_range(client: AsyncClient) -> Non
 
 @pytest.mark.asyncio
 async def test_health_still_works(client: AsyncClient) -> None:
-    response = await client.get("/health")
+    response = await client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"

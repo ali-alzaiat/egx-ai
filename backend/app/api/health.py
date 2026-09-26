@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from app.core.config import settings
 
-router = APIRouter(tags=["health"])
+router = APIRouter(prefix="/api", tags=["health"])
 
 
 @router.get("/health")
