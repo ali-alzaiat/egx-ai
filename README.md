@@ -235,6 +235,77 @@ Key rules:
 - No look-ahead bias in backtesting
 - Shariah methodology is versioned and configurable
 
+## Phase Orchestration
+
+This project uses an autonomous phase orchestration system for controlled development.
+
+### How It Works
+
+1. **Phase Tracker**: `PHASES.md` tracks the status of each phase
+2. **Phase Specifications**: `docs/phases/` contains detailed requirements for each phase
+3. **Agents**: Specialized agents handle building, reviewing, testing, and architecture
+4. **Command**: `/next-phase` orchestrates the workflow
+
+### Phase Statuses
+
+- `NOT_STARTED` — Phase not yet begun
+- `IN_PROGRESS` — Currently being implemented
+- `BLOCKED` — Waiting on dependency or human decision
+- `READY_FOR_REVIEW` — Implementation complete, awaiting approval
+- `COMPLETE` — Approved and finalized
+
+### Workflow
+
+```bash
+# Start or continue the next phase
+/next-phase
+```
+
+The orchestrator will:
+1. Identify the current phase
+2. Read the phase specification
+3. Implement the phase (via phase-builder agent)
+4. Run verification (via test-engineer agent)
+5. Review implementation (via phase-reviewer agent)
+6. Check architecture (via architecture-reviewer agent)
+7. Generate completion report
+8. Stop and wait for approval
+
+### Approval
+
+Human approval is required before marking a phase complete:
+
+```
+approve phase 4
+```
+
+### Agents
+
+- `phase-builder` — implements phase requirements
+- `phase-reviewer` — reviews against specification
+- `test-engineer` — runs verification suite
+- `architecture-reviewer` — ensures architectural integrity
+
+### Phase Specifications
+
+Each phase has a specification in `docs/phases/`:
+
+```bash
+docs/phases/
+├── phase-01-foundation.md
+├── phase-02-market-data.md
+├── phase-03-financial-data.md
+├── phase-04-financial-metrics.md
+├── phase-05-shariah.md
+├── phase-06-valuation.md
+├── phase-07-technical-analysis.md
+├── phase-08-ai-rag.md
+├── phase-09-opportunity-detection.md
+├── phase-10-backtesting.md
+├── phase-11-alerts.md
+└── phase-12-production.md
+```
+
 ## License
 
 Private — Personal use only.
