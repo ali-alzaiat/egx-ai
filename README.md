@@ -164,6 +164,42 @@ Run `python -m app.seed.seed` to populate:
 - 50 financial documents
 - 850 financial facts
 
+### Phase 4: Financial Metrics
+
+The platform now includes a deterministic financial metrics engine:
+
+**17 Metric Definitions** across 7 categories:
+- Growth: Revenue, Net Income, EPS (YoY)
+- Margins: Gross, Operating, Net, Operating Cash Flow, Free Cash Flow
+- Profitability: ROE, ROA
+- Leverage: Debt-to-Equity, Debt-to-Assets
+- Liquidity: Current Ratio, Quick Ratio
+- Per-Share: EPS, Book Value Per Share
+
+**Key Features:**
+- Pure deterministic calculations using Decimal precision
+- Period comparison with publication date awareness (no look-ahead bias)
+- Provenance tracking for every calculation
+- Formula versioning for auditability
+- Synthetic data labeled with `source_type = SYNTHETIC`
+
+**Calculate Metrics:**
+```bash
+curl -X POST "http://localhost:8000/api/metrics/companies/{company_id}/calculate?period_id={period_id}"
+```
+
+**View Metrics:**
+```bash
+# Get all metrics for a company
+curl "http://localhost:8000/api/metrics/companies/{company_id}"
+
+# Get metrics for a specific period
+curl "http://localhost:8000/api/metrics/companies/{company_id}/periods/{period_id}"
+
+# Get a specific metric
+curl "http://localhost:8000/api/metrics/companies/{company_id}/periods/{period_id}/gross_margin"
+```
+
 ## Project Structure
 
 ```
@@ -174,6 +210,7 @@ egx-ai/
 │   │   ├── core/     # Config, logging
 │   │   ├── db/       # Database setup
 │   │   ├── ingestion/# Data ingestion abstraction
+│   │   ├── metrics/  # Financial metrics engine
 │   │   ├── models/   # SQLAlchemy models
 │   │   ├── repositories/ # Data access
 │   │   ├── schemas/  # Pydantic schemas

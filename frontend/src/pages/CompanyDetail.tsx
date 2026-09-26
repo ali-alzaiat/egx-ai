@@ -30,6 +30,9 @@ export default function CompanyDetail() {
         <Link to={`/companies/${ticker}/financials`} className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
           View Financial Data
         </Link>
+        <Link to={`/companies/${ticker}/metrics`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
+          View Financial Metrics
+        </Link>
       </div>
 
       <div className="card-grid">

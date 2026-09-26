@@ -5,9 +5,9 @@ export default function FinancialData() {
   const { ticker } = useParams<{ ticker: string }>()
   const { data: company, isLoading: companyLoading } = useCompanyByTicker(ticker)
   const { data: periods, isLoading: periodsLoading } = useFinancialPeriods(company?.id)
-  const { data: incomeFacts, isLoading: incomeLoading } = useFinancialFacts(company?.id, { fact_type: 'INCOME_STATEMENT' })
-  const { data: balanceFacts, isLoading: balanceLoading } = useFinancialFacts(company?.id, { fact_type: 'BALANCE_SHEET' })
-  const { data: cashFlowFacts, isLoading: cashFlowLoading } = useFinancialFacts(company?.id, { fact_type: 'CASH_FLOW' })
+  const { data: incomeFacts } = useFinancialFacts(company?.id, { fact_type: 'INCOME_STATEMENT' })
+  const { data: balanceFacts } = useFinancialFacts(company?.id, { fact_type: 'BALANCE_SHEET' })
+  const { data: cashFlowFacts } = useFinancialFacts(company?.id, { fact_type: 'CASH_FLOW' })
 
   if (companyLoading || periodsLoading) {
     return <div className="loading">Loading financial data...</div>
@@ -15,14 +15,6 @@ export default function FinancialData() {
 
   if (!company) {
     return <div className="error">Company not found</div>
-  }
-
-  // Group facts by fiscal year
-  const groupByYear = (facts: typeof incomeFacts) => {
-    if (!facts) return {}
-    const grouped: Record<number, typeof facts> = {}
-    // This is simplified - in real app you'd join with periods
-    return grouped
   }
 
   return (

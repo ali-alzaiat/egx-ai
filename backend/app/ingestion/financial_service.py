@@ -1,8 +1,10 @@
 import logging
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion.financial_provider import FinancialDataProvider
+from app.models.financial import DocumentStatus, FactStatus, FactType, ReportingPeriodType
 from app.models.market import DataSourceType
 from app.repositories.company import CompanyRepository
 from app.repositories.data_source import DataSourceRepository
@@ -76,7 +78,7 @@ class FinancialDataIngestionService:
             await self.period_repo.upsert(
                 FinancialPeriodCreate(
                     company_id=company.id,
-                    period_type=p.period_type,
+                    period_type=ReportingPeriodType(p.period_type),
                     fiscal_year=p.fiscal_year,
                     fiscal_quarter=p.fiscal_quarter,
                     start_date=p.start_date,
@@ -106,7 +108,7 @@ class FinancialDataIngestionService:
                 FinancialDocumentCreate(
                     period_id=period.id,
                     source_id=data_source.id,
-                    document_status=d.document_status,
+                    document_status=DocumentStatus(d.document_status),
                     document_type=d.document_type,
                     document_url=None,
                     filing_date=d.filing_date,
@@ -150,7 +152,7 @@ class FinancialDataIngestionService:
                     period_id=period.id,
                     document_id=document.id,
                     company_id=company.id,
-                    fact_type=f.fact_type,
+                    fact_type=FactType(f.fact_type),
                     reported_label=f.reported_label,
                     normalized_label=None,
                     reported_value=f.reported_value,
@@ -158,10 +160,13 @@ class FinancialDataIngestionService:
                     currency=f.currency,
                     unit=f.unit,
                     scale=f.scale,
-                    status="REPORTED",
+                    status=FactStatus.REPORTED,
                     source_page=f.source_page,
                     source_line=f.source_line,
-                    reported_at=f.reported_at,
+                    reported_at=(
+                        datetime.combine(f.reported_at, datetime.min.time())
+                        if f.reported_at else None
+                    ),
                     normalized_at=None,
                 )
             )

@@ -28,11 +28,13 @@ def create_app() -> FastAPI:
     from app.api.data_sources import router as data_sources_router
     from app.api.financial import router as financial_router
     from app.api.health import router as health_router
+    from app.api.metrics import router as metrics_router
 
     app.include_router(health_router)
     app.include_router(companies_router)
     app.include_router(data_sources_router)
     app.include_router(financial_router)
+    app.include_router(metrics_router)
 
     return app
 

@@ -8,6 +8,7 @@ from app.models.financial import (
     ReportingPeriodType,
 )
 from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
+from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
 
 __all__ = [
     "Company",
@@ -20,6 +21,9 @@ __all__ = [
     "FactType",
     "FinancialDocument",
     "FinancialFact",
+    "FinancialMetric",
+    "FinancialMetricInput",
     "FinancialPeriod",
+    "MetricStatusDB",
     "ReportingPeriodType",
 ]

@@ -5,6 +5,7 @@ import type {
   DataSource,
   FinancialDocument,
   FinancialFact,
+  FinancialMetric,
   FinancialPeriod,
   PaginatedResponse,
 } from '../types'
@@ -136,5 +137,37 @@ export function useLatestFinancialFacts(companyId: string | undefined, params?: 
     queryKey: ['latestFinancialFacts', companyId, params],
     queryFn: () => fetchApi<FinancialFact[]>(`/financial/facts/${companyId}/latest${qs ? `?${qs}` : ''}`),
     enabled: !!companyId,
+  })
+}
+
+// Metrics API hooks
+export function useCompanyMetrics(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ['metrics', companyId],
+    queryFn: () => fetchApi<FinancialMetric[]>(`/metrics/companies/${companyId}`),
+    enabled: !!companyId,
+  })
+}
+
+export function useCompanyPeriodMetrics(
+  companyId: string | undefined,
+  periodId: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['metrics', companyId, periodId],
+    queryFn: () => fetchApi<FinancialMetric[]>(`/metrics/companies/${companyId}/periods/${periodId}`),
+    enabled: !!companyId && !!periodId,
+  })
+}
+
+export function useMetricDetail(
+  companyId: string | undefined,
+  periodId: string | undefined,
+  metricCode: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['metrics', companyId, periodId, metricCode],
+    queryFn: () => fetchApi<FinancialMetric>(`/metrics/companies/${companyId}/periods/${periodId}/${metricCode}`),
+    enabled: !!companyId && !!periodId && !!metricCode,
   })
 }

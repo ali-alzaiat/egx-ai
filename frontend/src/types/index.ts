@@ -94,6 +94,22 @@ export interface FinancialFact {
   created_at: string
 }
 
+export interface FinancialMetric {
+  id: string
+  company_id: string
+  period_id: string
+  metric_code: string
+  display_name: string
+  value: string | null
+  unit: string
+  status: string
+  reason: string | null
+  warnings: string | null
+  formula_version: number
+  calculated_at: string
+  created_at: string
+}
+
 export interface ApiError {
   detail: string
 }
