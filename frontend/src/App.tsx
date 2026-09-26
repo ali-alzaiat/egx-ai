@@ -4,6 +4,7 @@ import Companies from './pages/Companies'
 import CompanyDetail from './pages/CompanyDetail'
 import FinancialData from './pages/FinancialData'
 import FinancialMetrics from './pages/FinancialMetrics'
+import ShariahScreening from './pages/ShariahScreening'
 import Layout from './components/Layout'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Route path="/companies/:ticker" element={<CompanyDetail />} />
           <Route path="/companies/:ticker/financials" element={<FinancialData />} />
           <Route path="/companies/:ticker/metrics" element={<FinancialMetrics />} />
+          <Route path="/companies/:ticker/screening" element={<ShariahScreening />} />
         </Route>
       </Routes>
     </BrowserRouter>

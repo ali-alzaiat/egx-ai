@@ -1,0 +1,1 @@
+"""Shariah screening module."""
