@@ -16,10 +16,10 @@ Status: COMPLETE
 Status: COMPLETE
 
 ## Phase 6 — Valuation
-Status: READY_FOR_REVIEW
+Status: COMPLETE
 
 ## Phase 7 — Technical Analysis
-Status: NOT_STARTED
+Status: READY_FOR_REVIEW
 
 ## Phase 8 — AI Analyst & RAG
 Status: NOT_STARTED
