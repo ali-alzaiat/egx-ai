@@ -67,6 +67,12 @@ class MetricService:
         self.fact_repo = FinancialFactRepository(session)
         self.period_selector = PeriodSelector()
 
+    def _get_period_type_value(self, period: FinancialPeriod) -> str:
+        """Safely get period_type value whether it's an enum or string."""
+        if hasattr(period.period_type, 'value'):
+            return period.period_type.value
+        return str(period.period_type)
+
     async def calculate_metrics_for_period(
         self,
         company_id: str,
@@ -92,9 +98,10 @@ class MetricService:
             raise ValueError(f"Period {period_id} not found")
 
         # Get all periods for this company
+        period_type_value = self._get_period_type_value(period)
         all_periods = await self.period_repo.list_periods(
             company_id=uuid.UUID(company_id),
-            period_type=period.period_type.value,
+            period_type=period_type_value,
         )
 
         # Select comparable periods (convert Sequence to list)
@@ -213,7 +220,7 @@ class MetricService:
                         formula_version=metric.formula_version,
                         period_id=str(period.id),
                         fiscal_year=period.fiscal_year,
-                        period_type=period.period_type.value,
+                        period_type=self._get_period_type_value(period),
                         provenance={},
                         calculated_at=datetime.now(UTC),
                     )
@@ -231,7 +238,7 @@ class MetricService:
                 formula_version=metric.formula_version,
                 period_id=str(period.id),
                 fiscal_year=period.fiscal_year,
-                period_type=period.period_type.value,
+                period_type=self._get_period_type_value(period),
                 provenance={},
                 calculated_at=datetime.now(UTC),
             )
@@ -250,7 +257,7 @@ class MetricService:
                 formula_version=metric.formula_version,
                 period_id=str(period.id),
                 fiscal_year=period.fiscal_year,
-                period_type=period.period_type.value,
+                period_type=self._get_period_type_value(period),
                 provenance={},
                 calculated_at=datetime.now(UTC),
             )
@@ -279,7 +286,7 @@ class MetricService:
                 formula_version=metric.formula_version,
                 period_id=str(period.id),
                 fiscal_year=period.fiscal_year,
-                period_type=period.period_type.value,
+                period_type=self._get_period_type_value(period),
                 provenance={},
                 calculated_at=datetime.now(UTC),
             )
@@ -298,7 +305,7 @@ class MetricService:
             formula_version=metric.formula_version,
             period_id=str(period.id),
             fiscal_year=period.fiscal_year,
-            period_type=period.period_type.value,
+            period_type=self._get_period_type_value(period),
             provenance=provenance,
             calculated_at=datetime.now(UTC),
         )

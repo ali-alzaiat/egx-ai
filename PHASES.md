@@ -10,7 +10,7 @@ Status: COMPLETE
 Status: COMPLETE
 
 ## Phase 4 — Financial Metrics & Ratios
-Status: IN_PROGRESS
+Status: READY_FOR_REVIEW
 
 ## Phase 5 — Shariah Screening
 Status: NOT_STARTED

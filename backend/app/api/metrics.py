@@ -201,3 +201,53 @@ async def calculate_metrics(
         "periods_calculated": len(results),
         "metrics_persisted": persisted_count,
     }
+
+
+@router.post("/companies/{company_id}/periods/{period_id}/calculate")
+async def calculate_period_metrics(
+    company_id: uuid.UUID,
+    period_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Calculate and persist metrics for a specific period."""
+    from app.repositories.company import CompanyRepository
+
+    company_repo = CompanyRepository(session)
+    company = await company_repo.get_by_id(company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    service = MetricService(session)
+    metric_repo = MetricRepository(session)
+
+    # Calculate metrics for the specific period
+    results = await service.calculate_metrics_for_period(
+        company_id=str(company_id),
+        period_id=str(period_id),
+    )
+
+    # Persist results
+    persisted_count = 0
+    for metric_output in results:
+        await metric_repo.upsert_metric(
+            company_id=company_id,
+            period_id=period_id,
+            metric_code=metric_output.metric_code,
+            display_name=metric_output.display_name,
+            value=float(metric_output.value) if metric_output.value is not None else None,
+            unit=metric_output.unit,
+            status=MetricStatusDB(metric_output.status.value),
+            reason=metric_output.reason,
+            warnings=str(metric_output.warnings) if metric_output.warnings else None,
+            formula_version=metric_output.formula_version,
+            calculated_at=metric_output.calculated_at,
+        )
+        persisted_count += 1
+
+    await session.commit()
+
+    return {
+        "company_id": str(company_id),
+        "period_id": str(period_id),
+        "metrics_persisted": persisted_count,
+    }
