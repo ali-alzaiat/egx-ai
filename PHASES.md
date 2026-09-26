@@ -13,10 +13,10 @@ Status: COMPLETE
 Status: COMPLETE
 
 ## Phase 5 — Shariah Screening
-Status: READY_FOR_REVIEW
+Status: COMPLETE
 
 ## Phase 6 — Valuation
-Status: NOT_STARTED
+Status: READY_FOR_REVIEW
 
 ## Phase 7 — Technical Analysis
 Status: NOT_STARTED
