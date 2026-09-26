@@ -4,8 +4,8 @@ import asyncio
 import logging
 
 from app.db.session import async_session_factory
+from app.ingestion.egx_provider import create_egx_provider
 from app.ingestion.fake_financial_provider import FakeFinancialDataProvider
-from app.ingestion.fake_provider import FakeMarketDataProvider
 from app.ingestion.financial_service import FinancialDataIngestionService
 from app.ingestion.service import MarketDataIngestionService
 from app.models.market import DataSourceType
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 async def seed() -> None:
-    """Seed synthetic development data."""
-    market_provider = FakeMarketDataProvider()
+    """Seed development data using real EGX market data and synthetic financials."""
+    market_provider = create_egx_provider()
     financial_provider = FakeFinancialDataProvider()
 
     async with async_session_factory() as session:
@@ -23,22 +23,23 @@ async def seed() -> None:
         market_service = MarketDataIngestionService(
             session=session,
             provider=market_provider,
-            source_name="SYNTHETIC_DEV",
-            source_type=DataSourceType.SYNTHETIC,
+            source_name="YAHOO_FINANCE_EGX",
+            source_type=DataSourceType.DATA_PROVIDER,
         )
 
-        logger.info("Seeding companies...")
+        logger.info("Seeding companies from EGX...")
         company_count = await market_service.ingest_companies()
         logger.info("Seeded %d companies", company_count)
 
         logger.info("Seeding price data for all companies...")
         total_prices = 0
-        for company in market_provider.COMPANIES:
+        companies = await market_provider.get_companies()
+        for company in companies:
             count = await market_service.ingest_prices(company.ticker)
             total_prices += count
             logger.info("  %s: %d price records", company.ticker, count)
 
-        # Seed financial data
+        # Seed financial data (still synthetic)
         financial_service = FinancialDataIngestionService(
             session=session,
             provider=financial_provider,
@@ -50,7 +51,7 @@ async def seed() -> None:
         total_periods = 0
         total_documents = 0
         total_facts = 0
-        for company in market_provider.COMPANIES:
+        for company in companies:
             counts = await financial_service.ingest_financial_data(company.ticker)
             total_periods += counts["periods"]
             total_documents += counts["documents"]
