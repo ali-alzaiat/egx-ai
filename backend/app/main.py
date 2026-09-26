@@ -24,9 +24,15 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    from app.api.companies import router as companies_router
+    from app.api.data_sources import router as data_sources_router
+    from app.api.financial import router as financial_router
     from app.api.health import router as health_router
 
     app.include_router(health_router)
+    app.include_router(companies_router)
+    app.include_router(data_sources_router)
+    app.include_router(financial_router)
 
     return app
 

@@ -49,6 +49,9 @@ select = [
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
 ]
+ignore = [
+    "B008",  # Do not perform function call in argument defaults (FastAPI Depends/Query)
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

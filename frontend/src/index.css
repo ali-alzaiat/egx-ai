@@ -202,3 +202,107 @@ tr:last-child td {
   padding: 3rem;
   color: var(--text-secondary);
 }
+
+.filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.625rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.filter-input:focus {
+  border-color: var(--accent);
+}
+
+.filter-select {
+  padding: 0.625rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  border-color: var(--accent);
+}
+
+.ticker-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.ticker-link:hover {
+  color: var(--accent-hover);
+}
+
+.status-badge.active {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--green);
+}
+
+.status-badge.suspended {
+  background: rgba(234, 179, 8, 0.15);
+  color: var(--yellow);
+}
+
+.status-badge.delisted {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--red);
+}
+
+.status-badge.unknown {
+  background: rgba(156, 163, 180, 0.15);
+  color: var(--text-secondary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.pagination-btn {
+  padding: 0.5rem 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}

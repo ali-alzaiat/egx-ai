@@ -53,6 +53,9 @@ pip install -e ".[dev]"
 # Run migrations
 alembic upgrade head
 
+# Seed development data (synthetic)
+python -m app.seed.seed
+
 # Start dev server
 uvicorn app.main:app --reload --port 8000
 ```
@@ -80,12 +83,101 @@ make migrate      # Run database migrations
 make seed         # Seed development data
 ```
 
+## Phase 2 — Companies + Market Prices
+
+### Database Tables
+
+- **companies** — EGX-listed companies with ticker, ISIN, sector, industry, status
+- **daily_prices** — Historical OHLC prices with volume and provenance
+- **data_sources** — Tracks where data came from (EGX, SYNTHETIC, etc.)
+
+### API Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/companies` | List companies (paginated, filterable) |
+| `GET /api/companies/{id}` | Get company by ID |
+| `GET /api/companies/ticker/{ticker}` | Get company by ticker |
+| `GET /api/companies/{id}/prices` | Get historical prices |
+| `GET /api/companies/{id}/prices/latest` | Get latest price |
+
+### Ingestion Architecture
+
+The ingestion layer uses a `MarketDataProvider` protocol. Current providers:
+
+- **FakeMarketDataProvider** — Synthetic data for development (clearly labeled `SYNTHETIC`)
+
+To add a real EGX provider, implement `MarketDataProvider` and register it in the ingestion service.
+
+### Development Data
+
+Run `python -m app.seed.seed` to populate the database with 10 synthetic EGX companies and historical price data. All synthetic data is labeled with `source_type = SYNTHETIC`.
+
+## Phase 3 — Financial Statements & Normalized Financial Data
+
+### Database Tables
+
+- **financial_periods** — Reporting periods (annual, quarterly) for each company
+- **financial_documents** — Source documents (annual reports, quarterly reports) with provenance
+- **financial_facts** — Individual financial data points with full traceability
+
+### Key Enums
+
+- **ReportingPeriodType**: ANNUAL, Q1, Q2, Q3, Q4, SEMI_ANNUAL, INTERIM
+- **FactType**: INCOME_STATEMENT, BALANCE_SHEET, CASH_FLOW, SHAREHOLDERS_EQUITY, NOTES
+- **DocumentStatus**: ORIGINAL, RESTATED, AMENDED, ADJUSTED
+- **FactStatus**: REPORTED, NORMALIZED, CALCULATED, INSUFFICIENT_DATA
+
+### API Endpoints
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/financial/periods/{company_id}` | List financial periods for a company |
+| `GET /api/financial/documents/{period_id}` | List documents for a period |
+| `GET /api/financial/facts/{company_id}` | List financial facts (filterable by type, year, status) |
+| `GET /api/financial/facts/{company_id}/latest` | Get latest year's financial facts |
+
+### Normalization & Validation
+
+The ingestion layer includes deterministic normalization and validation:
+
+- **NormalizationService** — Maps reported labels to standardized labels (e.g., "Total Revenue" → "revenue")
+- **FinancialFactValidator** — Validates data quality with ERROR/WARNING distinction
+  - Errors: Missing required fields, invalid currency
+  - Warnings: Missing values, negative revenue, extremely large values
+
+### Financial Data Provider
+
+The `FinancialDataProvider` protocol is separate from `MarketDataProvider`:
+
+- **FakeFinancialDataProvider** — Generates synthetic financial statements for 10 EGX companies
+  - 5 years of annual periods per company
+  - Income statement, balance sheet, and cash flow data
+  - Deterministic variation based on ticker and year
+
+### Development Data
+
+Run `python -m app.seed.seed` to populate:
+- 10 synthetic EGX companies
+- 4,530+ price records
+- 50 financial periods
+- 50 financial documents
+- 850 financial facts
+
 ## Project Structure
 
 ```
 egx-ai/
 ├── backend/          # FastAPI backend
 │   ├── app/          # Application code
+│   │   ├── api/      # API routes
+│   │   ├── core/     # Config, logging
+│   │   ├── db/       # Database setup
+│   │   ├── ingestion/# Data ingestion abstraction
+│   │   ├── models/   # SQLAlchemy models
+│   │   ├── repositories/ # Data access
+│   │   ├── schemas/  # Pydantic schemas
+│   │   └── seed/     # Development seeding
 │   ├── tests/        # pytest tests
 │   └── alembic/      # Database migrations
 ├── frontend/         # React frontend
