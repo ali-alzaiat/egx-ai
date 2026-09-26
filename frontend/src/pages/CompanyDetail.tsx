@@ -33,6 +33,9 @@ export default function CompanyDetail() {
         <Link to={`/companies/${ticker}/metrics`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
           View Financial Metrics
         </Link>
+        <Link to={`/companies/${ticker}/technical`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
+          Technical Analysis
+        </Link>
       </div>
 
       <div className="card-grid">

@@ -110,6 +110,31 @@ export interface FinancialMetric {
   created_at: string
 }
 
+export interface TechnicalIndicator {
+  id: string
+  company_id: string
+  indicator_type: string
+  value: string | null
+  status: string
+  parameters: Record<string, unknown> | null
+  reason: string | null
+  calculated_at: string
+  created_at: string
+}
+
+export interface CalculateIndicatorsResponse {
+  company_id: string
+  ticker: string
+  indicators: {
+    indicator: string
+    value: string | null
+    status: string
+    parameters: Record<string, unknown> | null
+    reason: string | null
+  }[]
+  calculated_at: string
+}
+
 export interface ApiError {
   detail: string
 }

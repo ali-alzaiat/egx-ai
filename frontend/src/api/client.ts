@@ -8,6 +8,8 @@ import type {
   FinancialMetric,
   FinancialPeriod,
   PaginatedResponse,
+  TechnicalIndicator,
+  CalculateIndicatorsResponse,
 } from '../types'
 
 const API_BASE = '/api'
@@ -170,4 +172,40 @@ export function useMetricDetail(
     queryFn: () => fetchApi<FinancialMetric>(`/metrics/companies/${companyId}/periods/${periodId}/${metricCode}`),
     enabled: !!companyId && !!periodId && !!metricCode,
   })
+}
+
+// Technical Analysis API hooks
+export function useTechnicalIndicators(
+  companyId: string | undefined,
+  indicatorType?: string,
+) {
+  const searchParams = new URLSearchParams()
+  if (indicatorType) searchParams.set('indicator_type', indicatorType)
+  const qs = searchParams.toString()
+  return useQuery({
+    queryKey: ['technical', companyId, indicatorType],
+    queryFn: () =>
+      fetchApi<TechnicalIndicator[]>(
+        `/technical/companies/${companyId}${qs ? `?${qs}` : ''}`,
+      ),
+    enabled: !!companyId,
+  })
+}
+
+export async function calculateIndicators(
+  companyId: string,
+  prices: string,
+  volumes: string,
+  indicatorTypes?: string,
+): Promise<CalculateIndicatorsResponse> {
+  const searchParams = new URLSearchParams()
+  searchParams.set('prices', prices)
+  searchParams.set('volumes', volumes)
+  if (indicatorTypes) searchParams.set('indicator_types', indicatorTypes)
+  const qs = searchParams.toString()
+  const res = await fetch(`${API_BASE}/technical/companies/${companyId}/calculate?${qs}`, {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  return res.json()
 }
