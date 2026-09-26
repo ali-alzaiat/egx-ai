@@ -36,6 +36,9 @@ export default function CompanyDetail() {
         <Link to={`/companies/${ticker}/technical`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
           Technical Analysis
         </Link>
+        <Link to={`/companies/${ticker}/ai`} className="btn btn-primary" style={{ marginTop: '0.5rem', marginLeft: '0.5rem' }}>
+          AI Insights
+        </Link>
       </div>
 
       <div className="card-grid">
