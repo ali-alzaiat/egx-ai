@@ -154,14 +154,16 @@ Body (personality prose is the implementer's to write; required content):
 Run:
 ```bash
 backend/.venv/bin/python - <<'EOF'
-import re, sys, glob
+import re, glob
 ALLOWED = {"name","model","variant","description","mode","hidden","color","steps","options","permission","disable","temperature","top_p"}
-files = sorted(glob.glob(".opencode/agents/*.md")) or sys.exit("no agent files")
+LEGACY = {"architecture-reviewer.md","phase-builder.md","phase-reviewer.md","test-engineer.md"}
+files = sorted(set(glob.glob(".opencode/agents/*.md")) - {f".opencode/agents/{n}" for n in LEGACY})
+assert files, "no agent files"
 for f in files:
     t = open(f).read()
     m = re.match(r"^---\n(.*?)\n---\n", t, re.S)
     assert m, f"{f}: missing frontmatter"
-    keys = {k for line in m.group(1).splitlines() if (k := re.match(r"^([a-z_]+):", line))}
+    keys = {mm.group(1) for line in m.group(1).splitlines() if (mm := re.match(r"^([a-z_]+):", line))}
     bad = keys - ALLOWED
     assert not bad, f"{f}: bad keys {bad}"
     body = t[m.end():]
