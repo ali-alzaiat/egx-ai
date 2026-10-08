@@ -1,14 +1,19 @@
 """Tests for AI analysis and RAG pipeline."""
 
 import json
+import uuid
+from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.analyzer import AIAnalyzer, AnalysisRequest
 from app.ai.document_indexer import DocumentIndexer
 from app.ai.rag_pipeline import RAGPipeline
 from app.models.ai import AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.metrics import FinancialMetric, MetricStatusDB
 
 
 class TestDocumentIndexer:
@@ -30,6 +35,64 @@ class TestDocumentIndexer:
         assert "financial_metrics" in counts
         assert "valuations" in counts
         assert "screenings" in counts
+
+    @pytest.mark.asyncio
+    async def test_index_fact_keeps_zero_value(
+        self, db_session: AsyncSession, test_company, zero_value_facts
+    ) -> None:
+        """A normalized 0 must be indexed as 0, not replaced by the reported value."""
+        indexer = DocumentIndexer(db_session)
+        count = await indexer.index_financial_facts(test_company.id)
+        assert count >= 2
+
+        chunks = (
+            await db_session.execute(
+                select(DocumentChunk).where(
+                    DocumentChunk.company_id == test_company.id,
+                    DocumentChunk.chunk_type == ChunkTypeDB.FINANCIAL_FACT,
+                )
+            )
+        ).scalars().all()
+        contents = [json.loads(c.metadata_json) for c in chunks]
+        debt = next(c for c in contents if c.get("label") == "total_debt")
+        assert debt["value"] is not None
+        assert Decimal(debt["value"]) == Decimal("0")
+
+    @pytest.mark.asyncio
+    async def test_index_metric_keeps_zero_value(
+        self, db_session: AsyncSession, test_company, zero_value_facts
+    ) -> None:
+        """A metric value of 0 must be indexed as 0, not dropped as falsy."""
+        metric = FinancialMetric(
+            id=uuid.uuid4(),
+            company_id=test_company.id,
+            period_id=zero_value_facts[0].period_id,
+            metric_code="test_zero_metric",
+            display_name="Test Zero Metric",
+            value=Decimal("0"),
+            unit="percent",
+            status=MetricStatusDB.AVAILABLE,
+            formula_version=1,
+            calculated_at=datetime.now(UTC),
+        )
+        db_session.add(metric)
+        await db_session.flush()
+
+        indexer = DocumentIndexer(db_session)
+        await indexer.index_financial_metrics(test_company.id)
+
+        chunks = (
+            await db_session.execute(
+                select(DocumentChunk).where(
+                    DocumentChunk.company_id == test_company.id,
+                    DocumentChunk.chunk_type == ChunkTypeDB.METRIC,
+                )
+            )
+        ).scalars().all()
+        contents = [json.loads(c.metadata_json) for c in chunks]
+        zeroed = next(c for c in contents if c.get("label") == "Test Zero Metric")
+        assert zeroed["value"] is not None
+        assert Decimal(zeroed["value"]) == Decimal("0")
 
 
 class TestRAGPipeline:

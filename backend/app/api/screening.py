@@ -105,7 +105,7 @@ async def screen_company(
     facts_dict = {}
     for fact in facts:
         label = fact.normalized_label or fact.reported_label
-        value = fact.normalized_value or fact.reported_value
+        value = fact.reported_value if fact.normalized_value is None else fact.normalized_value
         facts_dict[label] = value
 
     # Create screening input

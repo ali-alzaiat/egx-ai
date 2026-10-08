@@ -383,7 +383,9 @@ class MetricService:
         for fact in facts:
             if str(fact.period_id) == period_id:
                 label = fact.normalized_label or fact.reported_label
-                facts_dict[label] = fact.normalized_value or fact.reported_value
+                facts_dict[label] = (
+                    fact.reported_value if fact.normalized_value is None else fact.normalized_value
+                )
 
         return facts_dict
 

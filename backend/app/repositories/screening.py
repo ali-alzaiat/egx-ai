@@ -23,14 +23,19 @@ class ScreeningRepository:
     async def upsert_screening_result(
         self,
         company_id: uuid.UUID,
-        is_compliant: bool,
+        is_compliant: bool | None,
         methodology_version: str,
         methodology_name: str,
         overall_reason: str,
         screened_at,
     ) -> ShariahScreeningResult:
         """Create or update a screening result."""
-        status = ScreeningStatusDB.COMPLIANT if is_compliant else ScreeningStatusDB.NON_COMPLIANT
+        if is_compliant is None:
+            status = ScreeningStatusDB.INSUFFICIENT_DATA
+        elif is_compliant:
+            status = ScreeningStatusDB.COMPLIANT
+        else:
+            status = ScreeningStatusDB.NON_COMPLIANT
 
         stmt = (
             pg_insert(ShariahScreeningResult)

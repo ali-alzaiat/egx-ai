@@ -43,7 +43,7 @@ class ShariahScreeningResult(Base):
     company_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
     )
-    is_compliant: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    is_compliant: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     status: Mapped[ScreeningStatusDB] = mapped_column(
         Enum(ScreeningStatusDB, name="screening_status", create_constraint=True),
         nullable=False,

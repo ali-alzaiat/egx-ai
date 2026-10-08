@@ -1,7 +1,15 @@
 """Tests for Shariah screening rules and service."""
 
+import uuid
 from decimal import Decimal
 
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.financial import FinancialFact
+from app.models.market import Company, CompanyStatus
+from app.models.screening import ScreeningStatusDB, ShariahScreeningResult
 from app.screening.methodology import DEFAULT_METHODOLOGY
 from app.screening.rules import (
     ScreeningVerdict,
@@ -135,3 +143,74 @@ class TestDefaultMethodology:
 
     def test_source_reference(self):
         assert "AAOIFI" in DEFAULT_METHODOLOGY.source_reference
+
+
+class TestScreeningPersistence:
+    """Tri-state persistence: missing data stays visible, never collapsed to a binary."""
+
+    async def test_screening_insufficient_status_persisted(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_company: Company,
+    ):
+        # No facts → ratio rules are INSUFFICIENT_DATA; permitted industry passes.
+        response = await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        assert response.status_code == 200
+        assert response.json()["is_compliant"] is None
+
+        row = (
+            await db_session.execute(
+                select(ShariahScreeningResult).where(
+                    ShariahScreeningResult.company_id == test_company.id
+                )
+            )
+        ).scalar_one()
+        assert row.status == ScreeningStatusDB.INSUFFICIENT_DATA
+        assert row.is_compliant is None
+
+    async def test_screening_any_fail_overrides_insufficient(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+    ):
+        company = Company(
+            id=uuid.uuid4(),
+            ticker=f"ALC_{uuid.uuid4().hex[:8].upper()}",
+            isin=f"EG{uuid.uuid4().hex[:10].upper()}",
+            name="Alcohol Producer",
+            sector="Beverages",
+            industry="Alcohol Production",
+            currency="EGP",
+            status=CompanyStatus.ACTIVE,
+        )
+        db_session.add(company)
+        await db_session.flush()
+
+        # Prohibited industry FAILs while every ratio rule lacks data.
+        response = await client.post(f"/api/screening/companies/{company.id}/screen")
+        assert response.status_code == 200
+        assert response.json()["is_compliant"] is False
+
+        row = (
+            await db_session.execute(
+                select(ShariahScreeningResult).where(
+                    ShariahScreeningResult.company_id == company.id
+                )
+            )
+        ).scalar_one()
+        assert row.status == ScreeningStatusDB.NON_COMPLIANT
+        assert row.is_compliant is False
+
+    async def test_zero_value_not_replaced(
+        self,
+        client: AsyncClient,
+        test_company: Company,
+        zero_value_facts: list[FinancialFact],
+    ):
+        # normalized total_debt is 0; falling back to the reported 999 would flip the rule.
+        response = await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        assert response.status_code == 200
+        rules = {r["rule_name"]: r for r in response.json()["rule_results"]}
+        assert rules["debt_ratio"]["verdict"] == "PASS"
+        assert Decimal(rules["debt_ratio"]["value"]) == 0

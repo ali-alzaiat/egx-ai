@@ -43,7 +43,7 @@ class ScreeningOutput(NamedTuple):
     """Output of Shariah screening."""
     company_id: str
     ticker: str
-    is_compliant: bool
+    is_compliant: bool | None  # None = insufficient data, not a pass/fail
     methodology_version: str
     rule_results: list[ScreeningRuleResult]
     overall_reason: str
@@ -120,13 +120,16 @@ class ShariahScreeningService:
     def _determine_compliance(
         self,
         rule_results: list[ScreeningRuleResult],
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool | None, str]:
         """Determine overall Shariah compliance from rule results.
 
         A company is Shariah-compliant if:
         - All applicable rules PASS
         - No rules FAIL
         - Rules with INSUFFICIENT_DATA are noted but don't cause failure
+
+        Returns ``(None, reason)`` when no rule FAILs but data is missing:
+        insufficient data is not a pass and not a fail.
         """
         failed_rules = [r for r in rule_results if r.verdict == ScreeningVerdict.FAIL]
         insufficient = [r for r in rule_results if r.verdict == ScreeningVerdict.INSUFFICIENT_DATA]
@@ -137,6 +140,6 @@ class ShariahScreeningService:
 
         if insufficient:
             insufficient_names = [r.rule_name for r in insufficient]
-            return False, f"Insufficient data for: {', '.join(insufficient_names)}"
+            return None, f"Insufficient data for: {', '.join(insufficient_names)}"
 
         return True, "All screening rules passed"

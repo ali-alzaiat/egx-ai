@@ -66,7 +66,9 @@ class DocumentIndexer:
                 "company_name": company.name if company else None,
                 "ticker": company.ticker if company else None,
                 "label": fact.normalized_label or fact.reported_label,
-                "value": str(fact.normalized_value or fact.reported_value),
+                "value": str(
+                    fact.reported_value if fact.normalized_value is None else fact.normalized_value
+                ),
                 "currency": fact.currency,
                 "status": fact.status.value if hasattr(fact.status, 'value') else str(fact.status),
                 "fact_type": fact_type_val,
@@ -108,7 +110,7 @@ class DocumentIndexer:
                 "company_name": company.name if company else None,
                 "ticker": company.ticker if company else None,
                 "label": metric.display_name,
-                "value": str(metric.value) if metric.value else None,
+                "value": str(metric.value) if metric.value is not None else None,
                 "status": status_val,
                 "reason": metric.reason,
             }
@@ -181,7 +183,10 @@ class DocumentIndexer:
         count = 0
 
         for screen in screenings:
-            compliance = "Compliant" if screen.is_compliant else "Non-compliant"
+            if screen.is_compliant is None:
+                compliance = "Insufficient data"
+            else:
+                compliance = "Compliant" if screen.is_compliant else "Non-compliant"
             content = {
                 "company_name": company.name if company else None,
                 "ticker": company.ticker if company else None,
