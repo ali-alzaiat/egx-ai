@@ -1,5 +1,5 @@
 # Status
 - Phase: 1 (data quality)
-- Task: Task 4 (data-quality models + migration 011)
+- Task: Task 5 (assessment service + API)
 - Next actor: staff-backend
 - Open escalations: none

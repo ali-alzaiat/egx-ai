@@ -32,6 +32,13 @@ async def get_screening_result(
     if not result:
         raise HTTPException(status_code=404, detail="Screening result not found")
 
+    from app.dataquality.service import DataQualityService
+
+    dq_result = await DataQualityService(session).latest(
+        company_id, "financial_statements"
+    )
+    data_quality = dq_result.as_dict() if dq_result is not None else None
+
     return {
         "id": str(result.id),
         "company_id": str(result.company_id),
@@ -52,6 +59,7 @@ async def get_screening_result(
             }
             for r in result.rule_results
         ],
+        "data_quality": data_quality,
     }
 
 

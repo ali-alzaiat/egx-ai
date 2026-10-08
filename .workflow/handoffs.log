@@ -6,3 +6,4 @@
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-2-brief.md | brief verified current; implement look-ahead fix per brief
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-3-brief.md | authorized
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-4-brief.md | authorized (R10: migration renumbered to 011; R11: indexer falsy-zero fix folded in as second commit)
+2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-5-brief.md | authorized (R12.1-12.3 folded in: scale key, issues check-not-run convention, concrete reason strings)
