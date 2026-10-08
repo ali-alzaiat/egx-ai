@@ -15,6 +15,14 @@ The main session is the router. Subagents never dispatch each other.
 - ASK USER: <precise question> — tech-lead only; router asks the human
 - DONE — task complete
 
+## Standard pipeline (every task/feature)
+
+1. **Researcher runs first.** The router dispatches `researcher` with the task/topic. Researcher gathers competitor data, market context, and prior art — cites every claim with a URL, marks gaps `no data`. Returns findings inline (edit-less). Router files them under `research/`.
+2. **PM decides.** The router dispatches `pm` with the research file path. PM reads the research, decides what we will build/change (prioritized requirements, scope cuts, what to skip), writes the decision to `design/` or `decisions/`. PM ends with `NEXT: tech-lead`.
+3. **Tech-lead orchestrates.** The router dispatches `tech-lead` with the PM's decision. Tech-lead: (a) reads the SDD ledger and plan to check for collisions or prior rulings, (b) authors the task brief, (c) verifies all required agents are working (dispatches a quick probe to each if needed), (d) updates STATUS.md and handoffs.log, (e) ends with `NEXT: <implementer>` (usually staff-backend or staff-frontend). From here the normal SDD task loop runs: implement → review → verdict.
+
+This pipeline replaces the old "researcher/pm/architect only for new phases" rule. Every task starts at step 1 unless the router explicitly skips it with a ledger note (e.g. pure bugfix with no product decision needed).
+
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
 2. Router dispatches tech-lead with the question.
