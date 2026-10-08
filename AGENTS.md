@@ -46,3 +46,12 @@ For missing financial data:
 {"value": null, "status": "INSUFFICIENT_DATA", "reason": "..."}
 ```
 Never substitute zero for missing information.
+
+## Agent team
+
+Eleven named subagents live in `.opencode/agents/`: researcher, pm, tech-lead,
+architect, staff-frontend, staff-backend, ux-expert, qa-ui, qa-security,
+qa-api, analyst. The main session is the router: read
+`.workflow/CONTRACT.md` before dispatching, seed the target agent's inbox,
+and follow the NEXT/BLOCKED/ASK USER/DONE contract. Only tech-lead may
+escalate to the user.
