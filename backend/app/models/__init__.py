@@ -1,4 +1,5 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
 from app.models.financial import (
     DocumentStatus,
     FactStatus,
@@ -29,6 +30,8 @@ __all__ = [
     "Company",
     "CompanyStatus",
     "DailyPrice",
+    "DataQualityAssessment",
+    "DataQualityStatusDB",
     "DataSource",
     "DataSourceType",
     "DocumentChunk",

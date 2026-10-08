@@ -1,5 +1,5 @@
 # Status
 - Phase: 1 (data quality)
-- Task: Task 3 (tri-state compliance + data-quality `or` fallbacks)
+- Task: Task 4 (data-quality models + migration 011)
 - Next actor: staff-backend
 - Open escalations: none
