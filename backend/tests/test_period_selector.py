@@ -165,3 +165,16 @@ class TestPeriodSelector:
 
         assert pair.current == target
         assert pair.previous == earlier
+
+    def test_target_without_qualifying_documents_yields_no_previous(self):
+        # Target has no documents; earlier period fully qualifies but the
+        # target failing the publication filter collapses previous to None.
+        target = create_period(2023)
+        earlier = create_period(2022, publication_date=date(2024, 5, 20))
+
+        pair = self.selector.select_comparable_periods(
+            [target, earlier], target, as_of_date=date(2024, 7, 1)
+        )
+
+        assert pair.current == target
+        assert pair.previous is None
