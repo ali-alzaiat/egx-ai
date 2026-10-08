@@ -23,6 +23,8 @@ The main session is the router. Subagents never dispatch each other.
 
 This pipeline replaces the old "researcher/pm/architect only for new phases" rule. Every task starts at step 1 unless the router explicitly skips it with a ledger note (e.g. pure bugfix with no product decision needed).
 
+**Skip rule (speed mode):** For purely technical tasks where the plan already specifies interfaces (no product decision needed), skip researcher + pm and go straight to tech-lead → implement → review. ux-expert and qa-* reviews remain mandatory for anything touching UI, API surface, or security-relevant code. Ledger the skip.
+
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
 2. Router dispatches tech-lead with the question.
