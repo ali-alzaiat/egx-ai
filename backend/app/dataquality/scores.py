@@ -160,6 +160,7 @@ def score_for(
     as_of: date,
     present: int,
     required: int,
+    observed: int,
     expected_depth: int,
     days_stale: int | None,
     errors: int,
@@ -167,11 +168,16 @@ def score_for(
     source_type: DataSourceType | str | None,
     no_rows: bool,
 ) -> DataQualityScore:
-    """Score one scope as of one date; ``no_rows`` forces MISSING with 0.0."""
+    """Score one scope as of one date; ``no_rows`` forces MISSING with 0.0.
+
+    ``present``/``required`` drive completeness (populated items vs required)
+    while ``observed``/``expected_depth`` drive depth (history actually held vs
+    expected) — different quantities that must not be conflated.
+    """
     completeness = completeness_score(present, required)
     freshness = freshness_score(days_stale)
     validation = validation_score(errors, warnings)
-    depth = depth_score(present, expected_depth)
+    depth = depth_score(observed, expected_depth)
     reliability = source_reliability(source_type)
 
     components = (
@@ -203,7 +209,7 @@ def score_for(
             "Historical depth",
             depth,
             COMPONENT_WEIGHTS["historical_depth"],
-            f"{present} of {expected_depth} expected periods present",
+            f"{observed} of {expected_depth} expected periods present",
         ),
         QualityComponent(
             "source_reliability",

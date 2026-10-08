@@ -24,6 +24,7 @@ AS_OF = date(2026, 10, 8)
 def _score(
     present: int = 10,
     required: int = 10,
+    observed: int = 10,
     expected_depth: int = 10,
     days_stale: int | None = 0,
     errors: int = 0,
@@ -38,6 +39,7 @@ def _score(
         as_of=AS_OF,
         present=present,
         required=required,
+        observed=observed,
         expected_depth=expected_depth,
         days_stale=days_stale,
         errors=errors,
@@ -163,6 +165,28 @@ class TestAggregate:
     def test_no_components_scores_zero(self):
         assert aggregate([]) == 0.0
 
+    def test_overall_stays_on_zero_to_hundred_scale(self):
+        """Regression: components are 0-100, so the overall is 0-100, not 0-10000."""
+        perfect = tuple(
+            QualityComponent(key, key, 100.0, weight, "perfect")
+            for key, weight in COMPONENT_WEIGHTS.items()
+        )
+        empty = tuple(
+            QualityComponent(key, key, 0.0, weight, "absent")
+            for key, weight in COMPONENT_WEIGHTS.items()
+        )
+        assert aggregate(perfect) == 100.0
+        assert aggregate(empty) == 0.0
+        # Both pinned thresholds are reachable from a real component mix:
+        ok_mix = _score(days_stale=50, errors=5, source_type=DataSourceType.DATA_PROVIDER)
+        degraded_mix = _score(
+            present=0, observed=0, days_stale=180, source_type=DataSourceType.DATA_PROVIDER
+        )
+        assert ok_mix.score == 70.0
+        assert ok_mix.status is DataQualityStatus.OK
+        assert degraded_mix.score == 40.0
+        assert degraded_mix.status is DataQualityStatus.DEGRADED
+
 
 class TestScoreFor:
     def test_healthy_inputs_are_ok(self):
@@ -171,7 +195,7 @@ class TestScoreFor:
         assert result.score == 99.5
 
     def test_no_rows_is_missing_with_zero_score(self):
-        result = _score(no_rows=True, present=0, days_stale=None, source_type=None)
+        result = _score(no_rows=True, present=0, observed=0, days_stale=None, source_type=None)
         assert result.status is DataQualityStatus.MISSING
         assert result.score == 0.0
 
@@ -179,6 +203,7 @@ class TestScoreFor:
         result = _score(
             present=5,
             required=10,
+            observed=5,
             days_stale=100,
             errors=1,
             source_type=DataSourceType.MANUAL,
@@ -190,6 +215,7 @@ class TestScoreFor:
         result = _score(
             present=1,
             required=10,
+            observed=1,
             days_stale=400,
             errors=5,
             source_type=DataSourceType.SYNTHETIC,
@@ -210,6 +236,7 @@ class TestScoreFor:
         result = _score(
             present=0,
             required=10,
+            observed=0,
             days_stale=180,
             source_type=DataSourceType.DATA_PROVIDER,
         )
@@ -221,16 +248,18 @@ class TestScoreFor:
         assert [c.key for c in result.components] == list(COMPONENT_WEIGHTS)
         assert [c.weight for c in result.components] == list(COMPONENT_WEIGHTS.values())
 
-    def test_depth_component_observed_comes_from_present(self):
-        result = _score(present=20, required=20, expected_depth=10)
+    def test_depth_component_observed_is_independent_of_present(self):
+        result = _score(present=3, required=5, observed=6, expected_depth=8)
+        completeness = next(c for c in result.components if c.key == "completeness")
         depth = next(c for c in result.components if c.key == "historical_depth")
-        assert depth.score == 100.0
-        assert result.score == 99.5
+        assert completeness.score == 60.0
+        assert depth.score == 75.0
 
     def test_issues_list_components_below_forty(self):
         result = _score(
             present=1,
             required=10,
+            observed=1,
             days_stale=400,
             errors=5,
             source_type=DataSourceType.SYNTHETIC,
