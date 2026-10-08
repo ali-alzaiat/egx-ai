@@ -6,6 +6,7 @@ The main session is the router. Subagents never dispatch each other.
 - STATUS.md — board: current phase, current task, next actor, open escalations
 - handoffs.log — append-only; line format: `YYYY-MM-DD | from -> to | artifact path or - | result or question`
 - inbox/<agent>.md — messages for that agent; router seeds it before dispatch
+  On dispatch, read your inbox first if it exists.
 - research/, design/, decisions/ — deliverables; decisions/ rulings are numbered continuing the R1–R8 ledger
 
 ## Result contract (end every result with exactly one)
@@ -20,9 +21,8 @@ The main session is the router. Subagents never dispatch each other.
 3. Tech-lead resolves -> writes ruling to decisions/ -> work resumes.
 4. Tech-lead cannot resolve -> ASK USER -> router asks the human. No silent defaults.
 
-## Edit-less agents
-Agents with edit: deny return deliverable content in the result;
-the router writes it to .workflow/ and appends the handoff.
+## Handoffs
+The router appends every handoffs.log entry and writes every deliverable file under .workflow/ — agents never append the log themselves (staff agents' prompts forbid touching .workflow/ entirely). Edit-less agents return deliverable content inline; the router files it.
 
 ## Roadmap integration (SDD roles)
 - Task briefs: tech-lead
@@ -30,3 +30,7 @@ the router writes it to .workflow/ and appends the handoff.
 - Reviews: analyst (formulas), qa-ui + ux-expert (UI), qa-security / qa-api (their domains)
 - Final verdict: tech-lead
 - Plan + ledger: docs/superpowers/plans/2026-10-08-competitive-enhancement-roadmap.md and .superpowers/sdd/.../progress.md (rulings R1–R8 continue)
+
+## Operational notes
+- `bash: ask` on researcher/pm/architect/ux-expert is an opencode-bug workaround (bash: deny broke model resolution). Caveat: with permission mode --auto, anything not explicitly deny is auto-approved, so ask becomes allow — do not run dispatches in auto mode.
+- Scope lines (frontend/**, backend/**, .workflow/**) are prose-enforced; bash access grants shell-equivalent file access. Path-pattern edit permissions are unverified in agent frontmatter.

@@ -18,6 +18,7 @@
 - Frontmatter allowed top-level keys: `name, model, variant, description, mode, hidden, color, steps, options, permission, disable, temperature, top_p`. Every agent file uses exactly `description`, `mode: subagent`, `permission`.
 - No `model` overrides in any agent file.
 - Permissions (tool-level): researcher/ux-expert `{edit: deny, bash: deny}` (researcher also `websearch: allow, webfetch: allow`); qa-ui/qa-security/qa-api/analyst `{edit: deny, bash: allow}`; pm/architect `{edit: allow, bash: deny}`; tech-lead/staff-frontend/staff-backend `{edit: allow, bash: allow}`.
+- Amended by Task 7 rulings (see .superpowers/sdd/2026-10-08-agent-team-workflow/progress.md): model: opencode/big-pickle IS pinned on all 11 agents; bash: deny is replaced with bash: ask on pm/architect/researcher/ux-expert (opencode bug). Do not "fix" these back.
 - Agents without `edit` return their deliverable content in their result; the router writes it to `.workflow/` and appends the handoff.
 - `.workflow/` and `.opencode/agents/` are committed to git; `opencode.json` stays gitignored.
 - The four legacy agents (`phase-builder`, `phase-reviewer`, `architecture-reviewer`, `test-engineer`) and `.opencode/commands/` are untouched.

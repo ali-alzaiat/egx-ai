@@ -142,6 +142,7 @@ this workflow: `tech-lead` picks up from the SDD ledger.
 - No changes to product code as part of this design.
 - Agents are not hot-reloaded; config changes require restart.
 - No per-agent model overrides unless later requested (defaults apply).
+- Amended by Task 7 rulings: model pins and the bash: ask workaround override the earlier no-override/permission lines; scope restrictions are prose-enforced (bash grants shell-equivalent access; --auto mode downgrades ask to allow).
 
 ## Testing / verification
 

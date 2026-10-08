@@ -1,4 +1,4 @@
-# from -> to | artifact | result-or-question (append-only)
+# YYYY-MM-DD | from -> to | artifact path or - | result or question (append-only)
 2026-10-08 | researcher -> router | research/mubasher-features-2026-10.md | inline findings filed; NEXT analyst overridden
 2026-10-08 | router -> ux-expert | - | BLOCKED: which screen/user/friction in scope?
 2026-10-08 | router -> tech-lead | - | routed ux-expert BLOCKED
