@@ -149,7 +149,7 @@ class DocumentIndexer:
                 "company_name": company.name if company else None,
                 "ticker": company.ticker if company else None,
                 "label": f"{model_val} valuation",
-                "value": str(val.value) if val.value else None,
+                "value": str(val.value) if val.value is not None else None,
                 "assumptions": val.assumptions,
                 "reason": val.reason,
             }
