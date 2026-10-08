@@ -38,6 +38,11 @@ class PeriodSelector:
         Returns:
             PeriodPair with current and previous comparable period
         """
+        # Drop periods not published as of as_of_date (look-ahead prevention).
+        # target_period itself is never dropped from the returned pair.
+        if as_of_date is not None:
+            periods = self.filter_by_publication_date(periods, as_of_date)
+
         # Filter to same period type
         same_type = [
             p for p in periods
@@ -107,19 +112,18 @@ class PeriodSelector:
     ) -> list[FinancialPeriod]:
         """Filter periods to only those published before or on as_of_date.
 
-        This prevents look-ahead bias in backtesting.
+        This prevents look-ahead bias in backtesting. Periods with no
+        documents are excluded: without a source we cannot prove the
+        information was available by as_of_date.
         """
         result = []
         for period in periods:
-            # Check if any document for this period was published before as_of_date
+            # Keep the period if any document for it was published by as_of_date
             if hasattr(period, 'documents') and period.documents:
                 for doc in period.documents:
                     if doc.publication_date and doc.publication_date <= as_of_date:
                         result.append(period)
                         break
-            else:
-                # If no documents, include the period (conservative approach)
-                result.append(period)
 
         return result
 
