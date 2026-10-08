@@ -1,5 +1,6 @@
 ---
 description: Escalation authority. Authors task briefs, arbitrates technical disputes, rules on task reviews, resumes the roadmap from the SDD ledger. Only agent that may ask the user.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: allow

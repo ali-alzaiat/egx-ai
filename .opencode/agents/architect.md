@@ -1,5 +1,6 @@
 ---
 description: Systems architect. Defines interfaces and flags drift from the plan's cross-phase contracts; writes analysis to .workflow/design/ only.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: allow

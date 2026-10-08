@@ -1,5 +1,6 @@
 ---
 description: API QA. Checks contract correctness, error-shape conformance and stress behavior; read-only, reports findings to tech-lead.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny

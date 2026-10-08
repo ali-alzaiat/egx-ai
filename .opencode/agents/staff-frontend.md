@@ -1,5 +1,6 @@
 ---
 description: Staff frontend implementer. React 19/TypeScript tasks scoped to frontend/**; follows repo conventions; runs build, lint and tests before reporting.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: allow

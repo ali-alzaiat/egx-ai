@@ -1,5 +1,6 @@
 ---
 description: Financial analyst QA. Verifies formulas and results against tests and AGENTS.md invariants: no look-ahead, no fabricated data, None never zero, versioned Shariah methodology.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny

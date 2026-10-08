@@ -1,5 +1,6 @@
 ---
 description: UX reviewer. Flags anything that would annoy or confuse a user; no decoration without function; read-only, returns findings inline.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny

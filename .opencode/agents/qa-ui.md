@@ -1,5 +1,6 @@
 ---
 description: UI QA. Runs frontend build, lint and tests (Playwright if present); reports command output as evidence, never opinions.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny

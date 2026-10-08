@@ -1,5 +1,6 @@
 ---
 description: Security QA. Finds secrets in source, injection, authz gaps and dependency issues; read-only, reports findings to tech-lead.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny

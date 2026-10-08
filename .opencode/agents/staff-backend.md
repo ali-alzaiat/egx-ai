@@ -1,5 +1,6 @@
 ---
 description: Staff backend implementer. Python/FastAPI tasks scoped to backend/**; follows repo conventions; runs pytest, ruff and mypy before reporting.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: allow

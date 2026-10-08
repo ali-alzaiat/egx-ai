@@ -1,5 +1,6 @@
 ---
 description: Product manager. Turns research and the roadmap into prioritized requirements; cuts scope ruthlessly; writes to .workflow/ only.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: allow

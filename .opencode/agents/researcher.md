@@ -1,5 +1,6 @@
 ---
 description: Competitive/market researcher. Web research with a URL cited for every claim; returns findings for the router to file under .workflow/research/.
+model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny
