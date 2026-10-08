@@ -216,7 +216,7 @@ async def get_support(
     if len(closes_raw) < 10:
         raise HTTPException(
             status_code=404,
-            detail=f"Insufficient price history for {ticker} (got {len(prices_raw)} rows)",
+            detail=f"Insufficient price history for {ticker} (got {len(closes_raw)} rows)",
         )
 
     closes = [float(c) for c in closes_raw]
@@ -225,22 +225,27 @@ async def get_support(
     lookback = 20
     minima: list[dict[str, object]] = []
     for i in range(1, len(closes) - 1):
-        if closes[i] < closes[i - 1] and closes[i] < closes[i + 1]:
+        if (
+            closes[i] < closes[i - 1]
+            and closes[i] < closes[i + 1]
             # only keep the most recent `lookback` bars
-            if i >= len(closes) - lookback:
-                # find the date for this close
-                date_stmt = text(
-                    "select date from daily_prices where company_id in (select id from companies where ticker=:t) and close=:c order by date desc limit 1"
-                ).params(t=ticker.upper(), c=closes[i])
-                date_row = (await session.execute(date_stmt)).first()
-                date_val = date_row[0] if date_row else None
-                minima.append(
-                    {
-                        "price": round(closes[i], 2),
-                        "date": str(date_val) if date_val else None,
-                        "volume": None,  # volume not included in this minimal query
-                    }
-                )
+            and i >= len(closes) - lookback
+        ):
+            # find the date for this close
+            date_stmt = text(
+                "select date from daily_prices where company_id in "
+                "(select id from companies where ticker=:t) and close=:c "
+                "order by date desc limit 1"
+            ).params(t=ticker.upper(), c=closes[i])
+            date_row = (await session.execute(date_stmt)).first()
+            date_val = date_row[0] if date_row else None
+            minima.append(
+                {
+                    "price": round(closes[i], 2),
+                    "date": str(date_val) if date_val else None,
+                    "volume": None,  # volume not included in this minimal query
+                }
+            )
 
     # sort ascending by price and take top 5
     minima.sort(key=lambda x: x["price"])
@@ -259,7 +264,10 @@ async def get_support(
         "latest_close": round(float(latest), 2) if latest else None,
         "best_buy_price": {
             "price": round(float(latest), 2) if latest else None,
-            "note": "This is the most recent daily close from the price provider, not a real-time market ask/bid. Use as a research signal only."
+            "note": (
+                "This is the most recent daily close from the price provider, "
+                "not a real-time market ask/bid. Use as a research signal only."
+            ),
         } if latest else None,
         "support_levels": support_levels,
         "disclaimer": (

@@ -21,10 +21,9 @@ async def test_signals_list_with_filter(client: AsyncClient, test_company) -> No
 
 @pytest.mark.asyncio
 async def test_signals_list_coverage(client: AsyncClient, db_session) -> None:
-    from sqlalchemy import text
     from app.signals.engine import SignalEngine
     async with db_session as s:
-        r = await SignalEngine(s).run(persist=True)
+        await SignalEngine(s).run(persist=True)
         await s.commit()
     response = await client.get("/api/signals")
     assert response.status_code == 200
