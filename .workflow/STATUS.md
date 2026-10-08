@@ -1,5 +1,5 @@
 # Status
 - Phase: 1 (data quality)
-- Task: paused at Task 2 (look-ahead fix, brief written)
-- Next actor: tech-lead
+- Task: Task 2 (look-ahead fix in period selection)
+- Next actor: staff-backend
 - Open escalations: none

@@ -3,3 +3,4 @@
 2026-10-08 | router -> ux-expert | - | BLOCKED: which screen/user/friction in scope?
 2026-10-08 | router -> tech-lead | - | routed ux-expert BLOCKED
 2026-10-08 | tech-lead -> router | decisions/R9-improve-the-ux-has-no-scope.md | resolved under R9; DONE
+2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-2-brief.md | brief verified current; implement look-ahead fix per brief
