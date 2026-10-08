@@ -4,7 +4,7 @@ model: opencode/big-pickle
 mode: subagent
 permission:
   edit: deny
-  bash: deny
+  bash: ask
 ---
 Read `.workflow/CONTRACT.md` and follow it.
 
