@@ -191,19 +191,34 @@ class DataQualityService:
     async def _assess_financial_statements(
         self, company_id: uuid.UUID, as_of: date
     ) -> DataQualityScore:
+        # R14: bound both sets by as_of via each row's own document publication
+        # date, mirroring period_selector.filter_by_publication_date. SQL
+        # ``<= as_of`` excludes NULLs; is_not(None) kept for parity with the
+        # freshness query below.
+        qualifying_document = (
+            select(FinancialDocument.id)
+            .where(FinancialDocument.period_id == FinancialPeriod.id)
+            .where(FinancialDocument.publication_date.is_not(None))
+            .where(FinancialDocument.publication_date <= as_of)
+        )
         periods = (
             await self.session.execute(
-                select(FinancialPeriod).where(
-                    FinancialPeriod.company_id == company_id
-                )
+                select(FinancialPeriod)
+                .where(FinancialPeriod.company_id == company_id)
+                .where(qualifying_document.exists())
             )
         ).scalars().all()
         facts: list[FinancialFact] = list(
             (
                 await self.session.execute(
-                    select(FinancialFact).where(
-                        FinancialFact.company_id == company_id
+                    select(FinancialFact)
+                    .join(
+                        FinancialDocument,
+                        FinancialFact.document_id == FinancialDocument.id,
                     )
+                    .where(FinancialFact.company_id == company_id)
+                    .where(FinancialDocument.publication_date.is_not(None))
+                    .where(FinancialDocument.publication_date <= as_of)
                 )
             ).scalars().all()
         )

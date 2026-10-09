@@ -304,6 +304,90 @@ async def test_financial_statements_freshness_reason_has_date(
     assert "2025-04-12" in components["freshness"]["reason"]
 
 
+async def test_financial_statements_as_of_bounds_fact_loading(
+    client: AsyncClient, db_session: AsyncSession, test_company: Company
+) -> None:
+    """R14: as_of bounds facts/periods by their own document's publication_date."""
+    source = DataSource(
+        id=uuid.uuid4(),
+        name=f"Filing Source {uuid.uuid4().hex[:8]}",
+        source_type=DataSourceType.COMPANY,
+    )
+    db_session.add(source)
+    await db_session.flush()
+
+    async def add_filing(
+        fiscal_year: int, publication_date: date | None, label: str
+    ) -> None:
+        period = FinancialPeriod(
+            id=uuid.uuid4(),
+            company_id=test_company.id,
+            period_type="ANNUAL",
+            fiscal_year=fiscal_year,
+            start_date=date(fiscal_year, 1, 1),
+            end_date=date(fiscal_year, 12, 31),
+        )
+        db_session.add(period)
+        await db_session.flush()
+        document = FinancialDocument(
+            id=uuid.uuid4(),
+            period_id=period.id,
+            source_id=source.id,
+            document_type="ANNUAL_REPORT",
+            document_status="ORIGINAL",
+            publication_date=publication_date,
+        )
+        db_session.add(document)
+        await db_session.flush()
+        db_session.add(
+            FinancialFact(
+                id=uuid.uuid4(),
+                period_id=period.id,
+                document_id=document.id,
+                company_id=test_company.id,
+                fact_type="INCOME_STATEMENT",
+                reported_label=label,
+                normalized_label=label,
+                reported_value=None if label == "net_income" else Decimal("100"),
+                currency="EGP",
+            )
+        )
+        await db_session.flush()
+
+    # Published before the past as_of: counts.
+    await add_filing(2023, date(2024, 3, 1), "revenue")
+    # Published after the past as_of (and the source of the only validation
+    # warning): must be invisible at 2025-01-01, visible at 2026-06-01.
+    await add_filing(2024, date(2026, 3, 1), "net_income")
+    # NULL publication_date: never qualifies at any as_of (R14 pin 4).
+    await add_filing(2022, None, "total_assets")
+
+    base = f"/api/data-quality/companies/{test_company.id}/assess"
+    past = await client.post(f"{base}?scope=financial_statements&as_of=2025-01-01")
+    later = await client.post(f"{base}?scope=financial_statements&as_of=2026-06-01")
+    assert past.status_code == 200
+    assert later.status_code == 200
+
+    past_components = {c["key"]: c for c in past.json()["components"]}
+    later_components = {c["key"]: c for c in later.json()["components"]}
+
+    # Only revenue is present at the past date; total_assets (NULL date) and
+    # net_income (future filing) are excluded -> 1/5, not 2/5 or 3/5.
+    assert past_components["completeness"]["score"] == 20.0
+    assert past_components["historical_depth"]["reason"] == (
+        "1 of 8 expected periods present"
+    )
+    # The future filing's missing reported_value warning must not be counted.
+    assert past_components["validation"]["reason"] == "0 errors, 0 warnings"
+
+    # At the later as_of the future filing counts; the NULL-dated one never does.
+    assert later_components["completeness"]["score"] == 40.0
+    assert later_components["historical_depth"]["reason"] == (
+        "2 of 8 expected periods present"
+    )
+    assert later_components["validation"]["reason"] == "0 errors, 1 warnings"
+
+
 async def test_price_history_depth_uses_expected_trading_days(
     client: AsyncClient, db_session: AsyncSession, test_company: Company
 ) -> None:
