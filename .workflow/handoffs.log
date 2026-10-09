@@ -10,3 +10,6 @@
 2026-10-09 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-6-brief.md | authorized (R13: provider gains document_url + document_type; skip rule — no researcher/pm)
 2026-10-09 | tech-lead -> staff-backend | .workflow/decisions/R14-task-5-as-of-fact-loading.md | ruled (a): as_of bounds fact/period loading (plan line 21, rule 4); dedicated Task 5 follow-up commit BEFORE Task 6 — router: re-seed inbox
 2026-10-09 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-7-brief.md | authorized (R15: stamp in write_prices not ingest_prices; base_url only, no description; skip rule — no researcher/pm)
+2026-10-09 | router -> architect | .workflow/design/refresh-and-assess-contract.md | delivered — 202+poll in-process refresh job, assessment phase, GET stays read-only; NEXT: tech-lead
+2026-10-09 | router -> researcher | .workflow/research/app-wide-ux-patterns.md | delivered — cited competitor UX patterns for the whole-app overhaul
+2026-10-09 | router -> ux-expert | .workflow/design/app-ux-audit.md | delivered — 17 live Playwright findings (F1–F17: unreachable features, lying dashboard, destroyed list state)

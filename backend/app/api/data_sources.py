@@ -24,6 +24,7 @@ async def list_data_sources(
             "source_type": s.source_type.value,
             "base_url": s.base_url,
             "description": s.description,
+            "last_synced_at": s.last_synced_at.isoformat() if s.last_synced_at else None,
         }
         for s in sources
     ]

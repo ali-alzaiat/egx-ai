@@ -22,5 +22,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
+    # Market refresh job
+    SYNC_JOB_TIMEOUT_SECONDS: int = 1800
+
 
 settings = Settings()

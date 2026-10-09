@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
@@ -27,13 +28,101 @@ from app.models.market import DataSourceType
 from app.services.universe import CoverageReport, UniverseService
 
 if TYPE_CHECKING:
-    from app.ingestion.provider import DailyPriceData
+    from collections.abc import Callable
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.ingestion.provider import DailyPriceData, MarketDataProvider
 
 logger = logging.getLogger(__name__)
 
 PRICE_SOURCE_NAME = "YAHOO_FINANCE_EGX"
 PRICE_SOURCE_TYPE = DataSourceType.DATA_PROVIDER
 PRICE_SOURCE_URL = "https://finance.yahoo.com"
+
+
+@dataclass(frozen=True, slots=True)
+class PriceSyncSummary:
+    """Outcome of one price fetch+write pass."""
+
+    companies_total: int
+    companies_fetched: int
+    records_written: int
+    failures: tuple[tuple[str, str], ...]
+
+
+async def fetch_and_write_prices(
+    session: AsyncSession,
+    provider: MarketDataProvider,
+    targets: list[str],
+    start: date,
+    end: date,
+    concurrency: int,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> PriceSyncSummary:
+    """Fetch prices concurrently, write them sequentially, and summarise the run.
+
+    Network fetches run concurrently; database writes stay sequential because a
+    single AsyncSession is not safe for concurrent use. One bad ticker is
+    recorded as a failure and never stops the run.
+    """
+    logger.info("Fetching prices for %d companies, %s..%s", len(targets), start, end)
+    semaphore = asyncio.Semaphore(concurrency)
+    lock = asyncio.Lock()
+    fetched: dict[str, list[DailyPriceData]] = {}
+    failures: list[tuple[str, str]] = []
+    completed = 0
+
+    async def fetch_one(ticker: str) -> None:
+        nonlocal completed
+        try:
+            async with semaphore:
+                bars = await provider.get_daily_prices(ticker, start, end)
+        except Exception as exc:  # noqa: BLE001 - one bad ticker must not stop the run
+            async with lock:
+                failures.append((ticker, str(exc)))
+        else:
+            if bars:
+                async with lock:
+                    fetched[ticker] = bars
+        async with lock:
+            completed += 1
+            if on_progress is not None:
+                on_progress(completed, len(targets))
+
+    await asyncio.gather(*(fetch_one(t) for t in targets))
+    logger.info(
+        "Fetched price history for %d/%d companies; writing to database",
+        len(fetched),
+        len(targets),
+    )
+
+    service = MarketDataIngestionService(
+        session=session,
+        provider=provider,
+        source_name=PRICE_SOURCE_NAME,
+        source_type=PRICE_SOURCE_TYPE,
+        source_url=PRICE_SOURCE_URL,
+    )
+
+    total = 0
+    for ticker, bars in fetched.items():
+        total += await service.write_prices(ticker, bars)
+
+    logger.info("Prices: %d records across %d companies", total, len(fetched))
+    if failures:
+        logger.warning(
+            "%d tickers failed: %s",
+            len(failures),
+            "; ".join(f"{ticker}: {error}" for ticker, error in failures[:10]),
+        )
+
+    return PriceSyncSummary(
+        companies_total=len(targets),
+        companies_fetched=len(fetched),
+        records_written=total,
+        failures=tuple(failures),
+    )
 
 
 def _log_coverage(coverage: CoverageReport) -> None:
@@ -82,49 +171,8 @@ async def sync_prices(
 
         end = date.today()
         start = start_date or (end - timedelta(days=history_days))
-        logger.info("Fetching prices for %d companies, %s..%s", len(targets), start, end)
 
-        # Network fetches run concurrently; database writes stay sequential
-        # because a single AsyncSession is not safe for concurrent use.
-        semaphore = asyncio.Semaphore(concurrency)
-        lock = asyncio.Lock()
-        fetched: dict[str, list[DailyPriceData]] = {}
-        failures: list[str] = []
-
-        async def fetch_one(ticker: str) -> None:
-            async with semaphore:
-                try:
-                    bars = await provider.get_daily_prices(ticker, start, end)
-                except Exception as exc:  # noqa: BLE001 - one bad ticker must not stop the run
-                    async with lock:
-                        failures.append(f"{ticker}: {exc}")
-                    return
-            if not bars:
-                return
-            async with lock:
-                fetched[ticker] = bars
-
-        await asyncio.gather(*(fetch_one(t) for t in targets))
-        logger.info(
-            "Fetched price history for %d/%d companies; writing to database",
-            len(fetched), len(targets),
-        )
-
-        service = MarketDataIngestionService(
-            session=session,
-            provider=provider,
-            source_name=PRICE_SOURCE_NAME,
-            source_type=PRICE_SOURCE_TYPE,
-            source_url=PRICE_SOURCE_URL,
-        )
-
-        total = 0
-        for ticker, bars in fetched.items():
-            total += await service.write_prices(ticker, bars)
-
-        logger.info("Prices: %d records across %d companies", total, len(fetched))
-        if failures:
-            logger.warning("%d tickers failed: %s", len(failures), "; ".join(failures[:10]))
+        await fetch_and_write_prices(session, provider, targets, start, end, concurrency)
         _log_coverage(await universe_service.coverage())
 
 
