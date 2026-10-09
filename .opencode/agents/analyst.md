@@ -1,6 +1,6 @@
 ---
 description: Financial analyst QA. Verifies formulas and results against tests and AGENTS.md invariants: no look-ahead, no fabricated data, None never zero, versioned Shariah methodology.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: deny

@@ -1,6 +1,6 @@
 ---
 description: Staff frontend implementer. React 19/TypeScript tasks scoped to frontend/**; follows repo conventions; runs build, lint and tests before reporting.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: allow

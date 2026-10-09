@@ -1,6 +1,6 @@
 ---
 description: API QA. Checks contract correctness, error-shape conformance and stress behavior; read-only, reports findings to tech-lead.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: deny

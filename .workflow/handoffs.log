@@ -13,3 +13,4 @@
 2026-10-09 | router -> architect | .workflow/design/refresh-and-assess-contract.md | delivered — 202+poll in-process refresh job, assessment phase, GET stays read-only; NEXT: tech-lead
 2026-10-09 | router -> researcher | .workflow/research/app-wide-ux-patterns.md | delivered — cited competitor UX patterns for the whole-app overhaul
 2026-10-09 | router -> ux-expert | .workflow/design/app-ux-audit.md | delivered — 17 live Playwright findings (F1–F17: unreachable features, lying dashboard, destroyed list state)
+2026-10-09 | staff-frontend -> qa-ui | - | R16 refresh surface (types, startMarketRefresh/useSyncStatus, CompanyDetail button+status, DataQualityCard pinned line) + R17 UX fixes across 7 company pages, Rankings, Companies, Dashboard, Screening route — npm test 10/10, lint clean, build clean; NEXT: qa-ui

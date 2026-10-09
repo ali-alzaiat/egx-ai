@@ -1,6 +1,6 @@
 ---
 description: Escalation authority. Authors task briefs, arbitrates technical disputes, rules on task reviews, resumes the roadmap from the SDD ledger. Only agent that may ask the user.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: allow

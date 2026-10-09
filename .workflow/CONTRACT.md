@@ -23,6 +23,7 @@ The main session is the router. Subagents never dispatch each other.
 4. **Backend + frontend agree on the contract.** Both staff agents review the architect's contract and sign off before any code. Disagreement → BLOCKED → tech-lead.
 5. **UX designs from research.** `ux-expert` reads the competitor/UX research and produces the design → `design/`. Frontend implements that design — not its own invention.
 6. **Parallel implementation.** Backend implements the real endpoints; frontend builds against **mocks** of the frozen contract. They do not block each other. Frontend swaps mocks for the real backend once it lands (integration step).
+   **Briefing is the router's job, not a pipeline stop.** The router writes each task brief directly from the architect contract (or from the previous artifact) and dispatches. Do NOT route routine briefs or scope checks through tech-lead — that hop is reserved for escalation/arbitration, a disputed review, and the final per-task/per-phase verdict.
 7. **Every finished task goes straight to QA.** No task is called done until QA has run: `qa-api` (contract/conformance), `qa-ui` (build/lint/test/UX), `qa-security` (secrets/injection/authz), and `analyst` for financial logic. QA findings are blockers.
 8. **Code review on every code change.** A reviewer (`general`, medium tier) reviews each implementer's diff before it merges. No code merges unreviewed.
 9. **UX reviews the built design.** After frontend ships, `ux-expert` reviews the implementation against the design and flags gaps.

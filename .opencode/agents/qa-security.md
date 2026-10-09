@@ -1,6 +1,6 @@
 ---
 description: Security QA. Finds secrets in source, injection, authz gaps and dependency issues; read-only, reports findings to tech-lead.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: deny

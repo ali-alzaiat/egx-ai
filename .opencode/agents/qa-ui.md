@@ -1,6 +1,6 @@
 ---
 description: UI QA. Runs frontend build, lint and tests (Playwright if present); reports command output as evidence, never opinions.
-model: opencode/big-pickle
+model: opencode/nemotron-3.5-lightning-free
 mode: subagent
 permission:
   edit: deny
