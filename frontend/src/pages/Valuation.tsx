@@ -1,3 +1,5 @@
+import "./Valuation.css";
+
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker } from '../api/client'
 

@@ -1,3 +1,5 @@
+import "./FinancialData.css";
+
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker, useFinancialPeriods, useFinancialFacts } from '../api/client'
 

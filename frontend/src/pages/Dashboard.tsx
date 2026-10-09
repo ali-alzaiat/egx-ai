@@ -1,3 +1,5 @@
+import "./Dashboard.css";
+
 import { useHealthCheck } from '../api/client'
 
 export default function Dashboard() {

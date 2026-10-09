@@ -17,6 +17,7 @@ import type {
   ScoringModelInfo,
   SignalRun,
   UnscorableCompany,
+  ScreenedCompanySummary,
 } from "../types";
 
 const API_BASE = "/api";
@@ -316,4 +317,24 @@ export async function calculateIndicators(
   );
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
+}
+
+// GET /api/screening/companies (backend/app/api/screening.py::list_screened_companies)
+export function useScreenedCompanies(params: {
+  is_compliant?: boolean;
+  methodology_version?: string;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.is_compliant !== undefined)
+    searchParams.set("is_compliant", String(params.is_compliant));
+  if (params.methodology_version)
+    searchParams.set("methodology_version", params.methodology_version);
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: ["screenedCompanies", params],
+    queryFn: () =>
+      fetchApi<ScreenedCompanySummary[]>(
+        `/screening/companies${qs ? `?${qs}` : ""}`,
+      ),
+  });
 }

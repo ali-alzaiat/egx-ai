@@ -1,3 +1,5 @@
+import "./AIInsights.css";
+
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker } from '../api/client'

@@ -1,3 +1,5 @@
+import "./TechnicalAnalysis.css";
+
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker, useTechnicalIndicators, calculateIndicators } from '../api/client'

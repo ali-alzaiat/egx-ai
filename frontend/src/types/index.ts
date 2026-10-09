@@ -202,6 +202,17 @@ export interface UnscorableCompany {
   reason: string | null
 }
 
+// GET /api/screening/companies (backend/app/api/screening.py::list_screened_companies)
+export interface ScreenedCompanySummary {
+  id: string
+  company_id: string
+  is_compliant: boolean
+  status: string
+  methodology_version: string
+  overall_reason: string | null
+  screened_at: string
+}
+
 export interface ScoringFactor {
   key: string
   label: string

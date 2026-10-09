@@ -1,3 +1,5 @@
+import "./FinancialMetrics.css";
+
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker, useCompanyMetrics } from '../api/client'
 import type { FinancialMetric } from '../types'

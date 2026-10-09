@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useCompanies, useScreenedCompanies } from '../api/client'
-import type { Company } from '../types'
+import type { Company, ScreenedCompanySummary } from '../types'
 import { formatAsOf } from '../lib/format'
 
 // Global navigation destination for Shariah screening (R17 F2). Screening is
@@ -68,7 +68,7 @@ export default function Screening() {
                 </tr>
               </thead>
               <tbody>
-                {screened.map((s) => {
+                {screened.map((s: ScreenedCompanySummary) => {
                   const company = byId.get(s.company_id)
                   return (
                     <tr key={s.id}>
