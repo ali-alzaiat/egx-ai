@@ -216,3 +216,33 @@ export interface ScoringModelInfo {
   min_history_days: number
   factors: ScoringFactor[]
 }
+
+// ─── Data Quality (contract: .workflow/design/data-quality-contract.md) ─
+
+export type DataQualityStatus = "OK" | "DEGRADED" | "POOR" | "MISSING";
+
+export interface QualityComponent {
+  key: string;      // "completeness" | "freshness" | "validation" | "historical_depth" | "source_reliability"
+  label: string;
+  score: number;    // 0-100
+  weight: number;
+  reason: string;
+}
+
+export interface DataQualityScore {
+  scope: "price_history" | "company_profile" | "financial_statements";
+  as_of: string;    // YYYY-MM-DD
+  status: DataQualityStatus;
+  score: number;    // 0-100 (1 decimal precision)
+  components: QualityComponent[];
+  issues: string[];
+  methodology_version: string;
+}
+
+// GET /api/data-quality/companies/{company_id}
+export interface DataQualityListResponse {
+  items: DataQualityScore[];
+  methodology_version: string;
+  scale: string;
+  disclaimer: string;
+}

@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useCompanyByTicker, useCompanyPrices, useLatestPrice } from '../api/client'
+import DataQualityCard from '../components/DataQualityCard'
 
 export default function CompanyDetail() {
   const { ticker } = useParams<{ ticker: string }>()
@@ -34,6 +35,8 @@ export default function CompanyDetail() {
           <Link to={`/companies/${ticker}/ai`} className="btn btn-primary">AI Insights</Link>
         </div>
       </div>
+
+      <DataQualityCard companyId={company.id} />
 
       <div className="card-grid">
         <div className="card">

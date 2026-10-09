@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type {
   Company,
   DailyPrice,
+  DataQualityListResponse,
   DataSource,
   FinancialDocument,
   FinancialFact,
@@ -67,6 +68,18 @@ export function useCompanyByTicker(ticker: string | undefined) {
     queryKey: ["company", "ticker", ticker],
     queryFn: () => fetchApi<Company>(`/companies/ticker/${ticker}`),
     enabled: !!ticker,
+  })
+}
+
+export function useDataQuality(companyId: string | undefined, scope?: string) {
+  const qs = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+  return useQuery({
+    queryKey: ["dataQuality", companyId, scope],
+    queryFn: () =>
+      fetchApi<DataQualityListResponse>(
+        `/data-quality/companies/${companyId}${qs}`,
+      ),
+    enabled: !!companyId,
   });
 }
 
@@ -151,7 +164,7 @@ export function useUnscorable() {
 export function useSignalForTicker(ticker: string | undefined) {
   return useQuery({
     queryKey: ["signals", "ticker", ticker],
-    queryFn: () => fetchApi<MarketSignal>(`/signals/\${ticker}`),
+    queryFn: () => fetchApi<MarketSignal>(`/signals/${ticker}`),
     enabled: !!ticker,
   });
 }

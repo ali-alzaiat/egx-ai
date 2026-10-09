@@ -4,9 +4,7 @@ const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/companies', label: 'Companies' },
   { to: '/rankings', label: 'Screener' },
-  { to: '/watchlist', label: 'Watchlist' },
-  { to: '/research', label: 'Research' },
-  { to: '/alerts', label: 'Alerts' },
+  // /watchlist, /research, /alerts have no routes yet — they return in Phases 8/10.
 ]
 
 export default function Layout() {
