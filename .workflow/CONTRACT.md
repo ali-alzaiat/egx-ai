@@ -51,3 +51,4 @@ The router appends every handoffs.log entry and writes every deliverable file un
 ## Operational notes
 - `bash: ask` on researcher/pm/architect/ux-expert is an opencode-bug workaround (bash: deny broke model resolution). Caveat: with permission mode --auto, anything not explicitly deny is auto-approved, so ask becomes allow — do not run dispatches in auto mode.
 - Scope lines (frontend/**, backend/**, .workflow/**) are prose-enforced; bash access grants shell-equivalent file access. Path-pattern edit permissions are unverified in agent frontmatter.
+- Playwright MCP (`@playwright/mcp`, `playwright_*` tools) is available for qa-ui and ux-expert to drive the running frontend (default `http://localhost:5173`). Use it when dispatch asks for live UI verification; paste snapshot/console output as evidence. Requires the dev server to be running. Adding/changing agents or MCP servers needs an opencode restart.
