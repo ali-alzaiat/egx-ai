@@ -32,6 +32,7 @@ class MarketDataIngestionService:
         provider: MarketDataProvider,
         source_name: str,
         source_type: DataSourceType,
+        source_url: str | None = None,
     ) -> None:
         self.session = session
         self.provider = provider
@@ -40,6 +41,7 @@ class MarketDataIngestionService:
         self.source_repo = DataSourceRepository(session)
         self.source_name = source_name
         self.source_type = source_type
+        self.source_url = source_url
 
     async def ingest_companies(self) -> int:
         """Ingest companies from the provider, refreshing existing metadata."""
@@ -76,6 +78,7 @@ class MarketDataIngestionService:
         data_source = await self.source_repo.get_or_create(
             name=self.source_name,
             source_type=self.source_type,
+            base_url=self.source_url,
         )
 
         records = [
@@ -96,6 +99,9 @@ class MarketDataIngestionService:
         ]
 
         count = await self.price_repo.bulk_upsert(records)
+        from datetime import UTC, datetime
+
+        data_source.last_synced_at = datetime.now(UTC)
         await self.session.commit()
         logger.debug("Wrote %d price records for %s", count, ticker)
         return count
@@ -107,6 +113,7 @@ class MarketDataIngestionService:
         await self.source_repo.get_or_create(
             name=self.source_name,
             source_type=self.source_type,
+            base_url=self.source_url,
         )
         rows = [
             {

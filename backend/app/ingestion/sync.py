@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 PRICE_SOURCE_NAME = "YAHOO_FINANCE_EGX"
 PRICE_SOURCE_TYPE = DataSourceType.DATA_PROVIDER
+PRICE_SOURCE_URL = "https://finance.yahoo.com"
 
 
 def _log_coverage(coverage: CoverageReport) -> None:
@@ -114,6 +115,7 @@ async def sync_prices(
             provider=provider,
             source_name=PRICE_SOURCE_NAME,
             source_type=PRICE_SOURCE_TYPE,
+            source_url=PRICE_SOURCE_URL,
         )
 
         total = 0
