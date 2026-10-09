@@ -7,6 +7,7 @@ as embedded chunks for retrieval.
 import json
 import logging
 import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,7 @@ from app.models.valuation import ValuationResult
 logger = logging.getLogger(__name__)
 
 
-def _chunk_to_embedding_text(chunk_type: str, content: dict) -> str:
+def _chunk_to_embedding_text(chunk_type: str, content: dict[str, Any]) -> str:
     """Convert chunk content to text suitable for embedding."""
     parts = []
     if content.get("company_name"):

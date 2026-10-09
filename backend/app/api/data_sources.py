@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +13,7 @@ router = APIRouter(tags=["data-sources"])
 @router.get("/api/data-sources")
 async def list_data_sources(
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all data sources so the frontend can resolve source_id to source_type."""
     result = await session.execute(select(DataSource).order_by(DataSource.name))
     sources = result.scalars().all()

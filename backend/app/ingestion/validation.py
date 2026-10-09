@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
+from typing import Any
 
 from app.models.financial import FinancialFact
 
@@ -144,7 +145,7 @@ class FinancialFactValidator:
         """Validate multiple financial facts."""
         return [self.validate(fact) for fact in facts]
 
-    def get_summary(self, results: list[ValidationResult]) -> dict:
+    def get_summary(self, results: list[ValidationResult]) -> dict[str, Any]:
         """Get a summary of validation results."""
         total = len(results)
         valid = sum(1 for r in results if r.is_valid)
@@ -161,7 +162,7 @@ class FinancialFactValidator:
         }
 
 
-def validate_financial_facts(facts: list[FinancialFact]) -> dict:
+def validate_financial_facts(facts: list[FinancialFact]) -> dict[str, Any]:
     """Convenience function to validate financial facts and get summary."""
     validator = FinancialFactValidator()
     results = validator.validate_facts(facts)

@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -33,7 +34,7 @@ async def analyze_company(
     company_id: uuid.UUID,
     request: AnalyzeRequest,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Perform AI analysis on a company."""
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
@@ -75,7 +76,7 @@ async def analyze_company(
 async def index_company_data(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Index a company's financial data for RAG retrieval."""
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
@@ -98,7 +99,7 @@ async def get_analyses(
     company_id: uuid.UUID,
     analysis_type: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get AI analyses for a company."""
     from sqlalchemy import select
 

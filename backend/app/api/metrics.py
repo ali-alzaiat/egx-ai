@@ -1,6 +1,7 @@
 """API endpoints for financial metrics."""
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ async def list_company_metrics(
     fiscal_year: int | None = Query(None),
     metric_code: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all metrics for a company."""
     from app.repositories.company import CompanyRepository
 
@@ -61,7 +62,7 @@ async def list_period_metrics(
     period_id: uuid.UUID,
     metric_code: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all metrics for a specific period."""
     from app.repositories.company import CompanyRepository
 
@@ -103,7 +104,7 @@ async def get_specific_metric(
     period_id: uuid.UUID,
     metric_code: str,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Get a specific metric for a period."""
     from app.repositories.company import CompanyRepository
 
@@ -156,7 +157,7 @@ async def calculate_metrics(
     company_id: uuid.UUID,
     fiscal_year: int | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Calculate and persist all metrics for a company."""
     from app.repositories.company import CompanyRepository
 
@@ -208,7 +209,7 @@ async def calculate_period_metrics(
     company_id: uuid.UUID,
     period_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Calculate and persist metrics for a specific period."""
     from app.repositories.company import CompanyRepository
 

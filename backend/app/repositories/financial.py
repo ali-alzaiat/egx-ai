@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -170,7 +171,7 @@ class FinancialFactRepository:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def update(self, fact: FinancialFact, data: dict) -> FinancialFact:
+    async def update(self, fact: FinancialFact, data: dict[str, Any]) -> FinancialFact:
         for field, value in data.items():
             setattr(fact, field, value)
         await self.session.flush()

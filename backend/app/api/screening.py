@@ -1,6 +1,7 @@
 """API endpoints for Shariah screening."""
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/screening", tags=["screening"])
 async def get_screening_result(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Get the screening result for a company."""
     from app.repositories.company import CompanyRepository
 
@@ -68,7 +69,7 @@ async def list_screened_companies(
     is_compliant: bool | None = Query(None),
     methodology_version: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List all screened companies."""
     screening_repo = ScreeningRepository(session)
     results = await screening_repo.list_screened_companies(
@@ -94,7 +95,7 @@ async def list_screened_companies(
 async def screen_company(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Screen a company for Shariah compliance."""
     from app.repositories.company import CompanyRepository
 

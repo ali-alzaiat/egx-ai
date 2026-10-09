@@ -9,6 +9,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 class RetrievedChunk:
     """A chunk retrieved by the RAG pipeline with relevance score."""
     content: str
-    metadata: dict
+    metadata: dict[str, Any]
     score: float
     chunk_type: str
     chunk_id: str

@@ -3,6 +3,7 @@
 import json
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ async def get_indicators(
     company_id: uuid.UUID,
     indicator_type: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get technical indicators for a company."""
     from app.repositories.company import CompanyRepository
 
@@ -59,7 +60,7 @@ async def calculate_indicators(
     volumes: str = Query(..., description="Comma-separated volumes"),
     indicator_types: str | None = Query(None, description="Comma-separated indicator types"),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Calculate technical indicators for a company."""
     from app.repositories.company import CompanyRepository
 

@@ -9,9 +9,10 @@ References:
 - CFA Institute - Equity Asset Valuation
 """
 
+from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 
 class ValuationModel(Enum):
@@ -373,8 +374,8 @@ def calculate_sensitivity(
     base_assumptions: dict[str, Decimal],
     param_name: str,
     param_range: list[Decimal],
-    calculator,
-) -> list[dict]:
+    calculator: Callable[..., Any],
+) -> list[dict[str, Any]]:
     """Perform sensitivity analysis on a valuation parameter.
 
     Args:

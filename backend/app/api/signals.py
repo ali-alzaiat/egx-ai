@@ -7,6 +7,7 @@ actually covers.
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -19,7 +20,16 @@ from app.services.universe import UniverseService
 from app.signals.engine import SignalEngine
 from app.signals.scoring import DEFAULT_MODEL
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 router = APIRouter(prefix="/api/signals", tags=["signals"])
+
+
+class _SupportLevel(TypedDict):
+    price: float
+    date: str | None
+    volume: None
 
 
 async def _company_index(session: AsyncSession) -> dict[uuid.UUID, tuple[str, str | None]]:
@@ -212,7 +222,7 @@ async def get_support(
         where company_id in (select id from companies where ticker=:t)
         order by date desc limit 200
     """).params(t=ticker.upper())
-    closes_raw = (await session.execute(prices_stmt)).scalars().all()
+    closes_raw: Sequence[Any] = (await session.execute(prices_stmt)).scalars().all()
     if len(closes_raw) < 10:
         raise HTTPException(
             status_code=404,
@@ -223,7 +233,7 @@ async def get_support(
 
     # find local minima (swing lows) within the most recent 20 bars
     lookback = 20
-    minima: list[dict[str, object]] = []
+    minima: list[_SupportLevel] = []
     for i in range(1, len(closes) - 1):
         if (
             closes[i] < closes[i - 1]

@@ -1,6 +1,7 @@
 import math
 import uuid
 from datetime import date
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,7 @@ async def list_companies(
     status: CompanyStatus | None = Query(None),
     search: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     repo = CompanyRepository(session)
     companies, total = await repo.list_companies(
         page=page,
@@ -46,7 +47,7 @@ async def list_companies(
 async def get_company(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     repo = CompanyRepository(session)
     company = await repo.get_by_id(company_id)
     if not company:
@@ -58,7 +59,7 @@ async def get_company(
 async def get_company_by_ticker(
     ticker: str,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     repo = CompanyRepository(session)
     company = await repo.get_by_ticker(ticker.upper())
     if not company:
@@ -74,7 +75,7 @@ async def get_company_prices(
     page: int = Query(1, ge=1),
     page_size: int = Query(200, ge=1, le=1000),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
     if not company:
@@ -122,7 +123,7 @@ async def get_company_prices(
 async def get_latest_price(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
     if not company:

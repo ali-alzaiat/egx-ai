@@ -316,7 +316,7 @@ class MetricService:
         facts: dict[str, Decimal | None],
         previous_facts: dict[str, Decimal | None] | None,
         shares_outstanding: Decimal | None,
-    ) -> dict:
+    ) -> dict[str, Decimal | None]:
         """Prepare inputs for the calculation function."""
         calc_func = METRIC_CALCULATORS.get(metric.code)
         if not calc_func:

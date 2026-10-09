@@ -6,6 +6,7 @@ Clearly labeled as SYNTHETIC — do not use for real financial data.
 import hashlib
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from app.ingestion.financial_provider import (
     FinancialDataProvider,
@@ -101,7 +102,7 @@ class FakeFinancialDataProvider(FinancialDataProvider):
         },
     }
 
-    def _get_sector_template(self, sector: str) -> dict:
+    def _get_sector_template(self, sector: str) -> dict[str, Any]:
         """Get the financial template for a sector."""
         return self.FINANCIAL_TEMPLATES.get(sector, self.FINANCIAL_TEMPLATES["Industrials"])
 

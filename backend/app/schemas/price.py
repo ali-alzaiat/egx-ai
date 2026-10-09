@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -53,7 +54,7 @@ class DailyPriceListParams(BaseModel):
 
 
 class PaginatedResponse(BaseModel):
-    items: list[dict]
+    items: list[dict[str, Any]]
     total: int
     page: int
     page_size: int

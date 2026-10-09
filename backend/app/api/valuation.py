@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,7 @@ async def get_valuations(
     company_id: uuid.UUID,
     model: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get valuation results for a company."""
     from app.repositories.company import CompanyRepository
 
@@ -72,7 +73,7 @@ async def calculate_valuations(
     # General
     shares_outstanding: float | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, Any]:
     """Calculate valuations for a company."""
     from app.repositories.company import CompanyRepository
 

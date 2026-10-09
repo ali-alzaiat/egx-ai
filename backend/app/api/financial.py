@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +27,7 @@ async def list_financial_periods(
     period_type: ReportingPeriodType | None = Query(None),
     fiscal_year: int | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List financial periods for a company."""
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
@@ -61,7 +62,7 @@ async def list_financial_documents(
     period_id: uuid.UUID,
     document_status: DocumentStatus | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List financial documents for a period."""
     period_repo = FinancialPeriodRepository(session)
     period = await period_repo.get_by_id(period_id)
@@ -101,7 +102,7 @@ async def list_financial_facts(
     status: FactStatus | None = Query(None),
     fiscal_year: int | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """List financial facts for a company."""
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)
@@ -148,7 +149,7 @@ async def get_latest_financial_facts(
     company_id: uuid.UUID,
     fact_type: FactType | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Get the latest financial facts for a company (most recent fiscal year)."""
     company_repo = CompanyRepository(session)
     company = await company_repo.get_by_id(company_id)

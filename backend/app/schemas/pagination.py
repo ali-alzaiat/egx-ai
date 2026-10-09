@@ -1,8 +1,10 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class PaginatedResponse(BaseModel):
-    items: list[dict]
+    items: list[dict[str, Any]]
     total: int
     page: int
     page_size: int

@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -7,6 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.market import Company, CompanyStatus
 from app.schemas.company import CompanyCreate, CompanyUpdate
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 
 class CompanyRepository:
@@ -19,7 +23,7 @@ class CompanyRepository:
         await self.session.flush()
         return company
 
-    async def upsert_many(self, rows: Sequence[dict]) -> int:
+    async def upsert_many(self, rows: Sequence[dict[str, Any]]) -> int:
         """Insert or update many companies by ticker.
 
         ``name`` and ``status`` always come from the source. Optional descriptive
@@ -81,7 +85,7 @@ class CompanyRepository:
         if tickers:
             query = query.where(Company.ticker.notin_(tickers))
         result = await self.session.execute(query)
-        return result.rowcount or 0
+        return cast("CursorResult[Any]", result).rowcount or 0
 
     async def get_by_id(self, company_id: uuid.UUID) -> Company | None:
         return await self.session.get(Company, company_id)

@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -24,7 +25,7 @@ class TechnicalRepository:
         status: IndicatorStatusDB,
         parameters: str | None,
         reason: str | None,
-        calculated_at,
+        calculated_at: datetime,
     ) -> TechnicalIndicator:
         """Create or update a technical indicator."""
         stmt = (

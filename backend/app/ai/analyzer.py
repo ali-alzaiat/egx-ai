@@ -9,6 +9,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +35,7 @@ class AnalysisResponse:
     analysis_id: uuid.UUID
     summary: str
     detailed_analysis: str | None
-    sources: list[dict]
+    sources: list[dict[str, Any]]
     confidence_score: float | None
     disclaimer: str
     status: str
@@ -204,7 +205,7 @@ class AIAnalyzer:
 
         return summary, "\n".join(detailed_parts)
 
-    def _extract_sources(self, rag_result: RAGResult) -> list[dict]:
+    def _extract_sources(self, rag_result: RAGResult) -> list[dict[str, Any]]:
         """Extract source citations from retrieved chunks."""
         sources = []
         for i, chunk in enumerate(rag_result.chunks, 1):

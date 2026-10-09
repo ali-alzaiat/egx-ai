@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -27,7 +28,7 @@ class ScreeningRepository:
         methodology_version: str,
         methodology_name: str,
         overall_reason: str,
-        screened_at,
+        screened_at: datetime,
     ) -> ShariahScreeningResult:
         """Create or update a screening result."""
         if is_compliant is None:

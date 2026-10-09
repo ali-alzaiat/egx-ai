@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -28,7 +29,7 @@ class MetricRepository:
         reason: str | None,
         warnings: str | None,
         formula_version: int,
-        calculated_at,
+        calculated_at: datetime,
     ) -> FinancialMetric:
         """Create or update a financial metric."""
         stmt = (

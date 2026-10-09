@@ -11,7 +11,9 @@ from app.models.financial import (
     DocumentStatus,
     FactStatus,
     FactType,
+    FinancialDocument,
     FinancialFact,
+    FinancialPeriod,
     ReportingPeriodType,
 )
 from app.models.market import DataSourceType
@@ -228,10 +230,10 @@ class FinancialDataIngestionService:
 
     async def _find_period(
         self,
-        company_id,
+        company_id: uuid.UUID,
         period_type: str,
         fiscal_year: int,
-    ):
+    ) -> FinancialPeriod | None:
         """Find an existing period for the company."""
         from sqlalchemy import select
 
@@ -247,10 +249,10 @@ class FinancialDataIngestionService:
 
     async def _find_document(
         self,
-        period_id,
-        source_id,
+        period_id: uuid.UUID,
+        source_id: uuid.UUID,
         document_type: str,
-    ):
+    ) -> FinancialDocument | None:
         """Find an existing document for the period, source and type."""
         from sqlalchemy import select
 
