@@ -25,6 +25,8 @@ This pipeline replaces the old "researcher/pm/architect only for new phases" rul
 
 **Skip rule (speed mode):** For purely technical tasks where the plan already specifies interfaces (no product decision needed), skip researcher + pm and go straight to tech-lead → implement → review. ux-expert and qa-* reviews remain mandatory for anything touching UI, API surface, or security-relevant code. Ledger the skip.
 
+**Parallel rule:** staff-backend, staff-frontend, ux-expert, qa-ui, qa-api, and qa-security dispatch in parallel whenever their scopes don't overlap (disjoint files/modules). Tech-lead verifies scope disjointness before parallel dispatch. When scopes overlap or depend on each other, run sequentially. Reviews of completed work also run in parallel with the next task's implementation when scopes are disjoint.
+
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
 2. Router dispatches tech-lead with the question.
