@@ -25,6 +25,7 @@ class FinancialDocumentData(NamedTuple):
     publication_date: date | None
     fiscal_year_end: date | None
     notes: str | None
+    document_url: str | None = None
 
 
 class FinancialFactData(NamedTuple):
@@ -41,6 +42,7 @@ class FinancialFactData(NamedTuple):
     source_page: str | None
     source_line: str | None
     reported_at: date | None
+    document_type: str
 
 
 class FinancialDataProvider(ABC):

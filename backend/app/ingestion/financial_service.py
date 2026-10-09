@@ -1,10 +1,19 @@
 import logging
-from datetime import datetime
+import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion.financial_provider import FinancialDataProvider
-from app.models.financial import DocumentStatus, FactStatus, FactType, ReportingPeriodType
+from app.ingestion.normalization import NormalizationService
+from app.ingestion.validation import FinancialFactValidator
+from app.models.financial import (
+    DocumentStatus,
+    FactStatus,
+    FactType,
+    FinancialFact,
+    ReportingPeriodType,
+)
 from app.models.market import DataSourceType
 from app.repositories.company import CompanyRepository
 from app.repositories.data_source import DataSourceRepository
@@ -49,6 +58,8 @@ class FinancialDataIngestionService:
         self.document_repo = FinancialDocumentRepository(session)
         self.fact_repo = FinancialFactRepository(session)
         self.source_repo = DataSourceRepository(session)
+        self.normalizer = NormalizationService()
+        self.validator = FinancialFactValidator()
         self.source_name = source_name
         self.source_type = source_type
 
@@ -70,7 +81,7 @@ class FinancialDataIngestionService:
             source_type=self.source_type,
         )
 
-        counts = {"periods": 0, "documents": 0, "facts": 0}
+        counts = {"periods": 0, "documents": 0, "facts": 0, "normalized": 0, "invalid": 0}
 
         # Ingest periods
         periods = await self.provider.get_financial_periods(ticker)
@@ -110,7 +121,7 @@ class FinancialDataIngestionService:
                     source_id=data_source.id,
                     document_status=DocumentStatus(d.document_status),
                     document_type=d.document_type,
-                    document_url=None,
+                    document_url=d.document_url,
                     filing_date=d.filing_date,
                     publication_date=d.publication_date,
                     fiscal_year_end=d.fiscal_year_end,
@@ -124,7 +135,7 @@ class FinancialDataIngestionService:
 
         # Ingest facts
         facts = await self.provider.get_financial_facts(ticker, fiscal_year)
-        fact_records = []
+        fact_records: list[FinancialFactCreate] = []
         for f in facts:
             # Find the matching period and document
             period = await self._find_period(
@@ -138,7 +149,7 @@ class FinancialDataIngestionService:
                 continue
 
             document = await self._find_document(
-                period.id, data_source.id, f.reported_label
+                period.id, data_source.id, f.document_type
             )
             if not document:
                 logger.warning(
@@ -147,27 +158,63 @@ class FinancialDataIngestionService:
                 )
                 continue
 
+            # Transient, unsaved fact: normalize + validate on the real model shape.
+            fact = FinancialFact(
+                id=uuid.uuid4(),
+                period_id=period.id,
+                document_id=document.id,
+                company_id=company.id,
+                fact_type=FactType(f.fact_type),
+                reported_label=f.reported_label,
+                normalized_label=None,
+                reported_value=f.reported_value,
+                normalized_value=None,
+                currency=f.currency,
+                unit=f.unit,
+                scale=f.scale,
+                status=FactStatus.REPORTED,
+                source_page=f.source_page,
+                source_line=f.source_line,
+                reported_at=(
+                    datetime.combine(f.reported_at, datetime.min.time())
+                    if f.reported_at else None
+                ),
+                normalized_at=None,
+            )
+            normalization = self.normalizer.normalize_fact(fact)
+            validation = self.validator.validate(fact)
+
+            status = FactStatus(normalization.status)
+            normalized_value = normalization.normalized_value
+            if not validation.is_valid:
+                # Invalid fact: keep the reported value, drop the normalized one.
+                status = FactStatus.INSUFFICIENT_DATA
+                normalized_value = None
+            normalized_at = datetime.now(UTC) if status == FactStatus.NORMALIZED else None
+
+            if status == FactStatus.NORMALIZED:
+                counts["normalized"] += 1
+            elif status == FactStatus.INSUFFICIENT_DATA:
+                counts["invalid"] += 1
+
             fact_records.append(
                 FinancialFactCreate(
-                    period_id=period.id,
-                    document_id=document.id,
-                    company_id=company.id,
-                    fact_type=FactType(f.fact_type),
-                    reported_label=f.reported_label,
-                    normalized_label=None,
-                    reported_value=f.reported_value,
-                    normalized_value=None,
-                    currency=f.currency,
-                    unit=f.unit,
-                    scale=f.scale,
-                    status=FactStatus.REPORTED,
-                    source_page=f.source_page,
-                    source_line=f.source_line,
-                    reported_at=(
-                        datetime.combine(f.reported_at, datetime.min.time())
-                        if f.reported_at else None
-                    ),
-                    normalized_at=None,
+                    period_id=fact.period_id,
+                    document_id=fact.document_id,
+                    company_id=fact.company_id,
+                    fact_type=fact.fact_type,
+                    reported_label=fact.reported_label,
+                    normalized_label=normalization.normalized_label,
+                    reported_value=fact.reported_value,
+                    normalized_value=normalized_value,
+                    currency=fact.currency,
+                    unit=fact.unit,
+                    scale=fact.scale,
+                    status=status,
+                    source_page=fact.source_page,
+                    source_line=fact.source_line,
+                    reported_at=fact.reported_at,
+                    normalized_at=normalized_at,
                 )
             )
 
@@ -202,9 +249,9 @@ class FinancialDataIngestionService:
         self,
         period_id,
         source_id,
-        reported_label: str,
+        document_type: str,
     ):
-        """Find an existing document for the period."""
+        """Find an existing document for the period, source and type."""
         from sqlalchemy import select
 
         from app.models.financial import FinancialDocument
@@ -212,6 +259,7 @@ class FinancialDataIngestionService:
         query = select(FinancialDocument).where(
             FinancialDocument.period_id == period_id,
             FinancialDocument.source_id == source_id,
+            FinancialDocument.document_type == document_type,
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

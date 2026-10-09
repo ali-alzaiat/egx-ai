@@ -195,6 +195,7 @@ class FakeFinancialDataProvider(FinancialDataProvider):
                             source_page=page,
                             source_line=None,
                             reported_at=date(year + 1, 3, 31),
+                            document_type="ANNUAL_REPORT",
                         )
                     )
 

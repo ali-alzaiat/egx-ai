@@ -12,6 +12,9 @@ from app.models.financial import FactStatus, FinancialFact
 
 logger = logging.getLogger(__name__)
 
+# Version of the normalization rules below; stamp on derived data.
+NORMALIZATION_VERSION = "1.0"
+
 
 class NormalizationResult(NamedTuple):
     """Result of normalizing a financial fact."""

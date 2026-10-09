@@ -7,3 +7,5 @@
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-3-brief.md | authorized
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-4-brief.md | authorized (R10: migration renumbered to 011; R11: indexer falsy-zero fix folded in as second commit)
 2026-10-08 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-5-brief.md | authorized (R12.1-12.3 folded in: scale key, issues check-not-run convention, concrete reason strings)
+2026-10-09 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-6-brief.md | authorized (R13: provider gains document_url + document_type; skip rule — no researcher/pm)
+2026-10-09 | tech-lead -> staff-backend | .workflow/decisions/R14-task-5-as-of-fact-loading.md | ruled (a): as_of bounds fact/period loading (plan line 21, rule 4); dedicated Task 5 follow-up commit BEFORE Task 6 — router: re-seed inbox
