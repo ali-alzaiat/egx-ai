@@ -28,6 +28,9 @@ Before writing code:
 - Frontend: React 19, TypeScript, Vite, TanStack Query
 - Tests: pytest (backend), vitest (frontend)
 - Linting: Ruff (backend), ESLint (frontend)
+- Typing: every function parameter and return value must be annotated; generic
+  containers must be parameterized (`dict[str, Any]`, not bare `dict`). `mypy app`
+  must be clean — no baseline deferrals for new code.
 
 ## Data Sources
 

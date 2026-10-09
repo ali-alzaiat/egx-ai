@@ -17,15 +17,20 @@ The main session is the router. Subagents never dispatch each other.
 
 ## Standard pipeline (every task/feature)
 
-1. **Researcher runs first.** The router dispatches `researcher` with the task/topic. Researcher gathers competitor data, market context, and prior art — cites every claim with a URL, marks gaps `no data`. Returns findings inline (edit-less). Router files them under `research/`.
-2. **PM decides.** The router dispatches `pm` with the research file path. PM reads the research, decides what we will build/change (prioritized requirements, scope cuts, what to skip), writes the decision to `design/` or `decisions/`. PM ends with `NEXT: tech-lead`.
-3. **Tech-lead orchestrates.** The router dispatches `tech-lead` with the PM's decision. Tech-lead: (a) reads the SDD ledger and plan to check for collisions or prior rulings, (b) authors the task brief, (c) verifies all required agents are working (dispatches a quick probe to each if needed), (d) updates STATUS.md and handoffs.log, (e) ends with `NEXT: <implementer>` (usually staff-backend or staff-frontend). From here the normal SDD task loop runs: implement → review → verdict.
+1. **Researcher runs first.** `researcher` gathers competitor + market + UX findings (how competitors do it, UX best practices), every claim cited with a URL, gaps marked `no data`. Router files under `research/`.
+2. **PM decides.** `pm` turns the research into prioritized requirements and scope cuts → `decisions/`.
+3. **Architect designs the backend.** `architect` defines the backend interfaces and the API contract (endpoints, request/response shapes, field types) → `design/`. This is the single source of truth both sides build against.
+4. **Backend + frontend agree on the contract.** Both staff agents review the architect's contract and sign off before any code. Disagreement → BLOCKED → tech-lead.
+5. **UX designs from research.** `ux-expert` reads the competitor/UX research and produces the design → `design/`. Frontend implements that design — not its own invention.
+6. **Parallel implementation.** Backend implements the real endpoints; frontend builds against **mocks** of the frozen contract. They do not block each other. Frontend swaps mocks for the real backend once it lands (integration step).
+7. **Every finished task goes straight to QA.** No task is called done until QA has run: `qa-api` (contract/conformance), `qa-ui` (build/lint/test/UX), `qa-security` (secrets/injection/authz), and `analyst` for financial logic. QA findings are blockers.
+8. **Code review on every code change.** A reviewer (`general`, medium tier) reviews each implementer's diff before it merges. No code merges unreviewed.
+9. **UX reviews the built design.** After frontend ships, `ux-expert` reviews the implementation against the design and flags gaps.
+10. **Tech-lead final verdict** per task and phase.
 
-This pipeline replaces the old "researcher/pm/architect only for new phases" rule. Every task starts at step 1 unless the router explicitly skips it with a ledger note (e.g. pure bugfix with no product decision needed).
+Pipeline runs end to end for new features. Pure technical fixes may skip researcher/pm with a ledger note, but **never skip architect-contract, QA, code review, or UX where UI is touched**.
 
-**Skip rule (speed mode):** For purely technical tasks where the plan already specifies interfaces (no product decision needed), skip researcher + pm and go straight to tech-lead → implement → review. ux-expert and qa-* reviews remain mandatory for anything touching UI, API surface, or security-relevant code. Ledger the skip.
-
-**Parallel rule:** staff-backend, staff-frontend, ux-expert, qa-ui, qa-api, and qa-security dispatch in parallel whenever their scopes don't overlap (disjoint files/modules). Tech-lead verifies scope disjointness before parallel dispatch. When scopes overlap or depend on each other, run sequentially. Reviews of completed work also run in parallel with the next task's implementation when scopes are disjoint.
+**Parallel rule:** at any stage, dispatch agents whose scopes are disjoint in parallel — backend, frontend (mocked), ux-expert, qa-ui, qa-api, qa-security, and code reviewers. Tech-lead verifies disjointness. Overlapping or dependent scopes run sequentially.
 
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
