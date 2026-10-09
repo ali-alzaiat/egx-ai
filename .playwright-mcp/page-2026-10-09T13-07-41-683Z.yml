@@ -1,0 +1,12 @@
+- generic [ref=f11e3]:
+  - complementary [ref=f11e4]:
+    - generic [ref=f11e5]: ◈ EGX AI
+    - navigation [ref=f11e6]:
+      - link "Dashboard" [ref=f11e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f11e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f11e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f11e10]:
+    - generic [ref=f11e11]: Loading financial data...

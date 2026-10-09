@@ -1,0 +1,224 @@
+- generic [ref=f12e3]:
+  - complementary [ref=f12e4]:
+    - generic [ref=f12e5]: ◈ EGX AI
+    - navigation [ref=f12e6]:
+      - link "Dashboard" [ref=f12e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f12e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f12e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f12e10]:
+    - generic [ref=f12e2031]:
+      - generic [ref=f12e2032]:
+        - heading "Companies" [level=1] [ref=f12e2033]
+        - paragraph [ref=f12e2034]: EGX-listed companies
+      - generic [ref=f12e2035]:
+        - textbox "Search ticker or name..." [ref=f12e2036]
+        - combobox [ref=f12e2037]:
+          - option "All Status" [selected]
+          - option "Active"
+          - option "Suspended"
+          - option "Delisted"
+        - combobox [ref=f12e2038]:
+          - option "All Sectors" [selected]
+          - option "Financials"
+          - option "Consumer Staples"
+          - option "Industrials"
+          - option "Communication Services"
+          - option "Consumer Discretionary"
+          - option "Real Estate"
+      - table [ref=f12e2040]:
+        - rowgroup [ref=f12e2041]:
+          - row [ref=f12e2042]:
+            - columnheader "Ticker" [ref=f12e2043]
+            - columnheader "Name" [ref=f12e2044]
+            - columnheader "Sector" [ref=f12e2045]
+            - columnheader "Industry" [ref=f12e2046]
+            - columnheader "Status" [ref=f12e2047]
+            - columnheader "Currency" [ref=f12e2048]
+        - rowgroup [ref=f12e2049]:
+          - row [ref=f12e2050]:
+            - cell [ref=f12e2051]:
+              - link "AALR" [ref=f12e2052] [cursor=pointer]:
+                - /url: /companies/AALR
+            - cell "General Company For Land Reclamation, Development & Reconstruction" [ref=f12e2053]
+            - cell "--" [ref=f12e2054]
+            - cell "--" [ref=f12e2055]
+            - cell "ACTIVE" [ref=f12e2056]
+            - cell "EGP" [ref=f12e2058]
+          - row [ref=f12e2059]:
+            - cell [ref=f12e2060]:
+              - link "ABUK" [ref=f12e2061] [cursor=pointer]:
+                - /url: /companies/ABUK
+            - cell "Abu Qir Fertilizers & Chemical Industries Company (S.A.E)" [ref=f12e2062]
+            - cell "--" [ref=f12e2063]
+            - cell "--" [ref=f12e2064]
+            - cell "ACTIVE" [ref=f12e2065]
+            - cell "EGP" [ref=f12e2067]
+          - row [ref=f12e2068]:
+            - cell [ref=f12e2069]:
+              - link "ACAMD" [ref=f12e2070] [cursor=pointer]:
+                - /url: /companies/ACAMD
+            - cell "Arab Co.,for asset management and development" [ref=f12e2071]
+            - cell "--" [ref=f12e2072]
+            - cell "--" [ref=f12e2073]
+            - cell "ACTIVE" [ref=f12e2074]
+            - cell "EGP" [ref=f12e2076]
+          - row [ref=f12e2077]:
+            - cell [ref=f12e2078]:
+              - link "ACAP" [ref=f12e2079] [cursor=pointer]:
+                - /url: /companies/ACAP
+            - cell "A Capital Holding" [ref=f12e2080]
+            - cell "--" [ref=f12e2081]
+            - cell "--" [ref=f12e2082]
+            - cell "ACTIVE" [ref=f12e2083]
+            - cell "EGP" [ref=f12e2085]
+          - row [ref=f12e2086]:
+            - cell [ref=f12e2087]:
+              - link "ACGC" [ref=f12e2088] [cursor=pointer]:
+                - /url: /companies/ACGC
+            - cell "Arabia Cotton Ginning Company" [ref=f12e2089]
+            - cell "--" [ref=f12e2090]
+            - cell "--" [ref=f12e2091]
+            - cell "ACTIVE" [ref=f12e2092]
+            - cell "EGP" [ref=f12e2094]
+          - row [ref=f12e2095]:
+            - cell [ref=f12e2096]:
+              - link "ACTF" [ref=f12e2097] [cursor=pointer]:
+                - /url: /companies/ACTF
+            - cell "Act Financial" [ref=f12e2098]
+            - cell "--" [ref=f12e2099]
+            - cell "--" [ref=f12e2100]
+            - cell "ACTIVE" [ref=f12e2101]
+            - cell "EGP" [ref=f12e2103]
+          - row [ref=f12e2104]:
+            - cell [ref=f12e2105]:
+              - link "ADCI" [ref=f12e2106] [cursor=pointer]:
+                - /url: /companies/ADCI
+            - cell "The Arab Drug Company" [ref=f12e2107]
+            - cell "--" [ref=f12e2108]
+            - cell "--" [ref=f12e2109]
+            - cell "ACTIVE" [ref=f12e2110]
+            - cell "EGP" [ref=f12e2112]
+          - row [ref=f12e2113]:
+            - cell [ref=f12e2114]:
+              - link "ADIB" [ref=f12e2115] [cursor=pointer]:
+                - /url: /companies/ADIB
+            - cell "Abu Dhabi Islamic Bank - Egypt - S.A.E" [ref=f12e2116]
+            - cell "Financials" [ref=f12e2117]
+            - cell "Banks" [ref=f12e2118]
+            - cell "ACTIVE" [ref=f12e2119]
+            - cell "EGP" [ref=f12e2121]
+          - row [ref=f12e2122]:
+            - cell [ref=f12e2123]:
+              - link "ADPC" [ref=f12e2124] [cursor=pointer]:
+                - /url: /companies/ADPC
+            - cell "The Arab Dairy Products Co." [ref=f12e2125]
+            - cell "--" [ref=f12e2126]
+            - cell "--" [ref=f12e2127]
+            - cell "ACTIVE" [ref=f12e2128]
+            - cell "EGP" [ref=f12e2130]
+          - row [ref=f12e2131]:
+            - cell [ref=f12e2132]:
+              - link "AFDI" [ref=f12e2133] [cursor=pointer]:
+                - /url: /companies/AFDI
+            - cell "Al Ahly for Development & Investment" [ref=f12e2134]
+            - cell "--" [ref=f12e2135]
+            - cell "--" [ref=f12e2136]
+            - cell "ACTIVE" [ref=f12e2137]
+            - cell "EGP" [ref=f12e2139]
+          - row [ref=f12e2140]:
+            - cell [ref=f12e2141]:
+              - link "AFMC" [ref=f12e2142] [cursor=pointer]:
+                - /url: /companies/AFMC
+            - cell "Alexandria Flour Mills" [ref=f12e2143]
+            - cell "--" [ref=f12e2144]
+            - cell "--" [ref=f12e2145]
+            - cell "ACTIVE" [ref=f12e2146]
+            - cell "EGP" [ref=f12e2148]
+          - row [ref=f12e2149]:
+            - cell [ref=f12e2150]:
+              - link "AIDC" [ref=f12e2151] [cursor=pointer]:
+                - /url: /companies/AIDC
+            - cell "Arabia for Investment and Development S.A.E." [ref=f12e2152]
+            - cell "--" [ref=f12e2153]
+            - cell "--" [ref=f12e2154]
+            - cell "ACTIVE" [ref=f12e2155]
+            - cell "EGP" [ref=f12e2157]
+          - row [ref=f12e2158]:
+            - cell [ref=f12e2159]:
+              - link "AIHC" [ref=f12e2160] [cursor=pointer]:
+                - /url: /companies/AIHC
+            - cell "Arabia Investments Holding" [ref=f12e2161]
+            - cell "--" [ref=f12e2162]
+            - cell "--" [ref=f12e2163]
+            - cell "ACTIVE" [ref=f12e2164]
+            - cell "EGP" [ref=f12e2166]
+          - row [ref=f12e2167]:
+            - cell [ref=f12e2168]:
+              - link "AJWA" [ref=f12e2169] [cursor=pointer]:
+                - /url: /companies/AJWA
+            - cell "AJWA For Food Industries Co. Egypt" [ref=f12e2170]
+            - cell "--" [ref=f12e2171]
+            - cell "--" [ref=f12e2172]
+            - cell "ACTIVE" [ref=f12e2173]
+            - cell "EGP" [ref=f12e2175]
+          - row [ref=f12e2176]:
+            - cell [ref=f12e2177]:
+              - link "ALCN" [ref=f12e2178] [cursor=pointer]:
+                - /url: /companies/ALCN
+            - cell "Alexandria Container&Cargo Handling Company" [ref=f12e2179]
+            - cell "--" [ref=f12e2180]
+            - cell "--" [ref=f12e2181]
+            - cell "ACTIVE" [ref=f12e2182]
+            - cell "EGP" [ref=f12e2184]
+          - row [ref=f12e2185]:
+            - cell [ref=f12e2186]:
+              - link "ALRA" [ref=f12e2187] [cursor=pointer]:
+                - /url: /companies/ALRA
+            - cell "Atlas for Investment & Food Industries" [ref=f12e2188]
+            - cell "--" [ref=f12e2189]
+            - cell "--" [ref=f12e2190]
+            - cell "ACTIVE" [ref=f12e2191]
+            - cell "EGP" [ref=f12e2193]
+          - row [ref=f12e2194]:
+            - cell [ref=f12e2195]:
+              - link "ALUM" [ref=f12e2196] [cursor=pointer]:
+                - /url: /companies/ALUM
+            - cell "Arab Aluminum Company (S.A.E)" [ref=f12e2197]
+            - cell "--" [ref=f12e2198]
+            - cell "--" [ref=f12e2199]
+            - cell "ACTIVE" [ref=f12e2200]
+            - cell "EGP" [ref=f12e2202]
+          - row [ref=f12e2203]:
+            - cell [ref=f12e2204]:
+              - link "AMER" [ref=f12e2205] [cursor=pointer]:
+                - /url: /companies/AMER
+            - cell "Amer Group Holding Company S.A.E." [ref=f12e2206]
+            - cell "--" [ref=f12e2207]
+            - cell "--" [ref=f12e2208]
+            - cell "ACTIVE" [ref=f12e2209]
+            - cell "EGP" [ref=f12e2211]
+          - row [ref=f12e2212]:
+            - cell [ref=f12e2213]:
+              - link "AMES" [ref=f12e2214] [cursor=pointer]:
+                - /url: /companies/AMES
+            - cell "Alexandria New Medical Center" [ref=f12e2215]
+            - cell "--" [ref=f12e2216]
+            - cell "--" [ref=f12e2217]
+            - cell "ACTIVE" [ref=f12e2218]
+            - cell "EGP" [ref=f12e2220]
+          - row [ref=f12e2221]:
+            - cell [ref=f12e2222]:
+              - link "AMIA" [ref=f12e2223] [cursor=pointer]:
+                - /url: /companies/AMIA
+            - cell "Arab Moltaqa Investments Company" [ref=f12e2224]
+            - cell "--" [ref=f12e2225]
+            - cell "--" [ref=f12e2226]
+            - cell "ACTIVE" [ref=f12e2227]
+            - cell "EGP" [ref=f12e2229]
+      - generic [ref=f12e2230]:
+        - button "Previous" [disabled] [ref=f12e2231]
+        - generic [ref=f12e2232]: Page 1 of 12 (229 companies)
+        - button "Next" [ref=f12e2233] [cursor=pointer]

@@ -1,0 +1,49 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e4]:
+    - generic [ref=f4e5]: ◈ EGX AI
+    - navigation [ref=f4e6]:
+      - link "Dashboard" [ref=f4e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f4e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f4e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f4e10]:
+    - generic [ref=f4e11]:
+      - generic [ref=f4e12]:
+        - heading "Technical Analysis — COMI" [level=1] [ref=f4e13]
+        - paragraph [ref=f4e14]: Commercial International Bank Egypt (CIB) S.A.E.
+      - generic [ref=f4e15]:
+        - heading "Calculate Indicators" [level=3] [ref=f4e16]
+        - paragraph [ref=f4e17]: Enter comma-separated historical prices and volumes to calculate technical indicators.
+        - generic [ref=f4e18]:
+          - generic [ref=f4e19]: Prices (comma-separated)
+          - textbox "e.g. 10.5, 11.2, 10.8, 11.5, 12.0" [ref=f4e20]
+        - generic [ref=f4e21]:
+          - generic [ref=f4e22]: Volumes (comma-separated)
+          - textbox "e.g. 1000, 1500, 1200, 1800, 2000" [ref=f4e23]
+        - generic [ref=f4e24]:
+          - generic [ref=f4e25]: Indicators
+          - generic [ref=f4e26]:
+            - generic [ref=f4e27] [cursor=pointer]:
+              - checkbox "SMA" [checked] [ref=f4e28]
+              - text: SMA
+            - generic [ref=f4e29] [cursor=pointer]:
+              - checkbox "EMA" [checked] [ref=f4e30]
+              - text: EMA
+            - generic [ref=f4e31] [cursor=pointer]:
+              - checkbox "RSI" [checked] [ref=f4e32]
+              - text: RSI
+            - generic [ref=f4e33] [cursor=pointer]:
+              - checkbox "MACD" [checked] [ref=f4e34]
+              - text: MACD
+            - generic [ref=f4e35] [cursor=pointer]:
+              - checkbox "BOLLINGER" [checked] [ref=f4e36]
+              - text: BOLLINGER
+            - generic [ref=f4e37] [cursor=pointer]:
+              - checkbox "OBV" [checked] [ref=f4e38]
+              - text: OBV
+            - generic [ref=f4e39] [cursor=pointer]:
+              - checkbox "VWAP" [checked] [ref=f4e40]
+              - text: VWAP
+        - button "Calculate Indicators" [disabled] [ref=f4e41]

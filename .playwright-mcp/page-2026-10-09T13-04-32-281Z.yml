@@ -1,0 +1,43 @@
+- generic [ref=f8e3]:
+  - complementary [ref=f8e4]:
+    - generic [ref=f8e5]: ◈ EGX AI
+    - navigation [ref=f8e6]:
+      - link "Dashboard" [ref=f8e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f8e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f8e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f8e10]:
+    - generic [ref=f8e11]:
+      - generic [ref=f8e12]:
+        - generic [ref=f8e13]:
+          - heading "Market Rankings" [level=1] [ref=f8e14]
+          - paragraph [ref=f8e15]: Every company in the EGX universe, scored against the others on the same date.
+        - button "Re-run scoring" [ref=f8e16] [cursor=pointer]
+      - generic [ref=f8e17]:
+        - strong [ref=f8e18]: egx_price_momentum v1.1.0
+        - text: "— Cross-sectional blend of medium-term momentum, trend quality, drawdown risk, volatility, liquidity and volume confirmation. Prices only: no fundamentals are available yet, so no value or quality factor is included."
+      - generic [ref=f8e19]:
+        - generic [ref=f8e20]:
+          - text: Tier
+          - combobox "Tier" [ref=f8e21]:
+            - option "All"
+            - option "STRONGEST" [selected]
+            - option "STRONG"
+            - option "NEUTRAL"
+            - option "WEAK"
+            - option "WEAKEST"
+        - generic [ref=f8e22]:
+          - text: "Min score: 0"
+          - 'slider "Min score: 0" [ref=f8e23] [cursor=pointer]': "0"
+        - generic [ref=f8e24]:
+          - text: Show
+          - combobox "Show" [ref=f8e25]:
+            - option "top 25"
+            - option "top 50" [selected]
+            - option "top 100"
+            - option "top 199"
+      - generic [ref=f8e733]: Scoring the market…
+      - group [ref=f8e27]:
+        - generic "▶ How the score is built (v1.1.0)" [ref=f8e28] [cursor=pointer]

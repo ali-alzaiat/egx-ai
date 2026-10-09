@@ -1,0 +1,45 @@
+- generic [ref=f6e3]:
+  - complementary [ref=f6e4]:
+    - generic [ref=f6e5]: ◈ EGX AI
+    - navigation [ref=f6e6]:
+      - link "Dashboard" [ref=f6e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f6e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f6e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f6e10]:
+    - generic [ref=f6e11]:
+      - heading "Shariah Screening - COMI" [level=1] [ref=f6e12]
+      - heading "Commercial International Bank Egypt (CIB) S.A.E." [level=2] [ref=f6e13]
+      - paragraph [ref=f6e15]:
+        - strong [ref=f6e16]: "Note:"
+        - text: This is a screening tool, not a certification. Results are based on financial ratio analysis and should be verified with qualified Shariah scholars.
+      - generic [ref=f6e17]:
+        - heading "Methodology" [level=3] [ref=f6e18]
+        - paragraph [ref=f6e19]:
+          - strong [ref=f6e20]: "Source:"
+          - text: AAOIFI Shariah Standard No. 21 (Financial Papers)
+        - paragraph [ref=f6e21]:
+          - strong [ref=f6e22]: "Version:"
+          - text: "1.0"
+        - generic [ref=f6e23]:
+          - heading "Thresholds" [level=4] [ref=f6e24]
+          - list [ref=f6e25]:
+            - listitem [ref=f6e26]: "Debt/Assets: < 33%"
+            - listitem [ref=f6e27]: "Interest Income/Revenue: < 5%"
+            - listitem [ref=f6e28]: "Cash & Securities/Assets: < 33%"
+      - generic [ref=f6e29]:
+        - heading "Prohibited Industries" [level=3] [ref=f6e30]
+        - list [ref=f6e31]:
+          - listitem [ref=f6e32]: Alcohol
+          - listitem [ref=f6e33]: Gambling
+          - listitem [ref=f6e34]: Pork
+          - listitem [ref=f6e35]: Tobacco
+          - listitem [ref=f6e36]: Adult Entertainment
+          - listitem [ref=f6e37]: Weapons
+          - listitem [ref=f6e38]: Conventional Banking
+          - listitem [ref=f6e39]: Conventional Insurance
+      - generic [ref=f6e40]:
+        - text: "To screen this company, use the API endpoint:"
+        - code [ref=f6e41]: POST /api/screening/companies/b56a8e69-f490-474c-913b-92782a5ea401/screen

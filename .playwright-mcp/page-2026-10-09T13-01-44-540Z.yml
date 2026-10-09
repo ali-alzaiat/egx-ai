@@ -1,0 +1,35 @@
+- generic [ref=f7e3]:
+  - complementary [ref=f7e4]:
+    - generic [ref=f7e5]: ◈ EGX AI
+    - navigation [ref=f7e6]:
+      - link "Dashboard" [ref=f7e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=f7e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Screener" [ref=f7e9] [cursor=pointer]:
+        - /url: /rankings
+  - main [ref=f7e10]:
+    - generic [ref=f7e11]:
+      - heading "Valuation - COMI" [level=1] [ref=f7e12]
+      - heading "Commercial International Bank Egypt (CIB) S.A.E." [level=2] [ref=f7e13]
+      - paragraph [ref=f7e15]:
+        - strong [ref=f7e16]: "Note:"
+        - text: Valuations are based on explicit assumptions and deterministic formulas. Results should be interpreted with understanding of the underlying assumptions.
+      - generic [ref=f7e17]:
+        - heading "Supported Models" [level=3] [ref=f7e18]
+        - list [ref=f7e19]:
+          - listitem [ref=f7e20]:
+            - strong [ref=f7e21]: "P/E Valuation:"
+            - text: Price = EPS × P/E Ratio
+          - listitem [ref=f7e22]:
+            - strong [ref=f7e23]: "P/B Valuation:"
+            - text: Price = BVPS × P/B Ratio
+          - listitem [ref=f7e24]:
+            - strong [ref=f7e25]: "EV/EBITDA:"
+            - text: Price = (EBITDA × EV/EBITDA - Net Debt) / Shares
+          - listitem [ref=f7e26]:
+            - strong [ref=f7e27]: "DCF:"
+            - text: Discounted Cash Flow with terminal value
+      - generic [ref=f7e28]:
+        - text: "To calculate valuations, use the API endpoint:"
+        - code [ref=f7e29]: POST /api/valuation/companies/b56a8e69-f490-474c-913b-92782a5ea401/calculate
