@@ -1,5 +1,10 @@
 # Inbox: qa-api
 
+From: router (R27 fix-list re-verify) · 2026-10-10
+Task: Final re-verify of the R27 fix-list (uncommitted tree) — read-only: corrected `get_fair_value` docstring, last-writer-wins notes, pinning test (`backend/app/api/valuation.py`, `backend/app/repositories/valuation.py`, `backend/tests/test_valuation_fair_value_api.py`). Re-run valuation suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 3 SHIPS per R27 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
+
+---
+
 From: router (Phase 3 conformance) · 2026-10-10
 Task: Contract-conformance review of the Phase 3 backend (uncommitted tree) — read-only. Source of truth: R25 (`.workflow/decisions/R25-phase-3-scope.md` V1–V6), R26 constraints, brief `task-phase-3-brief.md`. Implementation: `app/valuation/{models,constants,fairvalue,seed,service}.py`, `app/models/valuation.py`, `app/repositories/valuation.py`, `app/api/valuation.py` (new GET `.../fair-value`, existing GET byte-identical), migration `013_valuation.py`. **Headline check:** implementer flags GET fair-value *flushes* (never commits) a deterministic snapshot cache — rule whether any DB write inside a GET violates the read-only-GET contract (R16) or is acceptable session hygiene; if the latter, say what test would pin it. Also: 4-model determinism (no fabricated growth/CoE), profile routing + exposed weights, bull/base/bear ordering + copy (never BUY), 1-D monotonicity, DQ ladder + MISSING degradation, 013 chain + round-trip, additive-router proof (existing GET shape test), methodology_version everywhere. Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
 

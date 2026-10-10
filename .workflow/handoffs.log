@@ -38,3 +38,7 @@
 2026-10-10 | pm -> tech-lead | .workflow/decisions/R25-phase-3-scope.md | Phase 3 V1-V6 (4 SWS-parity models, TIKR-3-input, DQ-fed ladder, honest MISSING); NEXT: tech-lead
 2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R26-phase-3-authorization.md | Phase 3 AUTHORIZED per R25 under R26 (013 chain re-verify, in-place extension, additive router); brief task-phase-3-brief.md; NEXT: staff-backend
 2026-10-10 | staff-backend -> qa-api | - | Phase 3 backend done (4 models in-place, profile router, bull/base/bear, 1-D sensitivity, DQ ladder, 013 migration, additive fair-value route; suites green; 1 pre-existing R21 census failure); FLAG: GET flushes snapshot cache (no commit) — read-only review; NEXT: qa-api
+2026-10-10 | qa-api -> tech-lead | - | Phase 3 conformant, no hard blockers; open F1 (GET-flush docstring + pinning test); NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R27-phase-3-backend-verdict.md | R27 verdict FIX-LIST then ship: F1 docstring fix + last-writer-wins note + pinning test; no rework; NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | R27 fix-list done (docstring fix + last-writer-wins notes + pinning test); suites 62/62, ruff/mypy clean, full-app 0/118; NEXT: qa-api
+2026-10-10 | qa-api -> router | - | R27 fix-list re-verified green (62 valuation tests, ruff/mypy clean, shapes exact); Phase 3 SHIPS per R27; DONE

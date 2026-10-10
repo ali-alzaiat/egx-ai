@@ -1,5 +1,10 @@
 # Inbox: staff-backend
 
+From: router (R27 fix-list) · 2026-10-10
+Task: R27 three items, backend only: (1) correct `get_fair_value` docstring in `app/api/valuation.py:171` (snapshot IS committed via get_session — drop "never committed"); (2) last-writer-wins note on `upsert_snapshot` + endpoint docstrings; (3) pinning test (identical-GET determinism + one-row-per-key + values/inputs match latest + GET writes only `valuation_fair_values`). Details in `.workflow/decisions/R27-phase-3-backend-verdict.md`. Nothing else. Run pytest on touched suites + ruff + mypy, paste outputs. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + evidence.
+
+---
+
 From: router (Phase 3 authorized) · 2026-10-10
 Task: Implement Phase 3 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-3-brief.md` (R25 V1–V6 under R26: re-verify 013 chain first, extend `app/valuation/` in place, additive router change only). Research context: `.workflow/research/phase-3-valuation.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
 

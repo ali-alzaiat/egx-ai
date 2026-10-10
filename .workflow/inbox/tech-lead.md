@@ -1,6 +1,11 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-10
+Task: Phase 3 backend verdict. qa-api found R25/R26 conformance (V1–V6 all PASS, gates re-verified: valuation suites green, ruff/mypy clean, full suite 434+1 with sole R21-known census failure) with NO hard blockers. One open item from qa-api: the GET fair-value session flush — qa-api ruled it acceptable hygiene but flagged F1 (docstring "never committed" is false under get_session commit; upsert key omits inputs → last-writer-wins) and recommended a pinning test (identical-GET determinism + domain-table cleanliness + last-writer-wins documentation). Rule: require the F1 fix+test now (fix-list) or accept-and-carry (ship), with next R-number and reasons. Then verdict: ship / fix-list / rework. Work is already committed (00cd305) so any fix-list lands as follow-up. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (superseded authorization brief kept for record)
 Task: Authorize Phase 3 (Valuation) for implementation. Inputs: R25 scope (`.workflow/decisions/R25-phase-3-scope.md`; builds V1–V6, cuts with reasons), research (`.workflow/research/phase-3-valuation.md`), roadmap §4–§5 exit criteria. Verify brief currency against live code (migration head — 012 just landed, confirm 013 free; existing `app/valuation/` engine — extend in place per roadmap architecture, no parallel implementation; collision-scan vs uncommitted tree incl. Phase 2 industry tables for the profile FK). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
 
 ---
