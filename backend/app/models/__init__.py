@@ -31,6 +31,12 @@ from app.models.signals import (
     UniverseCoverageSnapshot,
 )
 from app.models.technical import IndicatorStatusDB, IndicatorTypeDB, TechnicalIndicator
+from app.models.thesis import (
+    InvestmentThesis,
+    ThesisCatalyst,
+    ThesisInvalidation,
+    ThesisLedger,
+)
 from app.models.valuation import (
     IndustryValuationProfile,
     ValuationFairValue,
@@ -73,6 +79,7 @@ __all__ = [
     "IndustryScoreProfile",
     "IndustryValuationProfile",
     "InvestmentScore",
+    "InvestmentThesis",
     "MarketSignal",
     "MetricStatusDB",
     "ReportingPeriodType",
@@ -83,6 +90,9 @@ __all__ = [
     "SignalStatusDB",
     "SignalTierDB",
     "TechnicalIndicator",
+    "ThesisCatalyst",
+    "ThesisInvalidation",
+    "ThesisLedger",
     "UniverseCoverageSnapshot",
     "ValuationFairValue",
     "ValuationModelDB",
