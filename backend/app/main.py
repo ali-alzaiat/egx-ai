@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     from app.api.industry import router as industry_router
     from app.api.ingestion import router as ingestion_router
     from app.api.metrics import router as metrics_router
+    from app.api.scores import router as scores_router
     from app.api.screening import router as screening_router
     from app.api.signals import router as signals_router
     from app.api.technical import router as technical_router
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(ingestion_router)
     app.include_router(metrics_router)
     app.include_router(screening_router)
+    app.include_router(scores_router)
     app.include_router(signals_router)
     app.include_router(technical_router)
     app.include_router(valuation_router)

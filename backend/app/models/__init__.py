@@ -21,6 +21,7 @@ from app.models.industry import (
 )
 from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
 from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
+from app.models.scores import IndustryScoreProfile, InvestmentScore
 from app.models.screening import ScreeningRuleResultDB, ScreeningStatusDB, ShariahScreeningResult
 from app.models.signals import (
     MarketSignal,
@@ -69,7 +70,9 @@ __all__ = [
     "IndicatorStatusDB",
     "IndicatorTypeDB",
     "IndustryMetricProfile",
+    "IndustryScoreProfile",
     "IndustryValuationProfile",
+    "InvestmentScore",
     "MarketSignal",
     "MetricStatusDB",
     "ReportingPeriodType",

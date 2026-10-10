@@ -47,7 +47,9 @@ async def test_migration_up_down_round_trip() -> None:
         assert await _table_exists("industry_valuation_profiles")
         assert await _table_exists("valuation_fair_values")
 
-        await asyncio.to_thread(alembic.command.downgrade, cfg, "-1")
+        # Pin the target revision: "-1" broke when 014 became head, since
+        # one step down from head no longer removes the 013 tables.
+        await asyncio.to_thread(alembic.command.downgrade, cfg, "012")
         assert not await _table_exists("industry_valuation_profiles")
         assert not await _table_exists("valuation_fair_values")
 
