@@ -221,6 +221,11 @@ body {
   color: var(--accent-hover);
 }
 
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ─── Link button ────────────────────────────────────────────────────── */
 .link-btn {
   background: none;
@@ -1006,6 +1011,57 @@ tr:last-child td {
   white-space: nowrap;
   border: 0;
 }
+
+/* ─── Company Tabs (F3: one shared scrollable row on every company view) ─ */
+.company-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.company-tab {
+  padding: 0.5rem 0.875rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.company-tab:hover {
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.company-tab.active {
+  color: var(--accent-hover);
+  background: rgba(99, 102, 241, 0.14);
+}
+
+/* ─── Breadcrumb ─────────────────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.breadcrumb a {
+  color: var(--accent-hover);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover { text-decoration: underline; }
+
+.breadcrumb [aria-current="page"] { color: var(--text-primary); }
 
 /* ─── Responsive ─────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

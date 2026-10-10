@@ -45,6 +45,14 @@ function fmtPct(value: number | undefined): string {
   return `${(value * 100).toFixed(0)}%`
 }
 
+// Signed, arrowed and coloured momentum/drawdown/trend cells (F9/F10/F14).
+function fmtSigned(value: number | undefined | null): { text: string; className: string } {
+  if (value === undefined || value === null) return { text: '—', className: '' }
+  const pct = (Math.abs(value) * 100).toFixed(1)
+  if (value >= 0) return { text: `▲ +${pct}%`, className: 'positive' }
+  return { text: `▼ −${pct}%`, className: 'negative' }
+}
+
 export default function Rankings() {
   const queryClient = useQueryClient()
   const [tier, setTier] = useState<SignalTier | ''>('')
@@ -53,8 +61,9 @@ export default function Rankings() {
   const [showUnscorable, setShowUnscorable] = useState(false)
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  const { data, isLoading, error } = useSignals({
+  const { data, isLoading, isFetching, error } = useSignals({
     limit,
     tier: tier || undefined,
     min_score: minScore || undefined,
@@ -65,9 +74,12 @@ export default function Rankings() {
   const handleRun = async () => {
     setRunning(true)
     setRunError(null)
+    setToast(null)
     try {
-      await runSignals()
+      const run = await runSignals()
       await queryClient.invalidateQueries({ queryKey: ['signals'] })
+      setToast(`Scoring complete — results are as of ${run.as_of}.`)
+      window.setTimeout(() => setToast(null), 6000)
     } catch (err) {
       setRunError(err instanceof Error ? err.message : 'Failed to run the scoring engine')
     } finally {
@@ -88,10 +100,14 @@ export default function Rankings() {
             date.
           </p>
         </div>
-        <button onClick={handleRun} disabled={running} className="btn btn-primary">
+        <button onClick={handleRun} disabled={running || isFetching} className="btn btn-primary">
           {running ? 'Scoring…' : 'Re-run scoring'}
         </button>
       </div>
+
+      {toast && (
+        <p role="status" className="muted">{toast}</p>
+      )}
 
       {runError && <div className="alert alert-error">{runError}</div>}
 
@@ -163,7 +179,7 @@ export default function Rankings() {
         </label>
       </div>
 
-      {isLoading && <div className="loading">Scoring the market…</div>}
+      {isLoading && !data && <div className="loading">Loading rankings…</div>}
       {error && <div className="alert alert-error">{(error as Error).message}</div>}
       {data?.notice && <div className="alert">{data.notice}</div>}
 
@@ -193,8 +209,13 @@ export default function Rankings() {
                 <th>Why</th>
               </tr>
             </thead>
-            <tbody>
-              {data.results.map((s) => (
+          <tbody>
+            {data.results.map((s) => {
+              const mom3 = fmtSigned(s.factors.momentum_3m)
+              const mom6 = fmtSigned(s.factors.momentum_6m)
+              const trend = fmtSigned(s.factors.trend_alignment)
+              const dd = fmtSigned(s.factors.max_drawdown)
+              return (
                 <tr key={s.ticker}>
                   <td className="num">{s.rank}</td>
                   <td>
@@ -207,16 +228,17 @@ export default function Rankings() {
                   <td>
                     <span className={`tier-badge ${tierClass(s.tier)}`}>{s.tier}</span>
                   </td>
-                  <td className="num">{fmtPct(s.factors.momentum_3m)}</td>
-                  <td className="num">{fmtPct(s.factors.momentum_6m)}</td>
-                  <td className="num">{fmtPct(s.percentiles.trend_alignment)}</td>
-                  <td className="num">{fmtPct(s.factors.max_drawdown)}</td>
+                  <td className={`num ${mom3.className}`}>{mom3.text}</td>
+                  <td className={`num ${mom6.className}`}>{mom6.text}</td>
+                  <td className={`num ${trend.className}`}>{trend.text}</td>
+                  <td className={`num ${dd.className}`}>{dd.text}</td>
                   <td className="why-cell" title={s.rationale ?? ''}>
                     {summarise(s)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              )
+            })}
+          </tbody>
           </table>
           <p className="disclaimer">
             {data.disclaimer ??
@@ -244,7 +266,6 @@ export default function Rankings() {
         </details>
       )}
 
-      {Object.keys(FACTOR_LABELS).length === 0 && null}
     </div>
   )
 }

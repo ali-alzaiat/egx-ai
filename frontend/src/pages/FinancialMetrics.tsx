@@ -1,7 +1,11 @@
 import "./FinancialMetrics.css";
 
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useCompanyByTicker, useCompanyMetrics } from '../api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { calculateMetrics, useCompanyByTicker, useCompanyMetrics } from '../api/client'
+import CompanyNotFound from '../components/CompanyNotFound'
+import CompanyTabs from '../components/CompanyTabs'
 import type { FinancialMetric } from '../types'
 
 function MetricValue({ metric }: { metric: FinancialMetric }) {
@@ -61,25 +65,64 @@ function MetricCard({ metric }: { metric: FinancialMetric }) {
 
 export default function FinancialMetrics() {
   const { ticker } = useParams<{ ticker: string }>()
-  const { data: company, isLoading: companyLoading } = useCompanyByTicker(ticker)
+  const queryClient = useQueryClient()
+  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
 
-  const { data: metrics, isLoading: metricsLoading } = useCompanyMetrics(company?.id)
+  const {
+    data: metrics,
+    isLoading: metricsLoading,
+    error: metricsError,
+    refetch,
+  } = useCompanyMetrics(company?.id)
+
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const handleCalculate = async (): Promise<void> => {
+    if (!company) return
+    setRunning(true)
+    setRunError(null)
+    setToast(null)
+    try {
+      const res = await calculateMetrics(company.id)
+      await queryClient.invalidateQueries({ queryKey: ['metrics'] })
+      await refetch()
+      if (res.metrics_persisted === 0) {
+        setToast('No metrics calculated — no financial statements recorded.')
+      } else {
+        setToast(`Calculated ${res.metrics_persisted} metrics across ${res.periods_calculated} periods.`)
+      }
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : 'Failed to calculate metrics')
+    } finally {
+      setRunning(false)
+    }
+  }
 
   if (companyLoading || metricsLoading) {
     return <div className="loading">Loading financial metrics...</div>
   }
 
-  if (!company) {
-    return <div className="error">Company not found</div>
+  if (companyError || !company) {
+    return <CompanyNotFound ticker={ticker} />
   }
 
-  if (!metrics || metrics.length === 0) {
+  if (metricsError) {
     return (
       <div className="page">
-        <h1>Financial Metrics - {company.ticker}</h1>
-        <h2>{company.name}</h2>
-        <div className="empty-state">
-          No metrics calculated yet. Use the calculate endpoint to generate metrics.
+        <div className="page-header">
+          <div>
+            <h1>Financial Metrics - {company.ticker}</h1>
+            <p className="subtitle">{company.name}</p>
+          </div>
+        </div>
+        <CompanyTabs ticker={company.ticker} />
+        <div className="alert alert-error">
+          Couldn't load metrics.{' '}
+          <button className="link-btn" onClick={() => refetch()}>
+            Retry
+          </button>
         </div>
       </div>
     )
@@ -87,98 +130,128 @@ export default function FinancialMetrics() {
 
   // Group metrics by category
   const categories = {
-    growth: metrics.filter(m => m.metric_code.includes('growth')),
-    margins: metrics.filter(m => m.metric_code.includes('margin')),
-    profitability: metrics.filter(m => ['roe', 'roa'].includes(m.metric_code)),
-    leverage: metrics.filter(m => m.metric_code.includes('debt')),
-    liquidity: metrics.filter(m => ['current_ratio', 'quick_ratio'].includes(m.metric_code)),
-    cashFlow: metrics.filter(m => m.metric_code.includes('cash_flow') || m.metric_code === 'free_cash_flow'),
-    perShare: metrics.filter(m => m.metric_code === 'eps' || m.metric_code === 'book_value_per_share'),
+    growth: (metrics ?? []).filter(m => m.metric_code.includes('growth')),
+    margins: (metrics ?? []).filter(m => m.metric_code.includes('margin')),
+    profitability: (metrics ?? []).filter(m => ['roe', 'roa'].includes(m.metric_code)),
+    leverage: (metrics ?? []).filter(m => m.metric_code.includes('debt')),
+    liquidity: (metrics ?? []).filter(m => ['current_ratio', 'quick_ratio'].includes(m.metric_code)),
+    cashFlow: (metrics ?? []).filter(m => m.metric_code.includes('cash_flow') || m.metric_code === 'free_cash_flow'),
+    perShare: (metrics ?? []).filter(m => m.metric_code === 'eps' || m.metric_code === 'book_value_per_share'),
   }
 
   return (
     <div className="page">
-      <h1>Financial Metrics - {company.ticker}</h1>
-      <h2>{company.name}</h2>
-
-      <div className="metrics-grid">
-        {categories.growth.length > 0 && (
-          <section className="metrics-section">
-            <h3>Growth</h3>
-            <div className="metrics-list">
-              {categories.growth.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.margins.length > 0 && (
-          <section className="metrics-section">
-            <h3>Margins</h3>
-            <div className="metrics-list">
-              {categories.margins.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.profitability.length > 0 && (
-          <section className="metrics-section">
-            <h3>Profitability</h3>
-            <div className="metrics-list">
-              {categories.profitability.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.leverage.length > 0 && (
-          <section className="metrics-section">
-            <h3>Leverage</h3>
-            <div className="metrics-list">
-              {categories.leverage.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.liquidity.length > 0 && (
-          <section className="metrics-section">
-            <h3>Liquidity</h3>
-            <div className="metrics-list">
-              {categories.liquidity.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.cashFlow.length > 0 && (
-          <section className="metrics-section">
-            <h3>Cash Flow</h3>
-            <div className="metrics-list">
-              {categories.cashFlow.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {categories.perShare.length > 0 && (
-          <section className="metrics-section">
-            <h3>Per Share</h3>
-            <div className="metrics-list">
-              {categories.perShare.map(metric => (
-                <MetricCard key={metric.metric_code} metric={metric} />
-              ))}
-            </div>
-          </section>
-        )}
+      <div className="page-header">
+        <div>
+          <h1>Financial Metrics - {company.ticker}</h1>
+          <p className="subtitle">{company.name}</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleCalculate} disabled={running}>
+          {running ? 'Calculating…' : 'Calculate metrics'}
+        </button>
       </div>
+
+      <CompanyTabs ticker={company.ticker} />
+
+      {toast && (
+        <p role="status" className="muted">{toast}</p>
+      )}
+      {runError && (
+        <div className="alert alert-error">
+          {runError}{' '}
+          <button className="link-btn" onClick={handleCalculate}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {(!metrics || metrics.length === 0) && (
+        <div className="empty">
+          No metrics calculated for {company.ticker}. Metrics are derived from
+          recorded financial statements — calculate them to populate this view.
+        </div>
+      )}
+
+      {metrics && metrics.length > 0 && (
+        <div className="metrics-grid">
+          {categories.growth.length > 0 && (
+            <section className="metrics-section">
+              <h3>Growth</h3>
+              <div className="metrics-list">
+                {categories.growth.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.margins.length > 0 && (
+            <section className="metrics-section">
+              <h3>Margins</h3>
+              <div className="metrics-list">
+                {categories.margins.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.profitability.length > 0 && (
+            <section className="metrics-section">
+              <h3>Profitability</h3>
+              <div className="metrics-list">
+                {categories.profitability.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.leverage.length > 0 && (
+            <section className="metrics-section">
+              <h3>Leverage</h3>
+              <div className="metrics-list">
+                {categories.leverage.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.liquidity.length > 0 && (
+            <section className="metrics-section">
+              <h3>Liquidity</h3>
+              <div className="metrics-list">
+                {categories.liquidity.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.cashFlow.length > 0 && (
+            <section className="metrics-section">
+              <h3>Cash Flow</h3>
+              <div className="metrics-list">
+                {categories.cashFlow.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {categories.perShare.length > 0 && (
+            <section className="metrics-section">
+              <h3>Per Share</h3>
+              <div className="metrics-list">
+                {categories.perShare.map(metric => (
+                  <MetricCard key={metric.metric_code} metric={metric} />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,24 +1,71 @@
 import "./ShariahScreening.css";
 
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useCompanyByTicker } from '../api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { screenCompany, useCompanyByTicker, useScreeningResult } from '../api/client'
+import { formatAsOf } from '../lib/format'
+import CompanyNotFound from '../components/CompanyNotFound'
+import CompanyTabs from '../components/CompanyTabs'
+
+function verdictBadge(status: string): { label: string; className: string } {
+  if (status === 'COMPLIANT') return { label: 'Compliant', className: 'healthy' }
+  if (status === 'NON_COMPLIANT') return { label: 'Not compliant', className: 'error' }
+  return { label: 'Not enough data', className: 'unknown' }
+}
 
 export default function ShariahScreening() {
   const { ticker } = useParams<{ ticker: string }>()
-  const { data: company, isLoading: companyLoading } = useCompanyByTicker(ticker)
+  const queryClient = useQueryClient()
+  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
+  const {
+    data: result,
+    isLoading: resultLoading,
+    error: resultError,
+    refetch,
+  } = useScreeningResult(company?.id)
 
-  if (companyLoading) {
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+
+  const handleScreen = async (): Promise<void> => {
+    if (!company) return
+    setRunning(true)
+    setRunError(null)
+    try {
+      await screenCompany(company.id)
+      await queryClient.invalidateQueries({ queryKey: ['screening'] })
+      await refetch()
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : 'Screening failed')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  if (companyLoading || resultLoading) {
     return <div className="loading">Loading company...</div>
   }
 
-  if (!company) {
-    return <div className="error">Company not found</div>
+  if (companyError || !company) {
+    return <CompanyNotFound ticker={ticker} />
   }
+
+  const badge = result ? verdictBadge(result.status) : null
 
   return (
     <div className="page">
-      <h1>Shariah Screening - {company.ticker}</h1>
-      <h2>{company.name}</h2>
+      <div className="page-header">
+        <div>
+          <h1>Shariah Screening - {company.ticker}</h1>
+          <p className="subtitle">{company.name}</p>
+        </div>
+        <button className="btn btn-primary" onClick={handleScreen} disabled={running}>
+          {running ? 'Screening…' : 'Run screening'}
+        </button>
+      </div>
+
+      <CompanyTabs ticker={company.ticker} />
 
       <div className="screening-info">
         <p>
@@ -28,42 +75,68 @@ export default function ShariahScreening() {
         </p>
       </div>
 
-      <div className="methodology-info">
-        <h3>Methodology</h3>
-        <p>
-          <strong>Source:</strong> AAOIFI Shariah Standard No. 21 (Financial Papers)
-        </p>
-        <p>
-          <strong>Version:</strong> 1.0
-        </p>
-        <div className="thresholds">
-          <h4>Thresholds</h4>
-          <ul>
-            <li>Debt/Assets: &lt; 33%</li>
-            <li>Interest Income/Revenue: &lt; 5%</li>
-            <li>Cash & Securities/Assets: &lt; 33%</li>
-          </ul>
+      {runError && (
+        <div className="alert alert-error">
+          {runError}{' '}
+          <button className="link-btn" onClick={handleScreen}>
+            Retry
+          </button>
         </div>
-      </div>
+      )}
+      {resultError && (
+        <div className="alert alert-error">
+          Couldn't load the screening result.{' '}
+          <button className="link-btn" onClick={() => refetch()}>
+            Retry
+          </button>
+        </div>
+      )}
 
-      <div className="prohibited-industries">
-        <h3>Prohibited Industries</h3>
-        <ul>
-          <li>Alcohol</li>
-          <li>Gambling</li>
-          <li>Pork</li>
-          <li>Tobacco</li>
-          <li>Adult Entertainment</li>
-          <li>Weapons</li>
-          <li>Conventional Banking</li>
-          <li>Conventional Insurance</li>
-        </ul>
-      </div>
+      {!result && !resultError && (
+        <div className="empty">
+          Not screened yet. Run screening to assess {company.ticker} against the
+          versioned methodology.
+        </div>
+      )}
 
-      <div className="empty-state">
-        To screen this company, use the API endpoint:
-        <code>POST /api/screening/companies/{company.id}/screen</code>
-      </div>
+      {result && badge && (
+        <>
+          <div className="card">
+            <span className={`status-badge ${badge.className}`}>{badge.label}</span>
+            <p className="muted">
+              Screened {formatAsOf(result.screened_at)} · {result.methodology_name} · methodology v{result.methodology_version}
+            </p>
+            {result.overall_reason && <p>{result.overall_reason}</p>}
+          </div>
+
+          {result.rule_results.length > 0 && (
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Rule</th>
+                    <th>Verdict</th>
+                    <th>Value</th>
+                    <th>Threshold</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.rule_results.map((rule) => (
+                    <tr key={rule.rule_name}>
+                      <td>{rule.rule_name}</td>
+                      <td>{rule.verdict}</td>
+                      <td>{rule.value ?? '—'}</td>
+                      <td>{rule.threshold ?? '—'}</td>
+                      <td>{rule.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

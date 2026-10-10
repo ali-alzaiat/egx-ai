@@ -10,6 +10,7 @@ import TechnicalAnalysis from "./pages/TechnicalAnalysis";
 import AIInsights from "./pages/AIInsights";
 import Layout from "./components/Layout";
 import Rankings from "./pages/Rankings";
+import Screening from "./pages/Screening";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/companies" element={<Companies />} />
           <Route path="/rankings" element={<Rankings />} />
+          <Route path="/screening" element={<Screening />} />
           <Route path="/companies/:ticker" element={<CompanyDetail />} />
           <Route
             path="/companies/:ticker/financials"

@@ -45,6 +45,7 @@ export interface DataSource {
   source_type: 'EGX' | 'FRA' | 'COMPANY' | 'DATA_PROVIDER' | 'MANUAL' | 'SYNTHETIC'
   base_url: string | null
   description: string | null
+  last_synced_at: string | null // ISO datetime, null = never synced
 }
 
 export interface FinancialPeriod {
@@ -256,4 +257,100 @@ export interface DataQualityListResponse {
   methodology_version: string;
   scale: string;
   disclaimer: string;
+}
+
+// ─── Market refresh (contract: .workflow/design/refresh-and-assess-contract.md) ─
+
+export type SyncJobPhase = "universe" | "prices" | "assessment";
+
+export type SyncJobState =
+  | "idle"
+  | "accepted"
+  | "running"
+  | "done"
+  | "failed"
+  | "partial";
+
+export interface SyncJobProgress {
+  completed: number;
+  total: number;
+}
+
+export interface SyncJobFailure {
+  ticker: string;
+  error: string; // capped at 20 entries; see failed_count for the true total
+}
+
+export interface SyncJobPrices {
+  companies_fetched: number;
+  companies_total: number;
+  records_written: number;
+  failed_count: number;
+  failed_tickers: SyncJobFailure[];
+}
+
+export interface SyncJobAssessment {
+  companies_assessed: number;
+  scores_written: number;
+}
+
+// Job object returned by POST /api/ingestion/sync (202 and 409 bodies)
+// and GET /api/ingestion/sync/status (always 200)
+export interface SyncJobStatus {
+  status: SyncJobState;
+  started_at: string | null; // ISO datetime or null when idle
+  finished_at: string | null;
+  phase: SyncJobPhase | null;
+  progress: SyncJobProgress | null;
+  universe: { discovered: number } | null;
+  prices: SyncJobPrices | null; // null until the prices phase completes
+  assessment: SyncJobAssessment | null; // null until the assessment phase completes
+  error: string | null;
+}
+
+// GET /api/data-sources — existing DataSource gains one field:
+// last_synced_at is declared on DataSource above.
+
+// ─── Shariah screening (GET/POST /api/screening/companies/{id}[…]) ─
+
+export interface ScreeningRuleResult {
+  rule_name: string;
+  verdict: string;
+  value: string | null;
+  threshold: string | null;
+  reason: string;
+}
+
+export interface ScreeningResult {
+  id: string;
+  company_id: string;
+  is_compliant: boolean;
+  status: string; // COMPLIANT | NON_COMPLIANT | INSUFFICIENT_DATA
+  methodology_version: string;
+  methodology_name: string;
+  overall_reason: string | null;
+  screened_at: string;
+  created_at: string;
+  rule_results: ScreeningRuleResult[];
+}
+
+// ─── Valuation (GET/POST /api/valuation/companies/{id}[…]) ─
+
+export interface CompanyValuation {
+  id?: string;
+  company_id: string;
+  model: string;
+  value: string | null;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA | INVALID
+  assumptions: Record<string, unknown> | null;
+  reason: string | null;
+  calculated_at: string;
+  created_at?: string;
+}
+
+export interface CalculateValuationsResponse {
+  company_id: string;
+  ticker: string;
+  valuations: CompanyValuation[];
+  calculated_at: string;
 }

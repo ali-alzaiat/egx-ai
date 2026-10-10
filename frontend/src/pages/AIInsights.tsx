@@ -3,6 +3,8 @@ import "./AIInsights.css";
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useCompanyByTicker } from '../api/client'
+import CompanyNotFound from '../components/CompanyNotFound'
+import CompanyTabs from '../components/CompanyTabs'
 
 const ANALYSIS_TYPES = [
   { value: 'company_synthesis', label: 'Company Synthesis' },
@@ -30,14 +32,17 @@ interface AnalysisResult {
 
 export default function AIInsights() {
   const { ticker } = useParams<{ ticker: string }>()
-  const { data: company, isLoading: companyLoading } = useCompanyByTicker(ticker)
+  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
 
   const [analysisType, setAnalysisType] = useState('company_synthesis')
   const [query, setQuery] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isIndexing, setIsIndexing] = useState(false)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [prepareMsg, setPrepareMsg] = useState<string | null>(null)
+  const [prepareEmpty, setPrepareEmpty] = useState(false)
+  const [prepareError, setPrepareError] = useState<string | null>(null)
 
   const handleAnalyze = async () => {
     if (!company || !query) return
@@ -61,26 +66,34 @@ export default function AIInsights() {
     }
   }
 
-  const handleIndex = async () => {
+  const handlePrepare = async () => {
     if (!company) return
 
-    setIsIndexing(true)
+    setIsPreparing(true)
+    setPrepareMsg(null)
+    setPrepareEmpty(false)
+    setPrepareError(null)
     try {
       const res = await fetch(`/api/ai/companies/${company.id}/index`, {
         method: 'POST',
       })
       if (!res.ok) throw new Error(`API error: ${res.status}`)
       const data = await res.json()
-      alert(`Indexed ${data.total_chunks} chunks for ${company.ticker}`)
+      const n = Number(data.total_chunks ?? 0)
+      if (n > 0) {
+        setPrepareMsg(`Prepared ${n} data items for ${company.ticker}.`)
+      } else {
+        setPrepareEmpty(true)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Indexing failed')
+      setPrepareError(err instanceof Error ? err.message : 'Preparation failed')
     } finally {
-      setIsIndexing(false)
+      setIsPreparing(false)
     }
   }
 
   if (companyLoading) return <div className="loading">Loading company...</div>
-  if (!company) return <div className="error">Company not found</div>
+  if (companyError || !company) return <CompanyNotFound ticker={ticker} />
 
   return (
     <div className="page">
@@ -89,21 +102,35 @@ export default function AIInsights() {
         <p style={{ color: 'var(--text-secondary)' }}>{company.name}</p>
       </div>
 
+      <CompanyTabs ticker={company.ticker} />
+
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ margin: 0 }}>Index Data for RAG</h3>
+          <h3 style={{ margin: 0 }}>Prepare data for analysis</h3>
           <button
             className="btn btn-secondary"
-            onClick={handleIndex}
-            disabled={isIndexing}
+            onClick={handlePrepare}
+            disabled={isPreparing}
           >
-            {isIndexing ? 'Indexing...' : 'Index Company Data'}
+            {isPreparing ? 'Prepare data…' : 'Prepare data'}
           </button>
         </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-          Index financial facts, metrics, valuations, and screening results
-          for AI-powered analysis.
+          Gather this company's financial facts, metrics, valuations, and
+          screening results so analysis has something to work with.
         </p>
+        {prepareMsg && <p role="status">{prepareMsg}</p>}
+        {prepareEmpty && (
+          <div className="alert alert-warning">Nothing to prepare yet</div>
+        )}
+        {prepareError && (
+          <div className="alert alert-error">
+            {prepareError}{' '}
+            <button className="link-btn" onClick={handlePrepare}>
+              Retry
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: '1.5rem' }}>

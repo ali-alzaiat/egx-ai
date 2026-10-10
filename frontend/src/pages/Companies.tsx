@@ -1,22 +1,72 @@
 import "./Companies.css";
 
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useCompanies } from '../api/client'
+import { debounce } from '../lib/debounce'
 
 export default function Companies() {
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [sectorFilter, setSectorFilter] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const search = searchParams.get('search') ?? ''
+  const sectorFilter = searchParams.get('sector') ?? ''
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
 
-  const { data, isLoading, error } = useCompanies({
+  const [draft, setDraft] = useState(search)
+
+  // External navigation (e.g. "Search another ticker") writes ?search=
+  // directly; pick it up. While typing, the URL only ever holds what the
+  // draft already holds, so this is a no-op there.
+  useEffect(() => {
+    setDraft(search)
+  }, [search])
+
+  const setParam = (key: string, value: string | null): void => {
+    const next = new URLSearchParams(searchParams)
+    if (value === null || value === '') {
+      next.delete(key)
+    } else {
+      next.set(key, value)
+    }
+    if (key !== 'page') next.delete('page')
+    setSearchParams(next)
+  }
+
+  // Debounce URL writes so one query fires per search pause, not per keystroke.
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value: string) => {
+        setParam('search', value || null)
+      }, 300),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams.toString()],
+  )
+
+  const { data, isLoading, error, refetch } = useCompanies({
     page,
     page_size: 20,
     search: search || undefined,
-    status: statusFilter || undefined,
     sector: sectorFilter || undefined,
   })
+  // Universe total for the coverage note, independent of the active filter.
+  const { data: universe } = useCompanies({ page_size: 1 })
+  const universeTotal = universe?.total ?? data?.total ?? 0
+
+  const clearFilters = (): void => {
+    setDraft('')
+    setSearchParams({})
+  }
+
+  const coverageNote = (): string => {
+    const total = data?.total ?? 0
+    if (search) {
+      return `Showing ${total} matches for "${search}" of ${universeTotal} companies`
+    }
+    if (sectorFilter) {
+      const excluded = universeTotal - total
+      return `Showing ${total} of ${universeTotal} companies · ${excluded} excluded by this filter.`
+    }
+    return `Showing ${universeTotal} companies`
+  }
 
   return (
     <div>
@@ -29,32 +79,16 @@ export default function Companies() {
         <input
           type="text"
           placeholder="Search ticker or name..."
-          value={search}
+          value={draft}
           onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
+            setDraft(e.target.value)
+            debouncedSearch(e.target.value)
           }}
           className="filter-input"
         />
         <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value)
-            setPage(1)
-          }}
-          className="filter-select"
-        >
-          <option value="">All Status</option>
-          <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
-          <option value="DELISTED">Delisted</option>
-        </select>
-        <select
           value={sectorFilter}
-          onChange={(e) => {
-            setSectorFilter(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => setParam('sector', e.target.value || null)}
           className="filter-select"
         >
           <option value="">All Sectors</option>
@@ -67,10 +101,28 @@ export default function Companies() {
         </select>
       </div>
 
-      {isLoading && <div className="loading">Loading...</div>}
-      {error && <div className="loading">Error loading companies</div>}
+      {data && <p className="muted">{coverageNote()}</p>}
 
-      {data && (
+      {isLoading && <div className="loading">Loading companies...</div>}
+      {error && (
+        <div className="alert alert-error">
+          Couldn't load companies.{' '}
+          <button className="link-btn" onClick={() => refetch()}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {data && data.items.length === 0 && (
+        <div className="empty">
+          No companies match these filters.{' '}
+          <button className="link-btn" onClick={clearFilters}>
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {data && data.items.length > 0 && (
         <>
           <div className="table-container">
             <table>
@@ -80,37 +132,25 @@ export default function Companies() {
                   <th>Name</th>
                   <th>Sector</th>
                   <th>Industry</th>
-                  <th>Status</th>
-                  <th>Currency</th>
                 </tr>
               </thead>
               <tbody>
-                {data.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                      No companies found
+                {data.items.map((company) => (
+                  <tr key={company.id}>
+                    <td>
+                      <Link to={`/companies/${company.ticker}`} className="ticker-link">
+                        {company.ticker}
+                      </Link>
                     </td>
+                    <td>{company.name}</td>
+                    <td>
+                      {company.sector || (
+                        <span title="Sector not recorded">—</span>
+                      )}
+                    </td>
+                    <td>{company.industry || '—'}</td>
                   </tr>
-                ) : (
-                  data.items.map((company) => (
-                    <tr key={company.id}>
-                      <td>
-                        <Link to={`/companies/${company.ticker}`} className="ticker-link">
-                          {company.ticker}
-                        </Link>
-                      </td>
-                      <td>{company.name}</td>
-                      <td>{company.sector || '--'}</td>
-                      <td>{company.industry || '--'}</td>
-                      <td>
-                        <span className={`status-badge ${company.status.toLowerCase()}`}>
-                          {company.status}
-                        </span>
-                      </td>
-                      <td>{company.currency}</td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -118,7 +158,7 @@ export default function Companies() {
           {data.total_pages > 1 && (
             <div className="pagination">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => setParam('page', String(page - 1))}
                 disabled={page === 1}
                 className="pagination-btn"
               >
@@ -128,7 +168,7 @@ export default function Companies() {
                 Page {page} of {data.total_pages} ({data.total} companies)
               </span>
               <button
-                onClick={() => setPage((p) => Math.min(data.total_pages, p + 1))}
+                onClick={() => setParam('page', String(page + 1))}
                 disabled={page === data.total_pages}
                 className="pagination-btn"
               >

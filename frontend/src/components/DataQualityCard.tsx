@@ -158,12 +158,15 @@ export default function DataQualityCard({ companyId }: { companyId: string }) {
       )}
 
       {data && items.length === 0 && (
-        <div className="dq-empty">
-          <span className="status-badge unknown" aria-hidden="true">
-            –
-          </span>
-          <p>No data-quality assessment has been run for this company yet.</p>
-        </div>
+        <>
+          <div className="dq-empty">
+            <span className="status-badge unknown" aria-hidden="true">
+              –
+            </span>
+            <p>No data-quality assessment has been run for this company yet.</p>
+          </div>
+          <p className="muted">Refresh market data to compute assessments for every company.</p>
+        </>
       )}
 
       {items.map((item) => (

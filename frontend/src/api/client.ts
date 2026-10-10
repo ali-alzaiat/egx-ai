@@ -1,6 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import type {
+  CalculateValuationsResponse,
   Company,
+  CompanyValuation,
   DailyPrice,
   DataQualityListResponse,
   DataSource,
@@ -9,9 +12,11 @@ import type {
   FinancialMetric,
   FinancialPeriod,
   PaginatedResponse,
+  ScreeningResult,
   TechnicalIndicator,
   CalculateIndicatorsResponse,
   SignalsResponse,
+  SyncJobStatus,
   UniverseCoverage,
   MarketSignal,
   ScoringModelInfo,
@@ -26,6 +31,12 @@ async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
+}
+
+// Retry once for transient failures, but never retry a 404 — the caller
+// renders its not-found state from the first response (F15/F17).
+function retryUnless404(failureCount: number, error: Error): boolean {
+  return !error.message.includes("404") && failureCount < 1;
 }
 
 export function useHealthCheck() {
@@ -53,6 +64,7 @@ export function useCompanies(params: {
     queryKey: ["companies", params],
     queryFn: () =>
       fetchApi<PaginatedResponse<Company>>(`/companies${qs ? `?${qs}` : ""}`),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -69,6 +81,7 @@ export function useCompanyByTicker(ticker: string | undefined) {
     queryKey: ["company", "ticker", ticker],
     queryFn: () => fetchApi<Company>(`/companies/ticker/${ticker}`),
     enabled: !!ticker,
+    retry: retryUnless404,
   })
 }
 
@@ -115,6 +128,7 @@ export function useLatestPrice(companyId: string | undefined) {
     queryFn: () =>
       fetchApi<DailyPrice>(`/companies/${companyId}/prices/latest`),
     enabled: !!companyId,
+    retry: retryUnless404,
   });
 }
 
@@ -138,6 +152,7 @@ export function useSignals(
   return useQuery({
     queryKey: ["signals", params],
     queryFn: () => fetchApi<SignalsResponse>(`/signals${qs ? `?${qs}` : ""}`),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -336,5 +351,115 @@ export function useScreenedCompanies(params: {
       fetchApi<ScreenedCompanySummary[]>(
         `/screening/companies${qs ? `?${qs}` : ""}`,
       ),
+  });
+}
+
+// GET /api/screening/companies/{company_id} — 404 means never screened,
+// which is an empty state (null), not an error.
+export function useScreeningResult(
+  companyId: string | undefined,
+): UseQueryResult<ScreeningResult | null> {
+  return useQuery({
+    queryKey: ["screening", companyId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/screening/companies/${companyId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<ScreeningResult>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/screening/companies/{company_id}/screen — plain async, not useMutation.
+export async function screenCompany(companyId: string): Promise<ScreeningResult> {
+  const res = await fetch(`${API_BASE}/screening/companies/${companyId}/screen`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/valuation/companies/{company_id}
+export function useValuations(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["valuations", companyId],
+    queryFn: () =>
+      fetchApi<CompanyValuation[]>(`/valuation/companies/${companyId}`),
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/valuation/companies/{company_id}/calculate — plain async, not
+// useMutation. Empty call evaluates every model with no supplied assumptions.
+export async function calculateValuations(
+  companyId: string,
+  params?: Record<string, number | undefined>,
+): Promise<CalculateValuationsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && !Number.isNaN(value)) {
+        searchParams.set(key, String(value));
+      }
+    }
+  }
+  const qs = searchParams.toString();
+  const res = await fetch(
+    `${API_BASE}/valuation/companies/${companyId}/calculate${qs ? `?${qs}` : ""}`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST /api/metrics/companies/{company_id}/calculate — plain async, not useMutation.
+export async function calculateMetrics(companyId: string): Promise<{
+  company_id: string;
+  periods_calculated: number;
+  metrics_persisted: number;
+}> {
+  const res = await fetch(
+    `${API_BASE}/metrics/companies/${companyId}/calculate`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST /api/ingestion/sync — follows the runSignals pattern (plain fetch,
+// not useMutation). 409 means a job is already live: adopt the returned job
+// and start polling it instead of throwing.
+export async function startMarketRefresh(params?: {
+  tickers?: string;
+  history_days?: number;
+  universe_only?: boolean;
+}): Promise<SyncJobStatus> {
+  const searchParams = new URLSearchParams();
+  if (params?.tickers) searchParams.set("tickers", params.tickers);
+  if (params?.history_days !== undefined)
+    searchParams.set("history_days", String(params.history_days));
+  if (params?.universe_only !== undefined)
+    searchParams.set("universe_only", String(params.universe_only));
+  const qs = searchParams.toString();
+  const res = await fetch(`${API_BASE}/ingestion/sync${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+  });
+  if (res.status === 409) return res.json() as Promise<SyncJobStatus>;
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/ingestion/sync/status — polls every 2 s only while a job is live.
+export function useSyncStatus(): UseQueryResult<SyncJobStatus> {
+  return useQuery({
+    queryKey: ["syncStatus"],
+    queryFn: () => fetchApi<SyncJobStatus>("/ingestion/sync/status"),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "accepted" || status === "running" ? 2000 : false;
+    },
   });
 }

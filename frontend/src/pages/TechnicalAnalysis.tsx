@@ -1,18 +1,23 @@
 import "./TechnicalAnalysis.css";
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useCompanyByTicker, useTechnicalIndicators, calculateIndicators } from '../api/client'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCompanyByTicker, useCompanyPrices, useTechnicalIndicators, calculateIndicators } from '../api/client'
+import CompanyNotFound from '../components/CompanyNotFound'
+import CompanyTabs from '../components/CompanyTabs'
 
-const INDICATOR_TYPES = ['sma', 'ema', 'rsi', 'macd', 'bollinger', 'obv', 'vwap']
-
+// Indicators are calculated from the stored price history the app already
+// holds — the user never pastes prices by hand (F4).
 export default function TechnicalAnalysis() {
   const { ticker } = useParams<{ ticker: string }>()
-  const { data: company, isLoading: companyLoading } = useCompanyByTicker(ticker)
+  const queryClient = useQueryClient()
+  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
 
-  const [prices, setPrices] = useState('')
-  const [volumes, setVolumes] = useState('')
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(INDICATOR_TYPES)
+  const { data: pricesData, isLoading: pricesLoading } = useCompanyPrices(company?.id, {
+    page_size: 200,
+  })
+
   const [isCalculating, setIsCalculating] = useState(false)
   const [calculationResult, setCalculationResult] = useState<null | {
     indicators: {
@@ -28,8 +33,19 @@ export default function TechnicalAnalysis() {
 
   const { data: existingIndicators, isLoading: loadingIndicators } = useTechnicalIndicators(company?.id)
 
-  const handleCalculate = async () => {
-    if (!company) return
+  // Oldest-first series for the context line; the API returns newest first.
+  const series = useMemo(() => {
+    const items = [...(pricesData?.items ?? [])].reverse()
+    return {
+      closes: items.map((p) => p.close),
+      volumes: items.map((p) => String(p.volume)),
+      firstDate: items.length > 0 ? items[0]!.date : null,
+      lastDate: items.length > 0 ? items[items.length - 1]!.date : null,
+    }
+  }, [pricesData])
+
+  const handleCalculate = async (): Promise<void> => {
+    if (!company || series.closes.length === 0) return
 
     setIsCalculating(true)
     setError(null)
@@ -37,11 +53,11 @@ export default function TechnicalAnalysis() {
     try {
       const result = await calculateIndicators(
         company.id,
-        prices,
-        volumes,
-        selectedTypes.join(','),
+        series.closes.join(','),
+        series.volumes.join(','),
       )
       setCalculationResult(result)
+      await queryClient.invalidateQueries({ queryKey: ['technical'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to calculate indicators')
     } finally {
@@ -49,103 +65,55 @@ export default function TechnicalAnalysis() {
     }
   }
 
-  const toggleType = (type: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type)
-        ? prev.filter((t) => t !== type)
-        : [...prev, type],
-    )
-  }
-
   if (companyLoading) {
     return <div className="loading">Loading company...</div>
   }
 
-  if (!company) {
-    return <div className="error">Company not found</div>
+  if (companyError || !company) {
+    return <CompanyNotFound ticker={ticker} />
   }
+
+  const rows = calculationResult?.indicators ?? []
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Technical Analysis — {company.ticker}</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>{company.name}</p>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h3 style={{ marginBottom: '1rem' }}>Calculate Indicators</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-          Enter comma-separated historical prices and volumes to calculate technical indicators.
-        </p>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
-            Prices (comma-separated)
-          </label>
-          <input
-            type="text"
-            value={prices}
-            onChange={(e) => setPrices(e.target.value)}
-            placeholder="e.g. 10.5, 11.2, 10.8, 11.5, 12.0"
-            style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
-          />
+        <div>
+          <h1>Technical Analysis — {company.ticker}</h1>
+          <p className="subtitle">{company.name}</p>
         </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
-            Volumes (comma-separated)
-          </label>
-          <input
-            type="text"
-            value={volumes}
-            onChange={(e) => setVolumes(e.target.value)}
-            placeholder="e.g. 1000, 1500, 1200, 1800, 2000"
-            style={{ width: '100%', padding: '0.5rem', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
-            Indicators
-          </label>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {INDICATOR_TYPES.map((type) => (
-              <label
-                key={type}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTypes.includes(type)}
-                  onChange={() => toggleType(type)}
-                />
-                {type.toUpperCase()}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ color: 'var(--color-negative)', marginBottom: '1rem' }}>
-            {error}
-          </div>
-        )}
-
         <button
           className="btn btn-primary"
           onClick={handleCalculate}
-          disabled={isCalculating || !prices || !volumes}
+          disabled={isCalculating || pricesLoading || series.closes.length === 0}
         >
-          {isCalculating ? 'Calculating...' : 'Calculate Indicators'}
+          {isCalculating ? 'Calculating…' : 'Calculate indicators'}
         </button>
       </div>
 
-      {calculationResult && (
+      <CompanyTabs ticker={company.ticker} />
+
+      {pricesLoading && <div className="loading">Loading price history...</div>}
+      {!pricesLoading && series.closes.length === 0 && (
+        <p className="muted">No price data from the configured source for {company.ticker}.</p>
+      )}
+      {series.closes.length > 0 && (
+        <p className="muted">
+          Calculated from the last {series.closes.length} trading days of stored
+          price history ({series.firstDate} – {series.lastDate}).
+        </p>
+      )}
+
+      {error && (
+        <div className="alert alert-error">
+          {error}{' '}
+          <button className="link-btn" onClick={handleCalculate}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {rows.length > 0 && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <h3 style={{ marginBottom: '1rem' }}>Calculated Indicators</h3>
           <div className="table-container">
@@ -159,7 +127,7 @@ export default function TechnicalAnalysis() {
                 </tr>
               </thead>
               <tbody>
-                {calculationResult.indicators.map((ind) => (
+                {rows.map((ind) => (
                   <tr key={ind.indicator}>
                     <td>{ind.indicator.toUpperCase()}</td>
                     <td>{ind.value || '--'}</td>
@@ -175,39 +143,39 @@ export default function TechnicalAnalysis() {
         </div>
       )}
 
-      {existingIndicators && existingIndicators.length > 0 && (
-        <div className="card">
-          <h3 style={{ marginBottom: '1rem' }}>Previously Calculated Indicators</h3>
-          {loadingIndicators ? (
-            <div className="loading">Loading indicators...</div>
-          ) : (
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Value</th>
-                    <th>Status</th>
-                    <th>Calculated At</th>
+      <div className="card">
+        <h3 style={{ marginBottom: '1rem' }}>Previously Calculated Indicators</h3>
+        {loadingIndicators ? (
+          <div className="loading">Loading indicators...</div>
+        ) : existingIndicators && existingIndicators.length > 0 ? (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Value</th>
+                  <th>Status</th>
+                  <th>Calculated At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {existingIndicators.map((ind) => (
+                  <tr key={ind.id}>
+                    <td>{ind.indicator_type.toUpperCase()}</td>
+                    <td>{ind.value || '--'}</td>
+                    <td className={ind.status === 'AVAILABLE' ? 'positive' : 'negative'}>
+                      {ind.status}
+                    </td>
+                    <td>{new Date(ind.calculated_at).toLocaleDateString()}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {existingIndicators.map((ind) => (
-                    <tr key={ind.id}>
-                      <td>{ind.indicator_type.toUpperCase()}</td>
-                      <td>{ind.value || '--'}</td>
-                      <td className={ind.status === 'AVAILABLE' ? 'positive' : 'negative'}>
-                        {ind.status}
-                      </td>
-                      <td>{new Date(ind.calculated_at).toLocaleDateString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">No indicators calculated yet.</p>
+        )}
+      </div>
     </div>
   )
 }
