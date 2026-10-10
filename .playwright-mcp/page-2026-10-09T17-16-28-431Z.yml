@@ -1,0 +1,41 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]: ◈ EGX AI
+    - navigation [ref=e6]:
+      - link "Dashboard" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - link "Companies" [ref=e8] [cursor=pointer]:
+        - /url: /companies
+      - link "Market Rankings" [ref=e9] [cursor=pointer]:
+        - /url: /rankings
+      - link "Screening" [ref=e10] [cursor=pointer]:
+        - /url: /screening
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e14]:
+        - heading "Dashboard" [level=1] [ref=e15]
+        - paragraph [ref=e16]: EGX Stock Analysis & Shariah Screening Platform
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]: Companies tracked
+          - generic [ref=e20]: Loading...
+        - generic [ref=e21]:
+          - generic [ref=e22]: Market coverage
+          - generic [ref=e23]: Loading...
+        - generic [ref=e24]:
+          - generic [ref=e25]: Scored companies
+          - generic [ref=e26]: Loading...
+        - generic [ref=e27]:
+          - generic [ref=e28]: Scorable coverage
+          - generic [ref=e29]: Loading...
+      - paragraph [ref=e30]: Market data has never been refreshed.
+      - table [ref=e32]:
+        - rowgroup [ref=e33]:
+          - row [ref=e34]:
+            - columnheader "Ticker" [ref=e35]
+            - columnheader "Company" [ref=e36]
+            - columnheader "Score" [ref=e37]
+            - columnheader "Tier" [ref=e38]
+        - rowgroup [ref=e39]:
+          - row [ref=e40]:
+            - cell "Loading scores..." [ref=e41]

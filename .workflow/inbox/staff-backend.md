@@ -1,5 +1,25 @@
 # Inbox: staff-backend
 
+From: router (Phase 3 authorized) · 2026-10-10
+Task: Implement Phase 3 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-3-brief.md` (R25 V1–V6 under R26: re-verify 013 chain first, extend `app/valuation/` in place, additive router change only). Research context: `.workflow/research/phase-3-valuation.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
+
+---
+
+From: router (R24 fix-list) · 2026-10-10
+Task: R24 three-item fix-list, backend only: (F1) emit BOTH `reason` and `explanation` keys (same string) on industry percentile entries + test; (F2) wire real `display_name` via in-repo `get_metric()` with fallback + test; (F3) PUT-`[]` regression test pinning "explicit empty override" semantics (basis `override`, INSUFFICIENT_DATA floor). Details in `.workflow/decisions/R24-phase-2-backend-verdict.md`. No rework, nothing else. Run pytest on touched suites + ruff + mypy, paste outputs. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + evidence.
+
+---
+
+From: router (Phase 2 authorized) · 2026-10-10
+Task: Implement Phase 2 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-2-brief.md` (R22 scope + R23 migration 012; research Track A). Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
+
+---
+
+From: router (R20 fix-list) · 2026-10-10
+Task: One fix in `backend/app/ingestion/sync.py::fetch_one` — treat empty `bars` (`[]`, the provider's real no-history signal per `egx/provider.py:145,158-160`) as a failure entry `failures.append((ticker, "Yahoo returned no history"))` so the job reports `partial` with the ticker in `failed_tickers` instead of lying `done`/`failed_count 0`. Add the R20 regression test to `backend/tests/test_ingestion_jobs.py` (stub returns `[]`: assert `partial`, `failed_count == 1`, exact `failed_tickers` entry, assessment still ran; keep raise-path test green). No contract change. Run pytest on the jobs file + ruff + mypy on touched files, paste outputs. Scope: backend only; never touch frontend/** or .workflow/**. End with NEXT: qa-ui | BLOCKED: <question> | DONE + files + evidence. (Prior Stream A brief kept below for context.)
+
+---
+
 From: router (direct dispatch, no tech-lead briefing hop) · 2026-10-09
 Parallel stream A: implement the refresh + automatic assessment closeout for the two
 reported data gaps.

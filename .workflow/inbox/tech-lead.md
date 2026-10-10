@@ -1,6 +1,36 @@
 # Inbox: tech-lead
 
-From: router (user directive) · 2026-10-09
+From: router · 2026-10-10
+Task: Authorize Phase 3 (Valuation) for implementation. Inputs: R25 scope (`.workflow/decisions/R25-phase-3-scope.md`; builds V1–V6, cuts with reasons), research (`.workflow/research/phase-3-valuation.md`), roadmap §4–§5 exit criteria. Verify brief currency against live code (migration head — 012 just landed, confirm 013 free; existing `app/valuation/` engine — extend in place per roadmap architecture, no parallel implementation; collision-scan vs uncommitted tree incl. Phase 2 industry tables for the profile FK). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 2 verdict brief kept below for record)
+Task: Phase 2 backend verdict. qa-api found the implementation conformant to R22/R23 (INSUFFICIENT_DATA floor, explanations, verified-only mapping, backfill honesty, override, profiles, 404/400, 012 migration; gates re-verified green) with NO hard blockers but 6 ruling requests: (1) `explanation` key vs AGENTS `reason` pattern — alias accepted or rename/add? (2) taxonomy depth: 3-branch seed vs full 74-industry GICS tree — sufficient for Phase 2? (3) override version-stamped not version-history — confirm no history table wanted; (4) PUT `[]` semantics — "no peers" (current) or "clear override"? needs test either way; (5) `display_name` echoes `metric_key` — note for Phase 3; (6) stress paths unprobed — fold into Phase 3 QA or accept ASGI defaults? Rule each with next R-number(s), then verdict: ship / fix-list / rework. Frontend surface for Phase 2 is NOT in this verdict (no staff-frontend task yet — R22 is backend-shaped; flag if you want one). Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (superseded authorization brief kept for record)
+Task: Authorize Phase 2 (Industry Intelligence) for implementation. Inputs: R22 scope decision (`.workflow/decisions/R22-phase-2-scope.md`, builds R1–R6, cuts with reasons, standing reqs 1–5), research (`.workflow/research/phase-2-industry-competitive-landscape.md`), roadmap §2–§3 exit criteria. Your job per pipeline: verify the brief is current against live code (migration head number — R10/R11 history: 010 taken by screening-nullable, 011 by data-quality; confirm next free revision; check `companies.sector/industry/isin` columns exist; collision-scan vs uncommitted working tree), then authorize staff-backend (or amend scope with a new R-number if the code disagrees). Also confirm the R22 migration name `011_industry` doesn't collide. Return brief-verification + authorization inline; end with NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (R21 brief kept below for record)
+Task: Rule on staff-backend's BLOCKED question, next R-number. Facts: R20 fix landed (empty-bars → failure entry; regression test green; ruff/mypy clean). But `test_full_refresh_happy_path` (asserts assessment rows == companies×3, i.e. 687) fails with 1374 rows — staff-backend verified via `git stash` it fails identically WITHOUT the change: the shared local `egx_ai` DB holds 6 assessment rows per company (duplicates from earlier runs), so this is environmental, not from the diff. Question: (a) declare the happy-path failure environmental and send qa-api to re-verify on a clean test DB, then ship Stream A per R20; or (b) rule the duplicates indicate a real upsert-dedup defect (assessment was specified idempotent) and order a staff-backend follow-up. Return ruling inline; end with exactly one contract string: NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-09 (R20 brief kept below for record)
+Task: Rule on qa-api's Stream A blocker + give the Stream A verdict. Blocker: empty-history tickers vanish silently — `sync.py:81-87 fetch_one` records failures only on exception and stores only non-empty bars, so provider's `[]` (no Yahoo history, `provider.py:145,158-160`) is neither fetched nor failed; job reports `done` with `failed_count: 0` instead of `partial`, contradicting the contract's own `partial` example (`USCA / Yahoo returned no history`). No test covers it (stub raises, never returns `[]`). Rule: fix now via staff-backend (treat `[]` as failure entry + test) with next R-number, or defer/accept with reasons. Then Stream A verdict (ship / fix-list / rework) covering R18.1's folded Task 7 scope. Elsewhere conformant per qa-api (A1, C1, phases, timeout, read-only DQ GET, last_synced_at inheritance); router gates green (pytest 345, ruff, mypy 0/106). Return rulings inline; end with exactly one contract string: NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-09 (R19 brief kept below for record)
+Task: Final verdict on the R16+R17 frontend task (working tree, uncommitted; backend untouched). Evidence: staff-frontend re-implemented from frozen brief (gates green); qa-ui verified twice — test 10/10, lint clean, build clean (114 modules), live `/`, `/companies/COMI`, `/screening` with real data and 0 console errors, Playwright suite absent (noted, not a failure); Vercel-skill compliance pass found the tree already compliant (N/A rules listed with reasons). Rule on three open items and record as the next R-number in `.workflow/decisions/`: (1) nav 4th dest labeled `Screening` (`Layout.tsx:7`) instead of a second Rankings link — staff-frontend's reasoning: F14 kills the word `Screener`, F2 needs screening reachable; (2) Dashboard does not fetch `/health` — no card consumes it; (3) accept the Vercel-skill compliance result. Then give the per-task verdict (ship / fix-list / rework). Return rulings inline; end with exactly one contract string: NEXT: <agent> | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router (user directive) · 2026-10-09 (superseded — R16/R17/R18 already ruled)
 User's words: "fix the gaps and while the other agents are fixing the gaps make the UX
 expert test the current UX of the whole app and enhance it based on the other apps because
 I don't like the current UX."

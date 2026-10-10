@@ -1,6 +1,18 @@
 # Inbox: staff-frontend
 
-From: router (direct, no tech-lead hop) · 2026-10-09
+From: router · 2026-10-09
+Task: Vercel-skill compliance pass over `frontend/**` (standing requirement per user; now encoded in AGENTS.md, your agent definition, and CONTRACT step 7). Read the skill at `/Users/alialzaiat/.claude/skills/vercel-react-best-practices/SKILL.md` plus only the `rules/` files you actually need. Scope: client/rerender/bundle/rendering/js rules; server-*/Next.js-only rules (RSC cache, next/dynamic, streaming, after()) are N/A to this Vite SPA — list skipped rules with one-line reasons, never silently. Fix material violations only; no speculative refactors, no new deps, keep quality.test.ts green. Run `npm test`, `npm run lint`, `npm run build` in frontend/ and paste outputs. End with NEXT: qa-ui | BLOCKED: <question> | DONE + files changed + verification evidence.
+
+---
+
+From: router (re-dispatch, direct, no tech-lead hop) · 2026-10-09
+RE-WORK — the prior uncommitted R16/R17 implementation was destroyed by a router-side `git checkout -- frontend/src/` during an inline session. Recovery was attempted (unreachable-commit scan for `useSyncStatus`: zero hits across all 12 dangling commits) and failed. Re-implement from the frozen spec below (unchanged).
+
+Tree state at HEAD `bdc553b` — rebase onto it, do not revert:
+- PRESENT, reuse as-is: `useScreenedCompanies` + `ScreenedCompanySummary` (`api/client.ts`, `types/index.ts`); per-page `.css` placeholder files + one import line each (keep the lines; no index.css split in this task); `lib/format.ts`; `components/CompanyTabs.tsx`; `components/CompanyNotFound.tsx`; `pages/Screening.tsx`.
+- MISSING, implement per spec: `App.tsx` Screening route; `useScreeningResult` (GET 404=null) + `screenCompany` (POST); `keepPreviousData`/`retryUnless404` client predicates; R16 `SyncJobState` types + `startMarketRefresh` + `useSyncStatus` + CompanyDetail button/status + DataQualityCard pinned line; all §R17 fixes (verify the PRESENT files against spec, fix or keep).
+- Verify each PRESENT file against the spec below rather than assuming compliance.
+
 Task: Implement the R16 refresh surface + R17-intersecting UX fixes from the audit + research, in one task. Honor `.workflow/design/refresh-and-assess-contract.md` (R16) and `.workflow/decisions/R17-ux-overhaul-v1-scope.md` + `app-ux-audit.md`. No new deps, no jsdom changes. Keep quality.test.ts green.
 
 ## R16 refresh surface (contract-pinned, must deliver)
