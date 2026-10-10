@@ -57,6 +57,14 @@ class Company(Base):
         nullable=False,
         default=CompanyStatus.ACTIVE,
     )
+    egx_sector_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("egx_sectors.id", ondelete="RESTRICT"), nullable=True
+    )
+    gics_sub_industry_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("gics_sub_industries.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -74,6 +82,8 @@ class Company(Base):
         Index("ix_companies_isin", "isin"),
         Index("ix_companies_sector", "sector"),
         Index("ix_companies_status", "status"),
+        Index("ix_companies_egx_sector_id", "egx_sector_id"),
+        Index("ix_companies_gics_sub_industry_id", "gics_sub_industry_id"),
     )
 
 
