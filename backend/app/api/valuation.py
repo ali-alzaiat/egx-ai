@@ -168,7 +168,11 @@ async def get_fair_value(
 
     Additive sub-resource: the existing GET on this router keeps its contract.
     All inputs are optional; missing inputs degrade to INSUFFICIENT_DATA.
-    Computed snapshot is flushed (never committed) as a deterministic cache.
+    The computed snapshot is flushed in-service and committed by
+    ``get_session`` on success — a deterministic snapshot cache.
+    Last-writer-wins: the snapshot key is company + methodology version, so
+    differing inputs overwrite one row and ``inputs_echo`` reflects the
+    latest write.
     """
     service = FairValueService(session)
     return await service.fair_value(

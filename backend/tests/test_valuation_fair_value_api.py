@@ -351,6 +351,77 @@ async def test_metric_prefill_for_growth_and_margin(
     assert data["scenarios"]["base"]["status"] == "AVAILABLE"
 
 
+async def test_snapshot_pinning_determinism_last_writer_wins(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Pin the fair-value snapshot cache: determinism, one-row-per-key, latest-wins."""
+    from app.models.valuation import IndustryValuationProfile, ValuationResult
+
+    await _seed(db_session)
+    company = await _make_company(db_session, "BANKPIN")
+    await _good_dq(db_session, company)
+    await _add_price(db_session, company, Decimal("30"))
+    url = f"/api/valuation/companies/{company.id}/fair-value"
+    profiles_before = (
+        await db_session.execute(select(IndustryValuationProfile))
+    ).scalars().all()
+
+    first = (await client.get(url, params=BANK_PARAMS)).json()
+    second = (await client.get(url, params=BANK_PARAMS)).json()
+    assert first["fair_value"] == second["fair_value"]
+    assert first["fair_value"]["status"] == "AVAILABLE"
+    rows = (
+        await db_session.execute(
+            select(ValuationFairValue)
+            .where(ValuationFairValue.company_id == company.id)
+            .where(
+                ValuationFairValue.methodology_version
+                == VALUATION_METHODOLOGY_VERSION
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+
+    altered = dict(BANK_PARAMS)
+    altered["exit_multiple"] = "20"
+    third = (await client.get(url, params=altered)).json()
+    assert third["fair_value"]["status"] == "AVAILABLE"
+    assert third["fair_value"]["value"] != first["fair_value"]["value"]
+    rows_after = (
+        await db_session.execute(
+            select(ValuationFairValue)
+            .where(ValuationFairValue.company_id == company.id)
+            .where(
+                ValuationFairValue.methodology_version
+                == VALUATION_METHODOLOGY_VERSION
+            )
+            .execution_options(populate_existing=True)
+        )
+    ).scalars().all()
+    assert len(rows_after) == 1
+    row = rows_after[0]
+    # Numeric(20, 4) rounds the payload value; compare within rounding.
+    assert row.fair_value is not None
+    assert abs(Decimal(str(row.fair_value)) - Decimal(third["fair_value"]["value"])) < Decimal(
+        "0.0001"
+    )
+    assert row.legs == third["legs"]
+    assert row.weights == third["weights"]
+    assert Decimal(row.inputs_echo["inputs"]["exit_multiple"]) == Decimal("20")
+
+    # GET writes only its own domain table: no legacy rows, profiles untouched.
+    legacy = (
+        await db_session.execute(
+            select(ValuationResult).where(ValuationResult.company_id == company.id)
+        )
+    ).scalars().all()
+    assert legacy == []
+    profiles_after = (
+        await db_session.execute(select(IndustryValuationProfile))
+    ).scalars().all()
+    assert len(profiles_after) == len(profiles_before)
+
+
 async def test_existing_get_contract_unchanged(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:

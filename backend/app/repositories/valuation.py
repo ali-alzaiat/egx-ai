@@ -151,7 +151,12 @@ class FairValueRepository:
         price_as_of: date | None,
         computed_at: datetime,
     ) -> ValuationFairValue:
-        """Create or replace the snapshot for one company + methodology version."""
+        """Create or replace the snapshot for one company + methodology version.
+
+        Last-writer-wins: the unique key is company + methodology version
+        (inputs do not participate), so differing inputs overwrite the single
+        row and ``inputs_echo`` reflects only the latest write.
+        """
         stmt = (
             pg_insert(ValuationFairValue)
             .values(
