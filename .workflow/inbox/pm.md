@@ -1,6 +1,11 @@
 # Inbox: pm
 
 From: router · 2026-10-10
+Task: Phase 4 requirements (Investment score, roadmap §6: one explainable score, all components visible, confidence separate). Read `.workflow/research/phase-4-investment-score.md` in full (Snowflake 5×6 equal-weighted checks + thresholds; Morningstar 4-input star + widening ladder; Alpha Spread blend + solvency + assumption tables; EGX component support incl. thin-consensus + PDF-only constraints; req-3/req-4 mappings; non-binding steers). Cut scope ruthlessly into builds vs defers: component set v1 (which of value/growth/past/health/dividend survive EGX data), weighting (equal vs fitted — fitted needs justification against rule 2), confidence construction (DQ-fed ladder), INSUFFICIENT_DATA floors per component, what "explanation" each response carries. Bind AGENTS.md + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/companies/{id}`, methodology_version on scores). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 3 brief kept below for record)
 Task: Phase 3 requirements (Valuation, roadmap §4–§5). Read `.workflow/research/phase-3-valuation.md` in full (SWS 4-model router + 6 checks; Morningstar uncertainty ladder; TIKR 3-input adjustability + bull/base/bear; InvestingPro 15-model weighting; Alpha Spread scenarios; EGX broker target-price practice; EGX filing inputs support 5-statement models but thin consensus + PDF-only; standing req 3 mapping; design steers §1–3 non-binding). Cut scope ruthlessly into builds vs defers against §4–§5 exit criteria (models per industry, weighted fair value, bull/base/bear, sensitivity, confidence fed by data quality): how many models v1 (research steers 4 SWS-parity, decide), adjustability depth, uncertainty-ladder calibration source, what happens under financial_statements MISSING (honest degradation per AGENTS rule 4). Bind AGENTS.md + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/companies/{id}`, methodology_version on scores, INSUFFICIENT_DATA pattern). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
 
 ---

@@ -43,3 +43,12 @@
 2026-10-10 | staff-backend -> qa-api | - | R27 fix-list done (docstring fix + last-writer-wins notes + pinning test); suites 62/62, ruff/mypy clean, full-app 0/118; NEXT: qa-api
 2026-10-10 | qa-api -> router | - | R27 fix-list re-verified green (62 valuation tests, ruff/mypy clean, shapes exact); Phase 3 SHIPS per R27; DONE
 2026-10-10 | router -> main | - | Merged phase-1-data-quality into main (FF to 794578a, 0 diff); post-merge frontend build green; full suites green pre-merge exc R21-known env failure; branch kept (remote untouched, nothing pushed)
+2026-10-10 | router -> researcher | .workflow/inbox/researcher.md | Phase 4 kickoff on main: investment-score research (§6 + standing reqs 3/4); file findings to research/phase-4-investment-score.md
+2026-10-10 | researcher -> pm | .workflow/research/phase-4-investment-score.md | Snowflake 5x6 composition + Morningstar ladder + Alpha Spread transparency; EGX supports 4/5 components, consensus thin; NEXT: pm
+2026-10-10 | pm -> tech-lead | .workflow/decisions/R28-phase-4-scope.md | Phase 4 P1-P6 (4/5 components, equal weights, DQ-fed confidence); NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-4-brief.md | Phase 4 AUTHORIZED per R28, no amendment (014 free, surfaces verified, no collision); NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | Phase 4 backend done (23-check engine, floors, dual-track profiles, DQ ladder, explanations, 014 migration, scores router; suites green; 1 pre-existing R21 census failure); NEXT: qa-api
+2026-10-10 | qa-api -> tech-lead | - | Phase 4 conformant; 1 gap: GET drops headline.reason+health_track (not persisted); 2 nits (value str-vs-num, ticker None on GET); gates green; NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R29-phase-4-backend-verdict.md | R29 verdict FIX-LIST then ship: G1+N2 read-path reconstruction (no migration), N1 headline-number, round-trip test; no rework; NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | R29 fix-list done (read-path reconstruction, headline number, round-trip test; no migration); suites 29/29, ruff/mypy clean; NEXT: qa-api
+2026-10-10 | qa-api -> router | - | R29 fix-list re-verified green (29 scores tests, ruff/mypy clean, shapes exact); Phase 4 SHIPS per R29; DONE

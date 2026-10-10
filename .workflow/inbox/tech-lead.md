@@ -1,6 +1,16 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-10
+Task: Phase 4 backend verdict. qa-api found R28 conformance (P1–P6, gates green) with 1 functional gap + 2 nits: (1) GET read path drops `headline.reason` (None) and `health_track` (None) — table persists neither, so round-trip loses them; brief P5 demands reason on every response; (2) nit: headline `value` serializes as string vs component `score` as number; (3) nit: `assessment.ticker` None on GET (same root cause as 1). Rule each with next R-number: fix now (persist columns + normalize types?) vs accept-and-carry, with reasons. Note qa-api's observation that dividend/growth have only 3 checks each under a ≥3-run floor (literal R28 application, flagged for awareness). Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (superseded authorization brief kept below for record)
+Task: Authorize Phase 4 (Investment score) for implementation. Inputs: R28 scope (`.workflow/decisions/R28-phase-4-scope.md`; builds P1–P6, cuts with reasons), research (`.workflow/research/phase-4-investment-score.md`), roadmap §6 exit criteria. Verify brief currency against live code (migration head — 013 landed, confirm 014 free; consumes Phase-3 FV/bull-base-bear, Phase-2 industry_metric_profiles, Phase-1 DataQualityScore — verify those surfaces exist as described; collision-scan vs tree). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 3 verdict brief kept below for record)
 Task: Phase 3 backend verdict. qa-api found R25/R26 conformance (V1–V6 all PASS, gates re-verified: valuation suites green, ruff/mypy clean, full suite 434+1 with sole R21-known census failure) with NO hard blockers. One open item from qa-api: the GET fair-value session flush — qa-api ruled it acceptable hygiene but flagged F1 (docstring "never committed" is false under get_session commit; upsert key omits inputs → last-writer-wins) and recommended a pinning test (identical-GET determinism + domain-table cleanliness + last-writer-wins documentation). Rule: require the F1 fix+test now (fix-list) or accept-and-carry (ship), with next R-number and reasons. Then verdict: ship / fix-list / rework. Work is already committed (00cd305) so any fix-list lands as follow-up. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
 
 ---

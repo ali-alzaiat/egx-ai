@@ -1,5 +1,15 @@
 # Inbox: qa-api
 
+From: router (R29 fix-list re-verify) · 2026-10-10
+Task: Final re-verify of the R29 fix-list (uncommitted tree on main) — read-only: read-path reconstruction (reason/health_track/ticker on GET, no migration), headline number in both builders, round-trip test (`backend/app/scores/service.py`, `backend/app/repositories/scores.py`, `backend/tests/test_scores_api.py`). Re-run scores suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 4 SHIPS per R29 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
+
+---
+
+From: router (Phase 4 conformance) · 2026-10-10
+Task: Contract-conformance review of the Phase 4 backend (uncommitted tree on main) — read-only. Source of truth: R28 (`.workflow/decisions/R28-phase-4-scope.md` P1–P6), brief `task-phase-4-brief.md`. Implementation: `app/scores/` (checks/constants/service/seed), `app/models/scores.py`, `app/repositories/scores.py`, `app/api/scores.py` (GET + assess POST), migration `014_scores.py`. Checks: 23-check determinism (pass/fail/not-run, missing never fail/zero); floors (≥3/6, ≥3/5, headline null+reason); equal weights only (no fitted); dual-track routing + profile echo; confidence ladder never moves score (margin-of-safety display-only); explanation completeness + hedged copy (never BUY); 014 chain + round-trip; 404 shapes; methodology_version everywhere; assess-POST gap-filling honesty (latest price/FV/metrics/DQ-None). Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
+
+---
+
 From: router (R27 fix-list re-verify) · 2026-10-10
 Task: Final re-verify of the R27 fix-list (uncommitted tree) — read-only: corrected `get_fair_value` docstring, last-writer-wins notes, pinning test (`backend/app/api/valuation.py`, `backend/app/repositories/valuation.py`, `backend/tests/test_valuation_fair_value_api.py`). Re-run valuation suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 3 SHIPS per R27 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
 

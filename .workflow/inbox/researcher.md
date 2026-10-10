@@ -1,5 +1,10 @@
 # Inbox: researcher
 
+From: router (Phase 4 kickoff, on main) · 2026-10-10
+Task: Phase 4 (Investment score) research for roadmap §6 — one explainable score with all components visible, confidence separate from score — plus standing req 3 (industry profiles feed score confidence) and req 4 (data-quality as product). Study how SWS Snowflake / Morningstar star-rating / Alpha Spread grades compose multi-factor scores (weights, thresholds, how components stay visible), how they separate score from confidence/uncertainty, and what EGX data supports per component. Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-4-investment-score.md`). End NEXT: pm | BLOCKED: <question> | DONE.
+
+---
+
 From: router (Phase 3 kickoff) · 2026-10-10
 Task: Phase 3 (Valuation) research for roadmap §4–§5 (multiple models chosen per industry, weighted fair value, bull/base/bear, sensitivity, confidence score fed by data quality) + standing req 3 (per-industry metric profiles feed valuation model choice). Study how SWS/Koyfin/Yahoo/Morningstar do per-company valuation (methods, adjustable inputs, how they show uncertainty), what EGX-specific valuation practice looks like (broker research multiples by sector — EFG/CI reports), and which inputs EGX filings actually support (ties to financial_statements MISSING reality). Every claim cited with URL; `no data` where unverifiable. Reuse prior research files, don't redo them. Return inline (router files as `.workflow/research/phase-3-valuation.md`). End NEXT: pm | BLOCKED: <question> | DONE.
 
