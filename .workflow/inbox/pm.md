@@ -1,6 +1,11 @@
 # Inbox: pm
 
 From: router · 2026-10-10
+Task: Phase 5 requirements (Investment thesis, roadmap §7, §8, §9 + §16 part). Read `.workflow/research/phase-5-investment-thesis.md` in full (Narrative skeleton + 5-question assumptions; Bulls/Bears assumption-shifters; Alpha Spread scenario display; kill-criteria/falsification patterns; catalyst-calendar products; EGX disclosure-mandate mapping + PDF-only constraint; non-binding steers). Cut scope ruthlessly into builds vs defers against §7–§9 exit criteria (structured thesis on real metrics, labelled-assumption scenarios, stored invalidation, catalyst records): thesis sections v1, scenario depth, invalidation storage shape (threshold + source + status + append-only ledger), catalyst sourcing (mandated-disclosure skeleton + third-party rows, Confirmed-vs-Tentative labels), what degrades honestly under thin data. Bind AGENTS.md (rules 6/9/10: no certainty, no execution, reassessment-never-auto-sell) + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/companies/{id}`, methodology_version on records). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 4 brief kept below for record)
 Task: Phase 4 requirements (Investment score, roadmap §6: one explainable score, all components visible, confidence separate). Read `.workflow/research/phase-4-investment-score.md` in full (Snowflake 5×6 equal-weighted checks + thresholds; Morningstar 4-input star + widening ladder; Alpha Spread blend + solvency + assumption tables; EGX component support incl. thin-consensus + PDF-only constraints; req-3/req-4 mappings; non-binding steers). Cut scope ruthlessly into builds vs defers: component set v1 (which of value/growth/past/health/dividend survive EGX data), weighting (equal vs fitted — fitted needs justification against rule 2), confidence construction (DQ-fed ladder), INSUFFICIENT_DATA floors per component, what "explanation" each response carries. Bind AGENTS.md + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/companies/{id}`, methodology_version on scores). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
 
 ---

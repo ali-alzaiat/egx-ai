@@ -1,5 +1,10 @@
 # Inbox: qa-api
 
+From: router (Phase 5 conformance) · 2026-10-10
+Task: Contract-conformance review of the Phase 5 backend (uncommitted tree on main) — read-only. Source of truth: R30 (`.workflow/decisions/R30-phase-5-scope.md` P1–P7), brief `task-phase-5-brief.md`. Implementation: `app/thesis/` (thesis/constants/service), `app/models/thesis.py`, `app/repositories/thesis.py`, `app/api/theses.py` (GET + assess/update POSTs), migration `015_thesis.py`. Checks: deterministic template text (no LLM facts); history-anchored scenarios (no consensus pre-fill); invalidation shape (threshold+source+status+confidence+version, append-only ledger, trigger=reassessment never sale); catalyst labels + skeleton; MISSING degradation + DQ-fed confidence; hedged copy; 015 chain + round-trip; 404/400 shapes; methodology_version everywhere. Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
+
+---
+
 From: router (R29 fix-list re-verify) · 2026-10-10
 Task: Final re-verify of the R29 fix-list (uncommitted tree on main) — read-only: read-path reconstruction (reason/health_track/ticker on GET, no migration), headline number in both builders, round-trip test (`backend/app/scores/service.py`, `backend/app/repositories/scores.py`, `backend/tests/test_scores_api.py`). Re-run scores suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 4 SHIPS per R29 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
 

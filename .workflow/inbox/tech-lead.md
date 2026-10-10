@@ -1,6 +1,16 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-10
+Task: Phase 5 backend verdict. qa-api found R30 conformance (P1–P7, gates green) with 1 finding: header `fair_value` drops the `reason` key on the missing-data path (`service.py:787-793`, pinned by test `:427`) while sibling scenario entries carry it — the absent-value triple shape requires it. Rule with next R-number: fix now (pass through `fair["fair_value"]["reason"]` + update assertion) vs accept-and-carry, with reasons. Note: qa-api couldn't find the brief under `.workflow/` — it lives at `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-5-brief.md` (gitignored by project convention, not missing). Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (superseded authorization brief kept below for record)
+Task: Authorize Phase 5 (Investment thesis) for implementation. Inputs: R30 scope (`.workflow/decisions/R30-phase-5-scope.md`; builds P1–P7, cuts with reasons), research (`.workflow/research/phase-5-investment-thesis.md`), roadmap §7–§9 + §16-part exit criteria. Verify brief currency against live code (migration head — 014 landed, confirm 015 free; consumes Phase-3 FV/scenarios, Phase-4 score/confidence, Phase-1 DQ/latest — verify those surfaces exist as described; collision-scan vs tree; thesis tables must not exist yet). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 4 verdict brief kept below for record)
 Task: Phase 4 backend verdict. qa-api found R28 conformance (P1–P6, gates green) with 1 functional gap + 2 nits: (1) GET read path drops `headline.reason` (None) and `health_track` (None) — table persists neither, so round-trip loses them; brief P5 demands reason on every response; (2) nit: headline `value` serializes as string vs component `score` as number; (3) nit: `assessment.ticker` None on GET (same root cause as 1). Rule each with next R-number: fix now (persist columns + normalize types?) vs accept-and-carry, with reasons. Note qa-api's observation that dividend/growth have only 3 checks each under a ≥3-run floor (literal R28 application, flagged for awareness). Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
 
 ---

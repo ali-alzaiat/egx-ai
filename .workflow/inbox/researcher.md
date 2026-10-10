@@ -1,5 +1,10 @@
 # Inbox: researcher
 
+From: router (Phase 5 kickoff, on main) · 2026-10-10
+Task: Phase 5 (Investment thesis) research for roadmap §7, §8, §9 + §16 (part) — structured thesis referencing real metrics, scenarios with labelled assumptions, structurally stored invalidation conditions, catalyst records. Study how SWS Community Narratives / Morningstar analyst reports / Alpha Spread scenarios structure theses (assumption labelling, scenario ranges, what triggers invalidation), how catalyst/scenario tracking products do it (if any citable), and what EGX data supports per element. Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-5-investment-thesis.md`). End NEXT: pm | BLOCKED: <question> | DONE.
+
+---
+
 From: router (Phase 4 kickoff, on main) · 2026-10-10
 Task: Phase 4 (Investment score) research for roadmap §6 — one explainable score with all components visible, confidence separate from score — plus standing req 3 (industry profiles feed score confidence) and req 4 (data-quality as product). Study how SWS Snowflake / Morningstar star-rating / Alpha Spread grades compose multi-factor scores (weights, thresholds, how components stay visible), how they separate score from confidence/uncertainty, and what EGX data supports per component. Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-4-investment-score.md`). End NEXT: pm | BLOCKED: <question> | DONE.
 

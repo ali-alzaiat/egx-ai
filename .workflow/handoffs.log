@@ -52,3 +52,10 @@
 2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R29-phase-4-backend-verdict.md | R29 verdict FIX-LIST then ship: G1+N2 read-path reconstruction (no migration), N1 headline-number, round-trip test; no rework; NEXT: staff-backend
 2026-10-10 | staff-backend -> qa-api | - | R29 fix-list done (read-path reconstruction, headline number, round-trip test; no migration); suites 29/29, ruff/mypy clean; NEXT: qa-api
 2026-10-10 | qa-api -> router | - | R29 fix-list re-verified green (29 scores tests, ruff/mypy clean, shapes exact); Phase 4 SHIPS per R29; DONE
+2026-10-10 | router -> researcher | .workflow/inbox/researcher.md | Phase 5 kickoff: investment-thesis research (§7-9, §16 part); file findings to research/phase-5-investment-thesis.md
+2026-10-10 | researcher -> pm | .workflow/research/phase-5-investment-thesis.md | Narrative skeleton + Bulls/Bears shifters + kill-criteria patterns + EGX catalyst skeleton; NEXT: pm
+2026-10-10 | pm -> tech-lead | .workflow/decisions/R30-phase-5-scope.md | Phase 5 P1-P7 (thesis skeleton, history scenarios, stored invalidation, catalyst records); NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-5-brief.md | Phase 5 AUTHORIZED per R30, no amendment (015 free, surfaces verified, no collision); NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | Phase 5 backend done (thesis engine, invalidation+ledger, catalysts, 015 migration, theses router; 27 new tests green; 1 pre-existing R21 census failure); NEXT: qa-api
+2026-10-10 | qa-api -> tech-lead | - | Phase 5 conformant; 1 finding: header fair_value drops reason on missing path (test :427 pins it); brief lives under .superpowers (gitignored by convention); NEXT: tech-lead
+2026-10-10 | tech-lead -> router | .workflow/decisions/R31-phase-5-backend-verdict.md | R31 verdict SHIP: F1 accept-and-carry (reason in narrative, migration-free fix rejected); no fix-list, no rework; Phase 5 SHIPS; DONE

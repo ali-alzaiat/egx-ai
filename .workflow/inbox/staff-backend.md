@@ -1,5 +1,10 @@
 # Inbox: staff-backend
 
+From: router (Phase 5 authorized) · 2026-10-10
+Task: Implement Phase 5 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-5-brief.md` (R30 P1–P7, no amendment). Research context: `.workflow/research/phase-5-investment-thesis.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
+
+---
+
 From: router (R29 fix-list) · 2026-10-10
 Task: R29 three items, backend only, no migration: (G1+N2) reconstruct headline.reason + health_track + ticker on the GET read path from persisted data (reason derived via headline_score from components JSONB; health_track via profile lookup from persisted profile_key; ticker passed through from latest_payload) — no schema change; (N1) headline value as JSON number in both payload builders; (3) POST→GET round-trip regression test (value/status/reason, health_track, ticker, value types). Details in `.workflow/decisions/R29-phase-4-backend-verdict.md`. Nothing else. Run pytest on touched suites + ruff + mypy, paste outputs. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + evidence.
 
