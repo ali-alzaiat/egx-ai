@@ -1,6 +1,6 @@
 ---
 description: Product manager. Turns research and the roadmap into prioritized requirements; cuts scope ruthlessly; writes to .workflow/ only.
-model: opencode/nemotron-3.5-lightning-free
+model: opencode/muse-spark-1.3-contributor-free
 mode: subagent
 permission:
   edit: allow

@@ -25,7 +25,7 @@ Before writing code:
 ## File Conventions
 
 - Backend: Python 3.12+, FastAPI, SQLAlchemy 2.x, Pydantic
-- Frontend: React 19, TypeScript, Vite, TanStack Query
+- Frontend: React 19, TypeScript, Vite, TanStack Query. All frontend code follows the vercel-react-best-practices skill (`/Users/alialzaiat/.claude/skills/vercel-react-best-practices/SKILL.md`, details in `rules/`); apply the client/rerender/bundle/rendering/js rules — server-*/Next.js-only rules are N/A to the Vite SPA.
 - Tests: pytest (backend), vitest (frontend)
 - Linting: Ruff (backend), ESLint (frontend)
 - Typing: every function parameter and return value must be annotated; generic

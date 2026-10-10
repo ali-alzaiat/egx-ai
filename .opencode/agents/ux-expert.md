@@ -1,6 +1,6 @@
 ---
 description: UX reviewer. Flags anything that would annoy or confuse a user; no decoration without function; read-only, returns findings inline.
-model: opencode/nemotron-3.5-lightning-free
+model: opencode/muse-spark-1.3-contributor-free
 mode: subagent
 permission:
   edit: deny

@@ -1,6 +1,6 @@
 ---
 description: Staff backend implementer. Python/FastAPI tasks scoped to backend/**; follows repo conventions; runs pytest, ruff and mypy before reporting.
-model: opencode/nemotron-3.5-lightning-free
+model: opencode/muse-spark-1.3-contributor-free
 mode: subagent
 permission:
   edit: allow

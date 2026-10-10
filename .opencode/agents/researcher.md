@@ -1,6 +1,6 @@
 ---
 description: Competitive/market researcher. Web research with a URL cited for every claim; returns findings for the router to file under .workflow/research/.
-model: opencode/nemotron-3.5-lightning-free
+model: opencode/muse-spark-1.3-contributor-free
 mode: subagent
 permission:
   edit: deny
