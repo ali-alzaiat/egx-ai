@@ -21,6 +21,11 @@ class ValuationModel(Enum):
     PB = "price_to_book"
     EV_EBITDA = "ev_to_ebitda"
     DCF = "discounted_cash_flow"
+    PS = "price_to_sales"
+    FCFE_2STAGE = "fcfe_two_stage"
+    DDM = "dividend_discount"
+    EXCESS_RETURNS = "excess_returns"
+    AFFO_2STAGE = "affo_two_stage"
 
 
 class ValuationStatus(Enum):
@@ -52,6 +57,56 @@ def _safe_divide(
         return result.quantize(Decimal(10) ** -precision, rounding=ROUND_HALF_UP)
     except InvalidOperation:
         return None
+
+
+def _two_stage_present_value(
+    base_cash_flow: Decimal,
+    growth_high: Decimal,
+    years_high: int,
+    growth_stable: Decimal,
+    years_stable: int,
+    discount_rate: Decimal,
+    terminal_growth_rate: Decimal,
+) -> tuple[Decimal, Decimal, Decimal, Decimal] | None:
+    """Present value of a 2-stage cash-flow stream plus Gordon terminal value.
+
+    Stage 1 compounds at ``growth_high`` for ``years_high`` years, stage 2 at
+    ``growth_stable`` for ``years_stable`` years; the terminal value is a
+    Gordon perpetuity on the final projected flow.
+
+    Returns (pv_flows, terminal_value, pv_terminal, enterprise_value),
+    or None when the discounting math fails.
+    """
+    pv_flows = Decimal("0")
+    projected = base_cash_flow
+    year = 0
+    for _ in range(years_high):
+        year += 1
+        projected = projected * (1 + growth_high)
+        pv = _safe_divide(projected, (1 + discount_rate) ** year, precision=8)
+        if pv is None:
+            return None
+        pv_flows += pv
+    for _ in range(years_stable):
+        year += 1
+        projected = projected * (1 + growth_stable)
+        pv = _safe_divide(projected, (1 + discount_rate) ** year, precision=8)
+        if pv is None:
+            return None
+        pv_flows += pv
+
+    terminal_fcf = projected * (1 + terminal_growth_rate)
+    terminal_value = _safe_divide(
+        terminal_fcf, discount_rate - terminal_growth_rate, precision=8
+    )
+    if terminal_value is None:
+        return None
+    pv_terminal = _safe_divide(
+        terminal_value, (1 + discount_rate) ** year, precision=8
+    )
+    if pv_terminal is None:
+        return None
+    return (pv_flows, terminal_value, pv_terminal, pv_flows + pv_terminal)
 
 
 def calculate_pe_valuation(
@@ -144,6 +199,53 @@ def calculate_pb_valuation(
             "bvps": str(book_value_per_share),
             "pb_ratio": str(pb_ratio),
             "formula": "Price = BVPS × P/B Ratio",
+        },
+    )
+
+
+def calculate_ps_valuation(
+    revenue_per_share: Decimal | None,
+    ps_ratio: Decimal | None,
+) -> ValuationResult:
+    """Calculate implied price using P/S ratio.
+
+    Formula: Price = RPS × P/S Ratio
+
+    Args:
+        revenue_per_share: Current revenue per share
+        ps_ratio: Target P/S ratio
+
+    Returns:
+        ValuationResult with implied price and assumptions
+    """
+    if revenue_per_share is None or ps_ratio is None:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.PS,
+            assumptions={},
+            reason="Missing RPS or P/S ratio",
+        )
+
+    if revenue_per_share <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.PS,
+            assumptions={"rps": str(revenue_per_share), "ps_ratio": str(ps_ratio)},
+            reason="Revenue per share must be positive for P/S valuation",
+        )
+
+    implied_price = revenue_per_share * ps_ratio
+
+    return ValuationResult(
+        value=implied_price,
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.PS,
+        assumptions={
+            "rps": str(revenue_per_share),
+            "ps_ratio": str(ps_ratio),
+            "formula": "Price = RPS × P/S Ratio",
         },
     )
 
@@ -366,6 +468,590 @@ def calculate_dcf_valuation(
             "shares_outstanding": str(shares_outstanding) if shares_outstanding else None,
             "formula": "DCF with terminal value",
         },
+    )
+
+
+def calculate_fcfe_2stage(
+    free_cash_flow: Decimal | None,
+    growth_high: Decimal | None,
+    growth_stable: Decimal | None,
+    discount_rate: Decimal | None,
+    terminal_growth_rate: Decimal | None,
+    years_high: int = 5,
+    years_stable: int = 5,
+    shares_outstanding: Decimal | None = None,
+) -> ValuationResult:
+    """Calculate implied share price with a 2-stage FCFE model (general companies).
+
+    Stage 1 compounds FCF at ``growth_high`` for ``years_high`` years, stage 2
+    at ``growth_stable`` for ``years_stable`` years; terminal value is a Gordon
+    perpetuity discounted at ``discount_rate`` (cost of equity).
+
+    Args:
+        free_cash_flow: Current levered free cash flow (never fabricated)
+        growth_high: Near-term growth rate (historical extrapolation, not consensus)
+        growth_stable: Stable-phase growth rate
+        discount_rate: Cost of equity
+        terminal_growth_rate: Perpetual growth rate for the terminal value
+        years_high: Stage-1 years (default 5)
+        years_stable: Stage-2 years (default 5)
+        shares_outstanding: Shares outstanding for per-share value
+
+    Returns:
+        ValuationResult with implied price and assumptions
+    """
+    if any(
+        v is None
+        for v in [
+            free_cash_flow,
+            growth_high,
+            growth_stable,
+            discount_rate,
+            terminal_growth_rate,
+        ]
+    ):
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={},
+            reason="Missing FCF, growth, discount, or terminal growth rate",
+        )
+
+    assert free_cash_flow is not None
+    assert growth_high is not None
+    assert growth_stable is not None
+    assert discount_rate is not None
+    assert terminal_growth_rate is not None
+
+    if free_cash_flow <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={"fcf": str(free_cash_flow)},
+            reason="Free cash flow must be positive for FCFE valuation",
+        )
+
+    if discount_rate <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={"discount_rate": str(discount_rate)},
+            reason="Discount rate must be positive for FCFE valuation",
+        )
+
+    if discount_rate <= terminal_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={
+                "discount_rate": str(discount_rate),
+                "terminal_growth_rate": str(terminal_growth_rate),
+            },
+            reason="Discount rate must be greater than terminal growth rate",
+        )
+
+    if years_high <= 0 or years_stable <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={
+                "years_high": str(years_high),
+                "years_stable": str(years_stable),
+            },
+            reason="Projection horizons must be positive",
+        )
+
+    stages = _two_stage_present_value(
+        free_cash_flow,
+        growth_high,
+        years_high,
+        growth_stable,
+        years_stable,
+        discount_rate,
+        terminal_growth_rate,
+    )
+    if stages is None:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={},
+            reason="Two-stage discounting math failed",
+        )
+    pv_flows, terminal_value, pv_terminal, enterprise_value = stages
+
+    if enterprise_value <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={"enterprise_value": str(enterprise_value)},
+            reason="Implied enterprise value is not positive",
+        )
+
+    if shares_outstanding and shares_outstanding > 0:
+        price_per_share = _safe_divide(enterprise_value, shares_outstanding, precision=4)
+    else:
+        price_per_share = None
+
+    return ValuationResult(
+        value=price_per_share,
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.FCFE_2STAGE,
+        assumptions={
+            "fcf": str(free_cash_flow),
+            "growth_high": str(growth_high),
+            "years_high": str(years_high),
+            "growth_stable": str(growth_stable),
+            "years_stable": str(years_stable),
+            "discount_rate": str(discount_rate),
+            "terminal_growth_rate": str(terminal_growth_rate),
+            "pv_flows": str(pv_flows),
+            "terminal_value": str(terminal_value),
+            "pv_terminal": str(pv_terminal),
+            "enterprise_value": str(enterprise_value),
+            "shares_outstanding": str(shares_outstanding) if shares_outstanding else None,
+            "formula": "2-stage FCFE with Gordon terminal value",
+        },
+    )
+
+
+def calculate_ddm(
+    expected_dps: Decimal | None,
+    discount_rate: Decimal | None,
+    perpetual_growth_rate: Decimal | None,
+) -> ValuationResult:
+    """Calculate implied share price with the Gordon Dividend Discount Model.
+
+    Formula: Value = Expected DPS / (discount rate - perpetual growth).
+    Used for consistent dividend payers and as the fallback intrinsic model.
+
+    Args:
+        expected_dps: Expected dividend per share next period
+        discount_rate: Cost of equity
+        perpetual_growth_rate: Perpetual dividend growth rate
+
+    Returns:
+        ValuationResult with implied price and assumptions
+    """
+    if any(v is None for v in [expected_dps, discount_rate, perpetual_growth_rate]):
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.DDM,
+            assumptions={},
+            reason="Missing expected DPS, discount rate, or perpetual growth rate",
+        )
+
+    assert expected_dps is not None
+    assert discount_rate is not None
+    assert perpetual_growth_rate is not None
+
+    if expected_dps <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.DDM,
+            assumptions={"expected_dps": str(expected_dps)},
+            reason="Expected DPS must be positive for DDM valuation",
+        )
+
+    if discount_rate <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.DDM,
+            assumptions={"discount_rate": str(discount_rate)},
+            reason="Discount rate must be positive for DDM valuation",
+        )
+
+    if discount_rate <= perpetual_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.DDM,
+            assumptions={
+                "discount_rate": str(discount_rate),
+                "perpetual_growth_rate": str(perpetual_growth_rate),
+            },
+            reason="Discount rate must be greater than perpetual growth rate",
+        )
+
+    value = _safe_divide(
+        expected_dps, discount_rate - perpetual_growth_rate, precision=4
+    )
+    if value is None or value <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.DDM,
+            assumptions={
+                "expected_dps": str(expected_dps),
+                "discount_rate": str(discount_rate),
+            },
+            reason="DDM calculation failed",
+        )
+
+    return ValuationResult(
+        value=value,
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.DDM,
+        assumptions={
+            "expected_dps": str(expected_dps),
+            "discount_rate": str(discount_rate),
+            "perpetual_growth_rate": str(perpetual_growth_rate),
+            "formula": "Value = Expected DPS / (discount rate - perpetual growth)",
+        },
+    )
+
+
+def calculate_excess_returns(
+    stable_book_value_per_share: Decimal | None,
+    stable_roe: Decimal | None,
+    cost_of_equity: Decimal | None,
+    perpetual_growth_rate: Decimal | None,
+) -> ValuationResult:
+    """Calculate implied share price with the Excess Returns model (banks/insurers).
+
+    Formula: Excess = (Stable ROE - Cost of Equity) × Stable BV/share;
+    Fair Value/share = Stable BV/share + Excess / (CoE - g).
+    Terminal excess is already a present value (perpetuity from today), so no
+    further discounting is applied.
+
+    Args:
+        stable_book_value_per_share: Stable book value per share
+        stable_roe: Stable return on equity (fraction, e.g. 0.12)
+        cost_of_equity: Cost of equity (fraction)
+        perpetual_growth_rate: Perpetual growth rate of excess returns
+
+    Returns:
+        ValuationResult with implied price and assumptions
+    """
+    if any(
+        v is None
+        for v in [
+            stable_book_value_per_share,
+            stable_roe,
+            cost_of_equity,
+            perpetual_growth_rate,
+        ]
+    ):
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={},
+            reason="Missing stable BVPS, stable ROE, cost of equity, or perpetual growth",
+        )
+
+    assert stable_book_value_per_share is not None
+    assert stable_roe is not None
+    assert cost_of_equity is not None
+    assert perpetual_growth_rate is not None
+
+    if stable_book_value_per_share <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={"stable_bvps": str(stable_book_value_per_share)},
+            reason="Stable book value per share must be positive",
+        )
+
+    if cost_of_equity <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={"cost_of_equity": str(cost_of_equity)},
+            reason="Cost of equity must be positive",
+        )
+
+    if cost_of_equity <= perpetual_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={
+                "cost_of_equity": str(cost_of_equity),
+                "perpetual_growth_rate": str(perpetual_growth_rate),
+            },
+            reason="Cost of equity must be greater than perpetual growth rate",
+        )
+
+    excess = (stable_roe - cost_of_equity) * stable_book_value_per_share
+    terminal_excess = _safe_divide(
+        excess, cost_of_equity - perpetual_growth_rate, precision=8
+    )
+    if terminal_excess is None:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={},
+            reason="Terminal excess-returns calculation failed",
+        )
+    fair_value = stable_book_value_per_share + terminal_excess
+
+    if fair_value <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.EXCESS_RETURNS,
+            assumptions={
+                "stable_bvps": str(stable_book_value_per_share),
+                "stable_roe": str(stable_roe),
+                "cost_of_equity": str(cost_of_equity),
+                "excess": str(excess),
+            },
+            reason="Implied fair value is not positive",
+        )
+
+    return ValuationResult(
+        value=fair_value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.EXCESS_RETURNS,
+        assumptions={
+            "stable_bvps": str(stable_book_value_per_share),
+            "stable_roe": str(stable_roe),
+            "cost_of_equity": str(cost_of_equity),
+            "perpetual_growth_rate": str(perpetual_growth_rate),
+            "excess": str(excess),
+            "terminal_excess": str(terminal_excess),
+            "formula": "FV = Stable BV + (Stable ROE - CoE) × Stable BV / (CoE - g)",
+        },
+    )
+
+
+def calculate_affo_2stage(
+    cash_flow: Decimal | None,
+    growth_high: Decimal | None,
+    growth_stable: Decimal | None,
+    discount_rate: Decimal | None,
+    terminal_growth_rate: Decimal | None,
+    years_high: int = 5,
+    years_stable: int = 5,
+    shares_outstanding: Decimal | None = None,
+    cash_flow_source: str = "affo",
+) -> ValuationResult:
+    """Calculate implied share price with a 2-stage AFFO model (REITs/developers).
+
+    Identical mechanics to the 2-stage FCFE model but discounts adjusted funds
+    from operations. The caller resolves the AFFO → FFO → FCF fallback chain
+    and records which series was used in ``cash_flow_source``.
+
+    Args:
+        cash_flow: Current AFFO (or FFO/FCF fallback — see cash_flow_source)
+        growth_high: Near-term growth rate
+        growth_stable: Stable-phase growth rate
+        discount_rate: Cost of equity
+        terminal_growth_rate: Perpetual growth rate for the terminal value
+        years_high: Stage-1 years (default 5)
+        years_stable: Stage-2 years (default 5)
+        shares_outstanding: Shares outstanding for per-share value
+        cash_flow_source: One of "affo", "ffo", "fcf"
+
+    Returns:
+        ValuationResult with implied price and assumptions
+    """
+    if cash_flow_source not in ("affo", "ffo", "fcf"):
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={"cash_flow_source": cash_flow_source},
+            reason="cash_flow_source must be one of affo, ffo, fcf",
+        )
+
+    if any(
+        v is None
+        for v in [
+            cash_flow,
+            growth_high,
+            growth_stable,
+            discount_rate,
+            terminal_growth_rate,
+        ]
+    ):
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={},
+            reason="Missing AFFO, growth, discount, or terminal growth rate",
+        )
+
+    assert cash_flow is not None
+    assert growth_high is not None
+    assert growth_stable is not None
+    assert discount_rate is not None
+    assert terminal_growth_rate is not None
+
+    if cash_flow <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={"cash_flow": str(cash_flow)},
+            reason="Cash flow must be positive for AFFO valuation",
+        )
+
+    if discount_rate <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={"discount_rate": str(discount_rate)},
+            reason="Discount rate must be positive for AFFO valuation",
+        )
+
+    if discount_rate <= terminal_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={
+                "discount_rate": str(discount_rate),
+                "terminal_growth_rate": str(terminal_growth_rate),
+            },
+            reason="Discount rate must be greater than terminal growth rate",
+        )
+
+    if years_high <= 0 or years_stable <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={
+                "years_high": str(years_high),
+                "years_stable": str(years_stable),
+            },
+            reason="Projection horizons must be positive",
+        )
+
+    stages = _two_stage_present_value(
+        cash_flow,
+        growth_high,
+        years_high,
+        growth_stable,
+        years_stable,
+        discount_rate,
+        terminal_growth_rate,
+    )
+    if stages is None:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={},
+            reason="Two-stage discounting math failed",
+        )
+    pv_flows, terminal_value, pv_terminal, enterprise_value = stages
+
+    if enterprise_value <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={"enterprise_value": str(enterprise_value)},
+            reason="Implied enterprise value is not positive",
+        )
+
+    if shares_outstanding and shares_outstanding > 0:
+        price_per_share = _safe_divide(enterprise_value, shares_outstanding, precision=4)
+    else:
+        price_per_share = None
+
+    return ValuationResult(
+        value=price_per_share,
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.AFFO_2STAGE,
+        assumptions={
+            "cash_flow": str(cash_flow),
+            "cash_flow_source": cash_flow_source,
+            "growth_high": str(growth_high),
+            "years_high": str(years_high),
+            "growth_stable": str(growth_stable),
+            "years_stable": str(years_stable),
+            "discount_rate": str(discount_rate),
+            "terminal_growth_rate": str(terminal_growth_rate),
+            "pv_flows": str(pv_flows),
+            "terminal_value": str(terminal_value),
+            "pv_terminal": str(pv_terminal),
+            "enterprise_value": str(enterprise_value),
+            "shares_outstanding": str(shares_outstanding) if shares_outstanding else None,
+            "formula": "2-stage AFFO with Gordon terminal value",
+        },
+    )
+
+
+def select_preferred_multiple(
+    earnings_per_share: Decimal | None,
+    pe_ratio: Decimal | None,
+    revenue_per_share: Decimal | None,
+    ps_ratio: Decimal | None,
+    book_value_per_share: Decimal | None,
+    pb_ratio: Decimal | None,
+) -> ValuationResult:
+    """Select the preferred relative multiple: P/E → P/S → P/B.
+
+    P/E wins for profitable companies with a sane target (P/E < 150);
+    P/S covers growth/early-stage names; P/B covers banks/financials where the
+    asset base drives income. Anything else reports INSUFFICIENT_DATA — never
+    a zero or a guessed multiple.
+
+    Returns:
+        ValuationResult from the winning multiple, tagged with
+        ``selected_multiple`` in assumptions.
+    """
+    if (
+        earnings_per_share is not None
+        and earnings_per_share > 0
+        and pe_ratio is not None
+        and pe_ratio > 0
+        and pe_ratio < 150
+    ):
+        result = calculate_pe_valuation(earnings_per_share, pe_ratio)
+        return result._replace(
+            assumptions={**result.assumptions, "selected_multiple": "pe"}
+        )
+
+    if (
+        revenue_per_share is not None
+        and revenue_per_share > 0
+        and ps_ratio is not None
+        and ps_ratio > 0
+    ):
+        result = calculate_ps_valuation(revenue_per_share, ps_ratio)
+        return result._replace(
+            assumptions={**result.assumptions, "selected_multiple": "ps"}
+        )
+
+    if (
+        book_value_per_share is not None
+        and book_value_per_share > 0
+        and pb_ratio is not None
+        and pb_ratio > 0
+    ):
+        result = calculate_pb_valuation(book_value_per_share, pb_ratio)
+        return result._replace(
+            assumptions={**result.assumptions, "selected_multiple": "pb"}
+        )
+
+    return ValuationResult(
+        value=None,
+        status=ValuationStatus.INSUFFICIENT_DATA,
+        model=ValuationModel.PE,
+        assumptions={"selected_multiple": None},
+        reason=(
+            "No usable multiple: need profitable EPS with P/E<150, "
+            "or RPS with P/S, or BVPS with P/B"
+        ),
     )
 
 

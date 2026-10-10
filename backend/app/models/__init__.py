@@ -9,6 +9,16 @@ from app.models.financial import (
     FinancialPeriod,
     ReportingPeriodType,
 )
+from app.models.industry import (
+    CompanyPeerOverride,
+    EgxSector,
+    EgxSectorGicsMap,
+    GicsIndustry,
+    GicsIndustryGroup,
+    GicsSector,
+    GicsSubIndustry,
+    IndustryMetricProfile,
+)
 from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
 from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
 from app.models.screening import ScreeningRuleResultDB, ScreeningStatusDB, ShariahScreeningResult
@@ -20,7 +30,13 @@ from app.models.signals import (
     UniverseCoverageSnapshot,
 )
 from app.models.technical import IndicatorStatusDB, IndicatorTypeDB, TechnicalIndicator
-from app.models.valuation import ValuationModelDB, ValuationResult, ValuationStatusDB
+from app.models.valuation import (
+    IndustryValuationProfile,
+    ValuationFairValue,
+    ValuationModelDB,
+    ValuationResult,
+    ValuationStatusDB,
+)
 
 __all__ = [
     "AIAnalysis",
@@ -28,6 +44,7 @@ __all__ = [
     "AnalysisTypeDB",
     "ChunkTypeDB",
     "Company",
+    "CompanyPeerOverride",
     "CompanyStatus",
     "DailyPrice",
     "DataQualityAssessment",
@@ -36,6 +53,8 @@ __all__ = [
     "DataSourceType",
     "DocumentChunk",
     "DocumentStatus",
+    "EgxSector",
+    "EgxSectorGicsMap",
     "FactStatus",
     "FactType",
     "FinancialDocument",
@@ -43,8 +62,14 @@ __all__ = [
     "FinancialMetric",
     "FinancialMetricInput",
     "FinancialPeriod",
+    "GicsIndustry",
+    "GicsIndustryGroup",
+    "GicsSector",
+    "GicsSubIndustry",
     "IndicatorStatusDB",
     "IndicatorTypeDB",
+    "IndustryMetricProfile",
+    "IndustryValuationProfile",
     "MarketSignal",
     "MetricStatusDB",
     "ReportingPeriodType",
@@ -56,6 +81,7 @@ __all__ = [
     "SignalTierDB",
     "TechnicalIndicator",
     "UniverseCoverageSnapshot",
+    "ValuationFairValue",
     "ValuationModelDB",
     "ValuationResult",
     "ValuationStatusDB",

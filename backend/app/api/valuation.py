@@ -2,6 +2,7 @@
 
 import json
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_session
 from app.models.valuation import ValuationModelDB, ValuationStatusDB
 from app.repositories.valuation import ValuationRepository
-from app.valuation.service import ValuationInput, ValuationService
+from app.valuation.service import FairValueInput, FairValueService, ValuationInput, ValuationService
 
 router = APIRouter(prefix="/api/valuation", tags=["valuation"])
 
@@ -139,4 +140,63 @@ async def calculate_valuations(
     }
 
 
-from decimal import Decimal  # noqa: E402
+@router.get("/companies/{company_id}/fair-value")
+async def get_fair_value(
+    company_id: uuid.UUID,
+    free_cash_flow: float | None = Query(None),
+    growth_rate: float | None = Query(None),
+    stable_growth: float | None = Query(None),
+    discount_rate: float | None = Query(None),
+    terminal_growth_rate: float | None = Query(None),
+    expected_dps: float | None = Query(None),
+    stable_roe: float | None = Query(None),
+    affo: float | None = Query(None),
+    ffo: float | None = Query(None),
+    earnings_per_share: float | None = Query(None),
+    pe_ratio: float | None = Query(None),
+    revenue_per_share: float | None = Query(None),
+    ps_ratio: float | None = Query(None),
+    book_value_per_share: float | None = Query(None),
+    pb_ratio: float | None = Query(None),
+    shares_outstanding: float | None = Query(None),
+    revenue_growth: float | None = Query(None),
+    operating_margin: float | None = Query(None),
+    exit_multiple: float | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Weighted fair value with profile routing, scenarios, and confidence.
+
+    Additive sub-resource: the existing GET on this router keeps its contract.
+    All inputs are optional; missing inputs degrade to INSUFFICIENT_DATA.
+    Computed snapshot is flushed (never committed) as a deterministic cache.
+    """
+    service = FairValueService(session)
+    return await service.fair_value(
+        company_id,
+        FairValueInput(
+            free_cash_flow=_dec(free_cash_flow),
+            growth_rate=_dec(growth_rate),
+            stable_growth=_dec(stable_growth),
+            discount_rate=_dec(discount_rate),
+            terminal_growth_rate=_dec(terminal_growth_rate),
+            expected_dps=_dec(expected_dps),
+            stable_roe=_dec(stable_roe),
+            affo=_dec(affo),
+            ffo=_dec(ffo),
+            earnings_per_share=_dec(earnings_per_share),
+            pe_ratio=_dec(pe_ratio),
+            revenue_per_share=_dec(revenue_per_share),
+            ps_ratio=_dec(ps_ratio),
+            book_value_per_share=_dec(book_value_per_share),
+            pb_ratio=_dec(pb_ratio),
+            shares_outstanding=_dec(shares_outstanding),
+            revenue_growth=_dec(revenue_growth),
+            operating_margin=_dec(operating_margin),
+            exit_multiple=_dec(exit_multiple),
+        ),
+    )
+
+
+def _dec(value: float | None) -> Decimal | None:
+    """Query float to Decimal; None stays None and zero stays zero."""
+    return Decimal(str(value)) if value is not None else None
