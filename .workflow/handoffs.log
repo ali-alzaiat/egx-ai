@@ -42,3 +42,4 @@
 2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R27-phase-3-backend-verdict.md | R27 verdict FIX-LIST then ship: F1 docstring fix + last-writer-wins note + pinning test; no rework; NEXT: staff-backend
 2026-10-10 | staff-backend -> qa-api | - | R27 fix-list done (docstring fix + last-writer-wins notes + pinning test); suites 62/62, ruff/mypy clean, full-app 0/118; NEXT: qa-api
 2026-10-10 | qa-api -> router | - | R27 fix-list re-verified green (62 valuation tests, ruff/mypy clean, shapes exact); Phase 3 SHIPS per R27; DONE
+2026-10-10 | router -> main | - | Merged phase-1-data-quality into main (FF to 794578a, 0 diff); post-merge frontend build green; full suites green pre-merge exc R21-known env failure; branch kept (remote untouched, nothing pushed)
