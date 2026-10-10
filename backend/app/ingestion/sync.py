@@ -82,9 +82,11 @@ async def fetch_and_write_prices(
             async with lock:
                 failures.append((ticker, str(exc)))
         else:
-            if bars:
-                async with lock:
+            async with lock:
+                if bars:
                     fetched[ticker] = bars
+                else:
+                    failures.append((ticker, "Yahoo returned no history"))
         async with lock:
             completed += 1
             if on_progress is not None:

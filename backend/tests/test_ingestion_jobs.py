@@ -19,9 +19,15 @@ from app.models.market import Company
 class _StubProvider:
     """Fake price provider: deterministic bars, optional per-ticker failure/delay."""
 
-    def __init__(self, fail: set[str] | None = None, delay: float = 0.0) -> None:
+    def __init__(
+        self,
+        fail: set[str] | None = None,
+        delay: float = 0.0,
+        empty: set[str] | None = None,
+    ) -> None:
         self.fail = fail or set()
         self.delay = delay
+        self.empty = empty or set()
         self._inner = FakeMarketDataProvider()
 
     async def get_companies(self) -> list[object]:
@@ -37,6 +43,8 @@ class _StubProvider:
             await asyncio.sleep(self.delay)
         if ticker in self.fail:
             raise RuntimeError(f"no history for {ticker}")
+        if ticker in self.empty:
+            return []
         return await self._inner.get_daily_prices(ticker, start_date, end_date)
 
 
@@ -166,6 +174,26 @@ async def test_partial_on_ticker_failure(client, refresh_env, monkeypatch):
     assert job["prices"]["failed_count"] == 1
     assert job["prices"]["failed_tickers"] == [
         {"ticker": "COMI", "error": "no history for COMI"}
+    ]
+    assert job["assessment"]["scores_written"] > 0
+    assert job["error"] is None
+
+
+async def test_partial_on_empty_history(client, refresh_env, monkeypatch):
+    monkeypatch.setattr(
+        jobs, "create_price_provider", lambda: _StubProvider(empty={"COMI"})
+    )
+
+    assert (await client.post("/api/ingestion/sync", params=_TICKERS)).status_code == 202
+    await _await_job()
+
+    job = jobs.current_job().to_dict()
+    assert job["status"] == "partial"
+    assert job["prices"]["companies_total"] == 2
+    assert job["prices"]["companies_fetched"] == 1
+    assert job["prices"]["failed_count"] == 1
+    assert job["prices"]["failed_tickers"] == [
+        {"ticker": "COMI", "error": "Yahoo returned no history"}
     ]
     assert job["assessment"]["scores_written"] > 0
     assert job["error"] is None
