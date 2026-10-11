@@ -19,9 +19,15 @@ from enum import Enum
 
 
 class ShariahMethodologyVersion(Enum):
-    """Versioned methodology for auditability."""
+    """Versioned methodology for auditability.
+
+    V2 identifiers pin denominator + averaging window + thresholds
+    (R32 B1): bare standard names never ship on new verdicts.
+    V1_0/V1_1 remain so old rows stay readable via the version filter.
+    """
     V1_0 = "1.0"
     V1_1 = "1.1"
+    V2_ASSETS_SPOT = "aaoifi-assets-spot/33-33-5"
 
 
 class ProhibitedIndustry(Enum):
@@ -49,6 +55,12 @@ class ShariahMethodology:
     description: str
     source_reference: str
 
+    # Pinned engine semantics (R32 B1): the ratios are computed over spot
+    # balance-sheet totals (total_assets) and spot total revenue — an
+    # MSCI/FTSE-style denominator, not AAOIFI market-cap averaging.
+    denominator: str = "spot_total_assets"
+    averaging_window: str = "spot"
+
     # Financial ratio thresholds
     debt_to_assets_threshold: Decimal = Decimal("0.33")
     interest_income_to_revenue_threshold: Decimal = Decimal("0.05")
@@ -70,18 +82,24 @@ class ShariahMethodology:
         )
 
 
-# Default methodology based on AAOIFI standards
+# Default methodology: v2 pinned identifier (R32 B1). The version string
+# carries denominator + window + thresholds (debt 33 / cash+securities 33 /
+# impure income 5); bare "AAOIFI" never ships on new verdicts again.
 DEFAULT_METHODOLOGY = ShariahMethodology(
-    version=ShariahMethodologyVersion.V1_0,
-    name="AAOIFI-based Shariah Screening",
+    version=ShariahMethodologyVersion.V2_ASSETS_SPOT,
+    name="AAOIFI spot-asset screen (debt 33 / cash 33 / impure income 5)",
     description=(
-        "Shariah compliance screening based on AAOIFI standards. "
+        "Shariah compliance screening with AAOIFI thresholds applied over "
+        "spot total_assets and spot total_revenue. "
         "Screens companies based on financial ratios and prohibited industries."
     ),
     source_reference=(
-        "AAOIFI Shariah Standard No. 21 (Financial Papers), "
-        "S&P Shariah Indices Methodology"
+        "AAOIFI Shariah Standard No. 21 (Financial Papers) thresholds; "
+        "spot-asset denominator per engine semantics "
+        "(MSCI/FTSE-style, not market-cap averaging)"
     ),
+    denominator="spot_total_assets",
+    averaging_window="spot",
     debt_to_assets_threshold=Decimal("0.33"),
     interest_income_to_revenue_threshold=Decimal("0.05"),
     cash_and_securities_to_assets_threshold=Decimal("0.33"),

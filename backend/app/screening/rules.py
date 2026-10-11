@@ -5,6 +5,7 @@ a screening result. No AI is involved in rule evaluation.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from enum import Enum
 
@@ -18,12 +19,21 @@ class ScreeningVerdict(Enum):
 
 @dataclass(frozen=True)
 class ScreeningRuleResult:
-    """Result of evaluating a single screening rule."""
+    """Result of evaluating a single screening rule.
+
+    INSUFFICIENT_DATA is first-class (R32 B2): ``value`` stays None and the
+    ``reason`` + ``missing_input`` pair names the absent fact label(s).
+    ``source``/``source_date`` are stamped by the service from filing
+    provenance, never invented by the rule.
+    """
     rule_name: str
     verdict: ScreeningVerdict
     value: Decimal | None
     threshold: Decimal | None
     reason: str | None = None
+    missing_input: str | None = None
+    source: str | None = None
+    source_date: date | None = None
 
 
 def screen_debt_ratio(
@@ -44,12 +54,21 @@ def screen_debt_ratio(
         ScreeningRuleResult with PASS, FAIL, or INSUFFICIENT_DATA
     """
     if total_debt is None or total_assets is None:
+        missing = ", ".join(
+            label
+            for label, present in (
+                ("total_debt", total_debt),
+                ("total_assets", total_assets),
+            )
+            if present is None
+        )
         return ScreeningRuleResult(
             rule_name="debt_ratio",
             verdict=ScreeningVerdict.INSUFFICIENT_DATA,
             value=None,
             threshold=threshold,
             reason="Missing debt or assets data",
+            missing_input=missing,
         )
 
     if total_assets == 0:
@@ -92,12 +111,21 @@ def screen_interest_income(
         ScreeningRuleResult with PASS, FAIL, or INSUFFICIENT_DATA
     """
     if interest_income is None or total_revenue is None:
+        missing = ", ".join(
+            label
+            for label, present in (
+                ("interest_income", interest_income),
+                ("total_revenue", total_revenue),
+            )
+            if present is None
+        )
         return ScreeningRuleResult(
             rule_name="interest_income_ratio",
             verdict=ScreeningVerdict.INSUFFICIENT_DATA,
             value=None,
             threshold=threshold,
             reason="Missing interest income or revenue data",
+            missing_input=missing,
         )
 
     if total_revenue == 0:
@@ -140,12 +168,21 @@ def screen_cash_and_securities(
         ScreeningRuleResult with PASS, FAIL, or INSUFFICIENT_DATA
     """
     if cash_and_securities is None or total_assets is None:
+        missing = ", ".join(
+            label
+            for label, present in (
+                ("cash_and_equivalents", cash_and_securities),
+                ("total_assets", total_assets),
+            )
+            if present is None
+        )
         return ScreeningRuleResult(
             rule_name="cash_securities_ratio",
             verdict=ScreeningVerdict.INSUFFICIENT_DATA,
             value=None,
             threshold=threshold,
             reason="Missing cash/securities or assets data",
+            missing_input=missing,
         )
 
     if total_assets == 0:
@@ -192,6 +229,7 @@ def screen_industry(
             value=None,
             threshold=None,
             reason="Industry information not available",
+            missing_input="industry",
         )
 
     industry_lower = industry.lower()

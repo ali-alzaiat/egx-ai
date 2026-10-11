@@ -2,12 +2,13 @@
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -54,6 +55,10 @@ class ShariahScreeningResult(Base):
     screened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    # Filing date the verdict inputs came from (R32 B2); None with reason
+    # when unknown — never synthesized from the computation date.
+    report_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    report_date_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -89,6 +94,12 @@ class ScreeningRuleResultDB(Base):
     value: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
     threshold: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Absent fact label(s) behind INSUFFICIENT_DATA (R32 B2); None otherwise.
+    missing_input: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Cited filing behind the rule inputs, e.g. "ANNUAL_REPORT filing
+    # 2024-03-15" (R32 B2); industry rule cites "company record".
+    source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -100,4 +111,79 @@ class ScreeningRuleResultDB(Base):
     __table_args__ = (
         Index("ix_screening_rule_results_screening_result_id", "screening_result_id"),
         Index("ix_screening_rule_results_rule_name", "rule_name"),
+    )
+
+
+class ScreeningPurificationEstimate(Base):
+    """Dividend-method purification estimate in EGP (R32 B3/B4).
+
+    The amount stays NULL with status INSUFFICIENT_DATA until a cited filing
+    ratio exists — a missing ratio is never substituted with zero.
+    """
+
+    __tablename__ = "screening_purification_estimates"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    methodology_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    doctrine: Mapped[str] = mapped_column(String(50), nullable=False)
+    branch: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount_egp: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    dividend_egp: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    ratio: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    ratio_provenance: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    dps: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    dps_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    dps_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    missing_input: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id", "methodology_version",
+            name="uq_screening_purification_estimate",
+        ),
+        Index("ix_screening_purification_estimates_company_id", "company_id"),
+    )
+
+
+class ScreeningEgxMembership(Base):
+    """Dated EGX33 membership catalyst record (R32 B5).
+
+    Membership is shown side by side with our verdict and never overrides it.
+    """
+
+    __tablename__ = "screening_egx_memberships"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    methodology_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    member: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # Semi-annual review cycle, e.g. "2026-02" / "2026-08".
+    review_cycle: Mapped[str] = mapped_column(String(20), nullable=False)
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # EGX review PDF (or press) behind the record.
+    source: Mapped[str] = mapped_column(String(500), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "company_id", "review_cycle",
+            name="uq_screening_egx_membership",
+        ),
+        Index("ix_screening_egx_memberships_company_id", "company_id"),
     )

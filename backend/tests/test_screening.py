@@ -139,7 +139,10 @@ class TestDefaultMethodology:
         assert DEFAULT_METHODOLOGY.cash_and_securities_to_assets_threshold == Decimal("0.33")
 
     def test_version(self):
-        assert DEFAULT_METHODOLOGY.version.value == "1.0"
+        # R32 B1: v2 identifier pins denominator + window + thresholds.
+        assert DEFAULT_METHODOLOGY.version.value == "aaoifi-assets-spot/33-33-5"
+        assert DEFAULT_METHODOLOGY.denominator == "spot_total_assets"
+        assert DEFAULT_METHODOLOGY.averaging_window == "spot"
 
     def test_source_reference(self):
         assert "AAOIFI" in DEFAULT_METHODOLOGY.source_reference

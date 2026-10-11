@@ -171,6 +171,22 @@ class FinancialFactRepository:
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    async def list_facts_with_documents(
+        self, company_id: uuid.UUID
+    ) -> Sequence[tuple[FinancialFact, FinancialDocument]]:
+        """List a company's facts with their source documents (filing dates)."""
+        query = (
+            select(FinancialFact, FinancialDocument)
+            .join(
+                FinancialDocument,
+                FinancialDocument.id == FinancialFact.document_id,
+            )
+            .where(FinancialFact.company_id == company_id)
+            .order_by(FinancialFact.reported_label)
+        )
+        result = await self.session.execute(query)
+        return result.all()
+
     async def update(self, fact: FinancialFact, data: dict[str, Any]) -> FinancialFact:
         for field, value in data.items():
             setattr(fact, field, value)
