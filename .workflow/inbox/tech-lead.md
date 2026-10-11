@@ -1,6 +1,11 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-11
+Task: Phase 7 backend verdict. qa-api found R34 conformance (P0-1–P0-6, gates green: 67 disclosure tests, ruff/mypy clean) with F1 (python-multipart declared MIT but installed metadata says Apache-2.0 — likely paperwork fix) + F2 (fact blocks emit UNKNOWN vs AGENTS INSUFFICIENT_DATA literal; TTM blocks use INSUFFICIENT_DATA) + F3 (validation errors 422 vs brief 404/400) + F4 (filing_payload lacks methodology_version) + F5 (8 routes vs brief 7 — count only) + F6 (no 017 round-trip test) + F7 (stress unprobed). Rule each with next R-number: fix now vs accept-and-carry, with reasons. Then verdict: ship / fix-list / rework. Per user instruction this turn ends the run after Phase 7 lands — no Phase 8 kickoff. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-11 (superseded authorization brief kept below for record)
 Task: Authorize Phase 7 (Document intelligence) for implementation. Inputs: R34 scope (`.workflow/decisions/R34-phase-7-scope.md`; builds P0-1–P0-6, defers with reasons + license rulings), research (`.workflow/research/phase-7-document-intelligence.md`), roadmap §13–§16 exit criteria. Verify brief currency against live code (migration head — 016 landed, confirm 017 free; `backend/app/ingestion/disclosures/` is an empty skeleton — confirm; pdfplumber/Camelot presence in backend deps — if absent, the brief must name them as new deps with license justification per pm; collision-scan vs tree). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
 
 ---
