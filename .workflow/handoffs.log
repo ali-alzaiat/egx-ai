@@ -59,3 +59,12 @@
 2026-10-10 | staff-backend -> qa-api | - | Phase 5 backend done (thesis engine, invalidation+ledger, catalysts, 015 migration, theses router; 27 new tests green; 1 pre-existing R21 census failure); NEXT: qa-api
 2026-10-10 | qa-api -> tech-lead | - | Phase 5 conformant; 1 finding: header fair_value drops reason on missing path (test :427 pins it); brief lives under .superpowers (gitignored by convention); NEXT: tech-lead
 2026-10-10 | tech-lead -> router | .workflow/decisions/R31-phase-5-backend-verdict.md | R31 verdict SHIP: F1 accept-and-carry (reason in narrative, migration-free fix rejected); no fix-list, no rework; Phase 5 SHIPS; DONE
+2026-10-10 | router -> researcher | .workflow/inbox/researcher.md | Phase 6 kickoff (continuous run): Shariah research (§11-12 + standing reqs 1/5); file findings to research/phase-6-shariah.md
+2026-10-10 | researcher -> pm | .workflow/research/phase-6-shariah.md | Zoya/Islamicly/MSCI purification formulas + AAOIFI doctrine (gated) + EGX33 reconciliation problem + halal.sh breakdown shape; NEXT: pm
+2026-10-10 | pm -> tech-lead | .workflow/decisions/R32-phase-6-scope.md | Phase 6 B1-B6 (v2 versioning, report_date, EGP purification, honest degradation, EGX33 side-by-side); NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-6-brief.md | Phase 6 AUTHORIZED per R32, no amendment (016 free, engine verified, tree clean); NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | Phase 6 backend done (v2 versioning, report_date, EGP purification, honest degradation, EGX33 side-by-side, 016 migration; 46 screening tests green; 1 pre-existing R21 census failure); NEXT: qa-api
+2026-10-10 | qa-api -> tech-lead | - | Phase 6 conformant; F1 ruff I001 one-line autofix (016:8); O1 422-vs-400, O2 no version filter on single GET, O3 no 404 tests on new sub-resources; gates green; NEXT: tech-lead
+2026-10-10 | tech-lead -> staff-backend | .workflow/decisions/R33-phase-6-backend-verdict.md | R33 verdict FIX-LIST then ship: F1 ruff autofix only; O1 accepted, O2/O3 carried; NEXT: staff-backend
+2026-10-10 | staff-backend -> qa-api | - | R33 fix-list done (I001 autofix, ruff clean); NEXT: qa-api
+2026-10-10 | qa-api -> router | - | R33 fix-list re-verified green (46 screening tests, scoped ruff/mypy clean); Phase 6 SHIPS per R33; DONE

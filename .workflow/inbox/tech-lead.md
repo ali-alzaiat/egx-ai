@@ -1,6 +1,16 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-10
+Task: Phase 6 backend verdict. qa-api found R32 conformance (B1–B6, gates green: 46 screening tests, mypy 0/8) with F1 (ruff I001 import-sort at `016_shariah_phase6.py:8`, one-line autofix) + O1 (bad review_cycle → 422 not 400, test-pinned, FastAPI-idiomatic) + O2 (single-GET has no methodology_version filter; list does) + O3 (no 404-shape tests on new purification/egx sub-resources). Rule each with next R-number: fix now vs accept-and-carry, with reasons. Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (superseded authorization brief kept below for record)
+Task: Authorize Phase 6 (Shariah) for implementation. Inputs: R32 scope (`.workflow/decisions/R32-phase-6-scope.md`; builds B1–B6, defers with reasons — pm verified engine fields live), research (`.workflow/research/phase-6-shariah.md`), roadmap §11–§12 exit criteria. Verify brief currency against live code (migration head — 015 landed, confirm 016 free; screening engine/tables/router as pm described; collision-scan vs tree). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 5 verdict brief kept below for record)
 Task: Phase 5 backend verdict. qa-api found R30 conformance (P1–P7, gates green) with 1 finding: header `fair_value` drops the `reason` key on the missing-data path (`service.py:787-793`, pinned by test `:427`) while sibling scenario entries carry it — the absent-value triple shape requires it. Rule with next R-number: fix now (pass through `fair["fair_value"]["reason"]` + update assertion) vs accept-and-carry, with reasons. Note: qa-api couldn't find the brief under `.workflow/` — it lives at `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-5-brief.md` (gitignored by project convention, not missing). Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
 
 ---

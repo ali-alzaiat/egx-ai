@@ -1,5 +1,15 @@
 # Inbox: staff-backend
 
+From: router (R33 fix-list) · 2026-10-10
+Task: R33 single item, backend only: apply ruff I001 autofix at `backend/alembic/versions/016_shariah_phase6.py:8` (import sort). Nothing else — no rework, O1/O2/O3 carried per R33. Run ruff on the file to confirm clean, paste output. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + evidence.
+
+---
+
+From: router (Phase 6 authorized) · 2026-10-10
+Task: Implement Phase 6 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-6-brief.md` (R32 B1–B6, no amendment). Research context: `.workflow/research/phase-6-shariah.md`. Backend only, extend `backend/app/screening/` in place. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
+
+---
+
 From: router (Phase 5 authorized) · 2026-10-10
 Task: Implement Phase 5 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-5-brief.md` (R30 P1–P7, no amendment). Research context: `.workflow/research/phase-5-investment-thesis.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
 

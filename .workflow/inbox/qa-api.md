@@ -1,5 +1,15 @@
 # Inbox: qa-api
 
+From: router (R33 fix-list re-verify) · 2026-10-10
+Task: Final re-verify of the R33 fix-list (uncommitted tree on main) — read-only: ruff I001 autofix at `backend/alembic/versions/016_shariah_phase6.py:8` (`backend/tests/test_screening*.py` unaffected). Re-run screening suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 6 SHIPS per R33 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
+
+---
+
+From: router (Phase 6 conformance) · 2026-10-10
+Task: Contract-conformance review of the Phase 6 backend (uncommitted tree on main) — read-only. Source of truth: R32 (`.workflow/decisions/R32-phase-6-scope.md` B1–B6), brief `task-phase-6-brief.md`. Implementation: `app/screening/` (methodology/rules/purification/service), `app/models/screening.py`, `app/repositories/screening.py` (+financial.py provenance), `app/api/screening.py` (purification + egx-membership sub-resources), migration `016_shariah_phase6.py`. Checks: v2 identifier semantics + old-row readability; report_date + per-rule provenance with first-class INSUFFICIENT_DATA; dividend-formula correctness + doctrine labels + not-zakat copy + both branches; degradation honesty (no invented ratios); EGX33 side-by-side with flagged discrepancy, no override path; 016 chain + round-trip; methodology_version everywhere; 404/400 shapes. Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
+
+---
+
 From: router (Phase 5 conformance) · 2026-10-10
 Task: Contract-conformance review of the Phase 5 backend (uncommitted tree on main) — read-only. Source of truth: R30 (`.workflow/decisions/R30-phase-5-scope.md` P1–P7), brief `task-phase-5-brief.md`. Implementation: `app/thesis/` (thesis/constants/service), `app/models/thesis.py`, `app/repositories/thesis.py`, `app/api/theses.py` (GET + assess/update POSTs), migration `015_thesis.py`. Checks: deterministic template text (no LLM facts); history-anchored scenarios (no consensus pre-fill); invalidation shape (threshold+source+status+confidence+version, append-only ledger, trigger=reassessment never sale); catalyst labels + skeleton; MISSING degradation + DQ-fed confidence; hedged copy; 015 chain + round-trip; 404/400 shapes; methodology_version everywhere. Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
 

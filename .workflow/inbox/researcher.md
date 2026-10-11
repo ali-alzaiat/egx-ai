@@ -1,5 +1,10 @@
 # Inbox: researcher
 
+From: router (Phase 6 kickoff, on main) · 2026-10-10
+Task: Phase 6 (Shariah) research for roadmap §11–§12 — per-rule breakdown exposed, UNKNOWN when data missing, methodology + freshness on every result, estimated purification — plus standing req 1 (versioned verdict: methodology_version + report_date + per-rule UNKNOWN) and req 5 (EGX dividend purification math in EGP tied to cited filings). Study Zoya/Musaffa/Islamicly purification calculators (formulas, dividend handling), AAOIFI purification doctrine (citable sources only), EGX33 membership as catalyst input (reconcile with our verdicts), and how competitors display per-rule breakdowns. Existing engine: `backend/app/screening/` (extend in place per roadmap architecture — verify what exists before proposing). Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-6-shariah.md`). End NEXT: pm | BLOCKED: <question> | DONE.
+
+---
+
 From: router (Phase 5 kickoff, on main) · 2026-10-10
 Task: Phase 5 (Investment thesis) research for roadmap §7, §8, §9 + §16 (part) — structured thesis referencing real metrics, scenarios with labelled assumptions, structurally stored invalidation conditions, catalyst records. Study how SWS Community Narratives / Morningstar analyst reports / Alpha Spread scenarios structure theses (assumption labelling, scenario ranges, what triggers invalidation), how catalyst/scenario tracking products do it (if any citable), and what EGX data supports per element. Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-5-investment-thesis.md`). End NEXT: pm | BLOCKED: <question> | DONE.
 
