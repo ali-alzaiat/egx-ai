@@ -1,5 +1,18 @@
 # Status
-- Phase: 1 (data quality) — closing the two reported data gaps (stale data, empty DQ scores) + an app-wide UX overhaul the user asked for.
-- Task: ruled. **Stream A** refresh+assess — contract accepted with amendment A1 (R16), brief filed at .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-refresh-assess-brief.md. **Stream B** UX overhaul — scope ruled (R17), brief filed at .superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-ux-redesign-brief.md. Rulings R16/R17/R18 in .workflow/decisions/; ledger updated.
-- Next actor: researcher — Phase 7 (Document intelligence) research kickoff. Phase 6 SHIPPED per R33 (qa-api 46/46 green). CONTINUOUS RUN ordered (no phase-boundary stops through Phase 10). Standing rule: commit finished work without separate ask. Carry-forward: drop unused `useHealthCheck` on next `client.ts` touch; 004→005 migration enum bug; happy-path census fragility (R21 advisory); repo-wide alembic ruff debt (33 pre-existing errors, F1 fixed).
-- Open escalations: none. Backlog cleared: Task 7 review folded into the Stream A review (R18.1); Task 8 review findings disposed (R18.2 vitest env upheld, R18.3 minor items re-raised at the v1 frontend review).
+- **Current phase:** Phase 8 — Continuous Intelligence (kickoff per continuous run)
+- **Current task:** researcher conducting Phase 8 research (watchlist, alerts, thesis invalidation triggers on new data, event bus/audit log; roadmap §17, §23, §24). CONTINUOUS RUN in effect — no phase-boundary stops through Phase 10.
+- **Shipped:** Phase 1 (data quality), Phase 2 (industry intelligence), Phase 3 (valuation), Phase 4 (investment score), Phase 5 (investment thesis), Phase 6 (Shariah v2), Phase 7 (document intelligence backend per R36). All on `main`.
+- **Next actor:** researcher → pm (Phase 8 scope)
+- **Open escalations:** none.
+- **Carry-forward (address on next relevant touch):**
+  - Drop unused `useHealthCheck` on next `client.ts` touch
+  - 004→005 migration enum bug (pre-existing)
+  - ~~R21 fragile census test~~ — **FIXED 2026-10-11:** resilient assertion (`>= stub_companies * 3`), jobs suite 11/11 green
+  - Repo-wide alembic ruff debt (33 pre-existing errors; F1 fixed in Phase 6)
+  - Frontend pipeline stalled after Phase 1 — Phases 2–7 backend-only; schedule frontend catch-up
+  - Phase 0 import hotfix (`TYPE_CHECKING` in `models/financial.py`) — verified in working tree, clean pytest collection
+- **Decisions ledger:** R9–R36 filed. Next ruling: R37.
+- **Standing pre-phase data gate (2026-10-11):** 0 real financial facts in DB (`DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`).
+- **Subagent models (tiered 2026-10-11):**
+  - Smart tier (`opencode/nemotron-3-ultra-free`): tech-lead, architect, staff-backend, staff-frontend, analyst
+  - Fast tier (`opencode/muse-spark-1.3-contributor-free`): pm, researcher, qa-api, qa-ui, qa-security, ux-expert

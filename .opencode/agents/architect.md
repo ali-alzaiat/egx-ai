@@ -1,6 +1,6 @@
 ---
 description: Systems architect. Defines interfaces and flags drift from the plan's cross-phase contracts; writes analysis to .workflow/design/ only.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/nemotron-3-ultra-free
 mode: subagent
 permission:
   edit: allow

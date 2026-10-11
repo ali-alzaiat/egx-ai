@@ -1,5 +1,15 @@
 # Inbox: researcher
 
+From: router (Phase 8 kickoff, continuous run) · 2026-10-11
+Task: Phase 8 (Continuous intelligence) research for roadmap §17, §23, §24 — watchlist, alerts, thesis invalidation triggers on new data arrival, event bus / audit ledger. Study: (1) how competitors (Koyfin, Simply Wall St, Alpha Spread) structure user watchlists (tags, columns, multi-list) and alert triggers (price targets, valuation changes, earnings releases, restatements, thesis condition violations); (2) thesis invalidation automation patterns — how to evaluate stored Phase 5 invalidation thresholds against incoming Phase 7 parsed facts and Phase 1 daily prices without false positives; (3) audit log / event history patterns for investment apps (audit trails for score changes and trigger evaluations). Reuse prior `.workflow/research/` files. Every claim cited with URL; `no data` where unverifiable. DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships. Return inline (router files as `.workflow/research/phase-8-continuous-intelligence.md`). End NEXT: pm | BLOCKED: <question> | DONE.
+
+---
+
+From: router (Phase 7 kickoff, on main) · 2026-10-10
+Task: Phase 7 (Document intelligence) research for roadmap §13, §14, §15, §16 — disclosure → parse → facts with provenance, period comparison, "what changed?". Study how EGX disclosures are published and structured (bulletin PDFs, IR packs, CBE overlays — reuse Phase-3 §7 + Phase-5 §5 evidence, don't redo), what PDF-parsing/extraction approaches are citable (engines, table extraction, filing-specific gotchas like EAS vs IFRS deltas), how competitors handle period comparison and change detection (SWS/Koyfin financial templates, Alpha Spread history), and what provenance shape parsed facts need (page/line/cell coordinates tied to source PDFs). Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-7-document-intelligence.md`). End NEXT: pm | BLOCKED: <question> | DONE.
+
+---
+
 From: router (Phase 6 kickoff, on main) · 2026-10-10
 Task: Phase 6 (Shariah) research for roadmap §11–§12 — per-rule breakdown exposed, UNKNOWN when data missing, methodology + freshness on every result, estimated purification — plus standing req 1 (versioned verdict: methodology_version + report_date + per-rule UNKNOWN) and req 5 (EGX dividend purification math in EGP tied to cited filings). Study Zoya/Musaffa/Islamicly purification calculators (formulas, dividend handling), AAOIFI purification doctrine (citable sources only), EGX33 membership as catalyst input (reconcile with our verdicts), and how competitors display per-rule breakdowns. Existing engine: `backend/app/screening/` (extend in place per roadmap architecture — verify what exists before proposing). Reuse prior `.workflow/research/` files, don't redo them. Every claim cited with URL; `no data` where unverifiable. Return inline (router files as `.workflow/research/phase-6-shariah.md`). End NEXT: pm | BLOCKED: <question> | DONE.
 

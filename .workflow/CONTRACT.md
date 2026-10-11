@@ -53,3 +53,40 @@ The router appends every handoffs.log entry and writes every deliverable file un
 - `bash: ask` on researcher/pm/architect/ux-expert is an opencode-bug workaround (bash: deny broke model resolution). Caveat: with permission mode --auto, anything not explicitly deny is auto-approved, so ask becomes allow — do not run dispatches in auto mode.
 - Scope lines (frontend/**, backend/**, .workflow/**) are prose-enforced; bash access grants shell-equivalent file access. Path-pattern edit permissions are unverified in agent frontmatter.
 - Playwright MCP (`@playwright/mcp`, `playwright_*` tools) is available for qa-ui and ux-expert to drive the running frontend (default `http://localhost:5173`). Use it when dispatch asks for live UI verification; paste snapshot/console output as evidence. Requires the dev server to be running. Adding/changing agents or MCP servers needs an opencode restart.
+
+## Model tiers (updated 2026-10-11)
+
+Two tiers. Use the right one — wrong tier = wasted tokens or wrong decisions.
+
+| Tier | Model | Agents | Rationale |
+|---|---|---|---|
+| **Smart** | `opencode/nemotron-3-ultra-free` | tech-lead, architect, staff-backend, staff-frontend, analyst | High-reasoning tasks: rulings, architecture contracts, production implementation, formula verification |
+| **Fast** | `opencode/muse-spark-1.3-contributor-free` | researcher, pm, qa-api, qa-ui, qa-security, ux-expert | Structured reports, scoping templates, read-only contract conformance, UI/security verification |
+
+To change a tier: edit the `model:` line in the agent's `.opencode/agents/<name>.md` frontmatter. Requires an opencode restart to take effect.
+
+## Standing pre-phase gate (added 2026-10-11)
+
+**Before dispatching researcher for any new competitive phase (Phases 2–10),** the router must run:
+
+```bash
+cd backend && .venv/bin/python -c "
+import asyncio, asyncpg, os
+async def check():
+    conn = await asyncpg.connect(os.environ['DATABASE_URL'])
+    count = await conn.fetchval(
+        \"SELECT COUNT(*) FROM financial_facts WHERE source_type != 'SYNTHETIC'\"
+    )
+    print(f'Real financial facts: {count}')
+    if count == 0:
+        print('WARN: all data is synthetic — Phase 13 must ship before outputs are acted on')
+    await conn.close()
+asyncio.run(check())
+"
+```
+
+If `count == 0`, the phase may still be implemented (competitive features can be built in parallel), but the handoffs.log entry for that phase must include: `DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`.
+
+## PM fast-path (added 2026-10-11)
+
+For phases where the roadmap spec section (§N) is already written and researcher findings are thin (<3KB), the router may dispatch PM directly without a researcher step. PM reads the spec section and files scope cuts as usual. Log the skip in handoffs.log: `YYYY-MM-DD | router -> pm | - | fast-path: researcher skipped (spec §N complete)`.

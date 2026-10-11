@@ -1,5 +1,10 @@
 # Inbox: staff-backend
 
+From: router (Phase 7 authorized) · 2026-10-11
+Task: Implement Phase 7 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-7-brief.md` (R34 P0-1–P0-6 under R35: pdfplumber+Camelot approved MIT deps, Dockerfile apt note, 017 migration). Research context: `.workflow/research/phase-7-document-intelligence.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
+
+---
+
 From: router (R33 fix-list) · 2026-10-10
 Task: R33 single item, backend only: apply ruff I001 autofix at `backend/alembic/versions/016_shariah_phase6.py:8` (import sort). Nothing else — no rework, O1/O2/O3 carried per R33. Run ruff on the file to confirm clean, paste output. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + evidence.
 

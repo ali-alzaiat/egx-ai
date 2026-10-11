@@ -68,10 +68,41 @@ Inputs and failure modes the spec implies that no single task naturally catches.
 
 Data quality score, sector/industry/peer tables, industry metric framework, peer comparison, multi-model valuation orchestration, valuation scenarios/confidence, investment score, investment thesis + versions + invalidation, catalysts, risk engine, Shariah breakdown/UNKNOWN status/purification, disclosure ingestion pipeline, document fact extraction, change detection, watchlist, alerts, backtesting, score-performance analysis.
 
+> ⚠️ **DATA WARNING (added 2026-10-11 reliability audit):** `backend/app/ingestion/fra/` is an
+> empty stub. All financial facts in the live database are synthetic
+> (`FakeFinancialDataProvider`). Phases 1–9 of this competitive roadmap plus PHASES.md
+> Phases 3–9 therefore compute on invented numbers. No recommendation from this
+> platform should inform a real investment decision until Phase 13 (real data ingestion)
+> and Phase 14 (DQ UI gates) are complete.
+
+---
+
+### Reliability Audit — 2026-10-11
+
+Findings from a full codebase review against real-money investment criteria:
+
+| Finding | Severity | Addressed by |
+|---|---|---|
+| `TYPE_CHECKING` missing in `models/financial.py` — crashes app + all 38 tests fail | **BLOCKER** | PHASES.md Phase 0 |
+| `fra/` ingestion stub is empty — all financial data is synthetic | **BLOCKER** | Phase 13 |
+| 30/229 companies have no price data (Yahoo gap) | High | Phase 13 (EGX fallback) |
+| No backtesting evidence that scoring model predicts EGX returns | High | PHASES.md Phase 10 expanded |
+| Liquidity not surfaced — illiquid small-caps ranked alongside liquid names | High | Phase 14 |
+| DQ engine exists but is not a UI gate — `POOR` data reaches recommendations | High | Phase 14 |
+| Staleness not surfaced in UI — stale scores look identical to fresh ones | Medium | PHASES.md Phase 11 expanded |
+| No audit log for score changes | Medium | PHASES.md Phase 12 expanded |
+| Valuation assumptions not shown alongside fair-value figures | Medium | Phase 14 |
+| EGX-specific risk disclosures missing from UI | Medium | PHASES.md Phase 12 expanded |
+| `model_version` migration plan absent | Medium | PHASES.md Phase 12 expanded |
+| DCF/DDM growth inputs are assumptions, not consensus — not disclosed | Low | Phase 14 (sensitivity table) |
+
+---
+
 ### Phase → spec section mapping
 
 | Phase | Spec sections | Exit criteria |
 |---|---|---|
+| **0. Import hotfix** (BLOCKER) | — | `TYPE_CHECKING` added; all tests collect; pass-count baselined |
 | **1. Data reliability** (this plan) | §1, plus the correctness bugs §19 implies pre-backtest | Quality score persisted + served + shown; provenance columns; validation/normalization wired; look-ahead no-op fixed |
 | **2. Industry intelligence** | §2, §3 | Sector/industry tables, peer groups, configurable industry metrics, peer percentile comparison with written explanation |
 | **3. Valuation** | §4, §5 | Multiple models chosen per industry, weighted fair value, bull/base/bear, sensitivity, confidence score fed by data quality |
@@ -80,10 +111,14 @@ Data quality score, sector/industry/peer tables, industry metric framework, peer
 | **6. Shariah** | §11, §12 | Per-rule breakdown exposed, UNKNOWN when data missing, methodology + freshness on every result, estimated purification |
 | **7. Document intelligence** | §13, §14, §15, §16 | Disclosure → parse → facts with provenance, period comparison, "what changed?" |
 | **8. Continuous intelligence** | §17, §23, §24 | Thesis versioning on new data, watchlist, alerts |
-| **9. Backtesting** | §18, §19, §20 | Strategy runs, no-lookahead tests, benchmark/return metrics, score-vs-return analysis |
+| **9. Backtesting** | §18, §19, §20 | Strategy runs (≥3 EGX regimes), no-lookahead tests, Sharpe/drawdown/win-rate, liquidity pre-screen gate, benchmark/return metrics, score-vs-return analysis |
 | **10. Product polish** | §21, §22, §29, §30 | Unified company page, saved screens, progressive disclosure |
+| **13. Real data ingestion** ← NEW | Reliability audit | FRA parser live; real facts for ≥1 company; synthetic guard; EGX price fallback; UI coverage disclosure |
+| **14. DQ UI gates & liquidity** ← NEW | Reliability audit | POOR/MISSING gate in UI; LOW LIQUIDITY badge; valuation sensitivity table; staleness banner; data_as_of visible |
 
 Cross-cutting for every phase: §25 (AI safety), §26 (API conventions), §27 (schema discipline), §28 (tests), §30 (positioning — no charting/execution/chatbot competition).
+
+**Sequencing constraint added by audit:** Phase 13 → Phase 14 are prerequisites for Phases 2–10 to be trusted with real-money decisions. Work on competitive features (Phases 2–10) may continue in parallel, but outputs must not be acted on until 13 + 14 are complete.
 
 ### Cross-phase contracts (locked now so phases compose)
 

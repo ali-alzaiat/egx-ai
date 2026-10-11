@@ -1,5 +1,10 @@
 # Inbox: qa-api
 
+From: router (Phase 7 conformance) · 2026-10-11
+Task: Contract-conformance review of the Phase 7 backend (uncommitted tree on main) — read-only. Source of truth: R34 (`.workflow/decisions/R34-phase-7-scope.md` P0-1–P0-6), R35 dep approval, brief `task-phase-7-brief.md`. Implementation: `app/ingestion/disclosures/` (constants/intake/parse/facts/comparison/diffs/service), `app/models/disclosure.py` + financial.py provenance columns, `app/repositories/disclosure.py`, `app/api/disclosures.py` (7 endpoints), migration `017_disclosure_phase7.py`; new deps pdfplumber+Camelot (MIT) + python-multipart (MIT, upload requirement) + Dockerfile apt. Checks: hash-dedupe registry (no crawler); parse confidence + scanned→UNKNOWN; EAS tags + pooling guard; provenance completeness; TTM math + single-quarter floor; diff ledger + restatement supersedes chain + pre-restatement as_of; 017 chain + round-trip; methodology_version everywhere; 404/400 shapes; dep licenses as declared. Known pre-existing: happy-path census failure (R21). Re-run gates you doubt (.venv binaries), paste outputs. Never write under .workflow/ or append handoffs.log. End NEXT: <agent> | BLOCKED: <question> | DONE + findings with file:line evidence.
+
+---
+
 From: router (R33 fix-list re-verify) · 2026-10-10
 Task: Final re-verify of the R33 fix-list (uncommitted tree on main) — read-only: ruff I001 autofix at `backend/alembic/versions/016_shariah_phase6.py:8` (`backend/tests/test_screening*.py` unaffected). Re-run screening suites + ruff + mypy (.venv binaries), paste outputs. On green, Phase 6 SHIPS per R33 (no return to tech-lead) — end DONE. Anything red → NEXT: tech-lead with evidence. Never write under .workflow/ or append handoffs.log.
 

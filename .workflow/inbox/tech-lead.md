@@ -1,6 +1,11 @@
 # Inbox: tech-lead
 
-From: router · 2026-10-10
+From: router · 2026-10-11
+Task: Authorize Phase 7 (Document intelligence) for implementation. Inputs: R34 scope (`.workflow/decisions/R34-phase-7-scope.md`; builds P0-1–P0-6, defers with reasons + license rulings), research (`.workflow/research/phase-7-document-intelligence.md`), roadmap §13–§16 exit criteria. Verify brief currency against live code (migration head — 016 landed, confirm 017 free; `backend/app/ingestion/disclosures/` is an empty skeleton — confirm; pdfplumber/Camelot presence in backend deps — if absent, the brief must name them as new deps with license justification per pm; collision-scan vs tree). Amend with new R-number if code disagrees, else authorize staff-backend. Routine per CONTRACT step 26. Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 6 verdict brief kept below for record)
 Task: Phase 6 backend verdict. qa-api found R32 conformance (B1–B6, gates green: 46 screening tests, mypy 0/8) with F1 (ruff I001 import-sort at `016_shariah_phase6.py:8`, one-line autofix) + O1 (bad review_cycle → 422 not 400, test-pinned, FastAPI-idiomatic) + O2 (single-GET has no methodology_version filter; list does) + O3 (no 404-shape tests on new purification/egx sub-resources). Rule each with next R-number: fix now vs accept-and-carry, with reasons. Then verdict: ship / fix-list / rework. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
 
 ---

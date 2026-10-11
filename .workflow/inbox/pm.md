@@ -1,6 +1,11 @@
 # Inbox: pm
 
-From: router · 2026-10-10
+From: router · 2026-10-11
+Task: Phase 7 requirements (Document intelligence, roadmap §13–§16). Read `.workflow/research/phase-7-document-intelligence.md` in full (PDF-only EGX reality + permanent-mirror precedent; rule-based parse trio with accuracies + licenses; Docling upgrade path; EAS-vs-IFRS gotcha list; Koyfin Actuals-vs-Consensus + SWS TTM + Alpha Spread anchoring; SEC XBRL contrast incl. restatement mechanics; provenance shape synthesis; non-binding steers). Cut scope ruthlessly into builds vs defers against §13–§16 exit criteria (disclosure intake, parse to facts, period comparison, what-changed, provenance): intake sources v1 (bulletin PDFs? IR packs? third-party mirror use?), parse engine choice (rule-based which? VLM when?), EAS gotcha tags, comparison depth, restatement detector scope, provenance record shape. Bind AGENTS.md (rules 2/3/5: no fabrication, source everything, versioned methodology) + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/...`, methodology_version on records). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
+
+---
+
+From: router · 2026-10-10 (Phase 6 brief kept below for record)
 Task: Phase 6 requirements (Shariah, roadmap §11–§12). Read `.workflow/research/phase-6-shariah.md` in full (Zoya/Islamicly/MSCI purification formulas; AAOIFI doctrine gated — cite thresholds only from the Sec-Gen deck + advisor restatements; EGX33 reconciliation as side-by-side comparison never override; halal.sh breakdown shape; standard req 1 + req 5; engine NOT verified this pass — confirm stored fields against `backend/app/screening/` yourself before scoping). Cut scope ruthlessly into builds vs defers against §11–§12 exit criteria (per-rule breakdown, UNKNOWN when missing, methodology + freshness, estimated purification): methodology versioning depth (denominator + window pinned?), purification methods v1 (dividend-method default? per-share advanced? capital-gains out?), EGX33 comparison shape, what degrades honestly without parsed filings. Bind AGENTS.md (rules 2/3/5/6/10) + cross-phase contracts (one migration, UUID PKs, `/api/<domain>/companies/{id}`, methodology_version on records). No code, no file writes (return decision inline; router files with next R-number). End NEXT: tech-lead | BLOCKED: <question> | DONE.
 
 ---
