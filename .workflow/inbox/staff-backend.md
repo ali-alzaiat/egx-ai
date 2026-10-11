@@ -1,5 +1,10 @@
 # Inbox: staff-backend
 
+From: router (Phase 8 authorized, R39) · 2026-10-11
+Task: Implement Phase 8 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-8-brief.md` (R38 B1-B6 under R39: watchlist v1, 4 alert families, arrival-only warn/break triggers + human-review gate, restatement detector v1, fail-closed + evidence-quality gate, append-only event ledger; single migration 018; methodology_version `CI-1.0`). Scope: `.workflow/decisions/R38-phase-8-scope.md`. Authorization + clean-tree ruling: `.workflow/decisions/R39-phase-8-authorization.md`. Research context: `.workflow/research/phase-8-continuous-intelligence.md`. Tree is clean at 017 (Phase-13 WIP stashed — do NOT pop the stash). Create branch `feature/phase8-continuous-intelligence` from current HEAD. Backend only. DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships. Never touch frontend/** or .workflow/**. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs (pytest, ruff, mypy).
+
+---
+
 From: router (Phase 7 authorized) · 2026-10-11
 Task: Implement Phase 7 backend per `.superpowers/sdd/2026-10-08-competitive-enhancement-roadmap/task-phase-7-brief.md` (R34 P0-1–P0-6 under R35: pdfplumber+Camelot approved MIT deps, Dockerfile apt note, 017 migration). Research context: `.workflow/research/phase-7-document-intelligence.md`. Backend only. End NEXT: qa-api | BLOCKED: <question> | DONE + files + pasted gate outputs.
 

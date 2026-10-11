@@ -143,3 +143,10 @@ class CompanyRepository:
             setattr(company, field, value)
         await self.session.flush()
         return company
+
+    async def list_by_ids(self, company_ids: list[uuid.UUID]) -> Sequence[Company]:
+        """Get companies by a list of IDs."""
+        if not company_ids:
+            return []
+        result = await self.session.execute(select(Company).where(Company.id.in_(company_ids)))
+        return result.scalars().all()

@@ -1,8 +1,8 @@
 # Status
 - **Current phase:** Phase 8 — Continuous Intelligence (kickoff per continuous run)
-- **Current task:** researcher conducting Phase 8 research (watchlist, alerts, thesis invalidation triggers on new data, event bus/audit log; roadmap §17, §23, §24). CONTINUOUS RUN in effect — no phase-boundary stops through Phase 10.
+- **Current task:** frontend catch-up Batch A (company page: score, Shariah v2, valuation v2, peers) — contract filed at `.workflow/design/frontend-catchup-contract.md`; next: ux-expert Batch A design, then staff-frontend. Subagent dispatch is aborting today — router working in-session; ask user before large implements.
 - **Shipped:** Phase 1 (data quality), Phase 2 (industry intelligence), Phase 3 (valuation), Phase 4 (investment score), Phase 5 (investment thesis), Phase 6 (Shariah v2), Phase 7 (document intelligence backend per R36, findings verdict R37 — ship, no fix-list). All on `main`.
-- **Next actor:** researcher → pm (Phase 8 scope)
+- **Next actor:** staff-backend → qa-api (Phase 8 build)
 - **Open escalations:** none.
 - **Carry-forward (address on next relevant touch):**
   - Drop unused `useHealthCheck` on next `client.ts` touch
@@ -11,7 +11,7 @@
   - Repo-wide alembic ruff debt (33 pre-existing errors; F1 fixed in Phase 6)
   - Frontend pipeline stalled after Phase 1 — Phases 2–7 backend-only; schedule frontend catch-up
   - Phase 0 import hotfix (`TYPE_CHECKING` in `models/financial.py`) — verified in working tree, clean pytest collection
-- **Decisions ledger:** R9–R37 filed. Next ruling: R38.
+- **Decisions ledger:** R9–R39 filed. Next ruling: R40.
 - **Standing pre-phase data gate (2026-10-11):** 0 real financial facts in DB (`DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`).
 - **Subagent models (tiered 2026-10-11):**
   - Smart tier (`opencode/nemotron-3-ultra-free`): tech-lead, architect, staff-backend, staff-frontend, analyst

@@ -1,6 +1,11 @@
 # Inbox: tech-lead
 
 From: router · 2026-10-11
+Task: Authorize Phase 8 (Continuous intelligence) for implementation. Inputs: R38 scope (`.workflow/decisions/R38-phase-8-scope.md`; builds B1-B6, defers D1-D6 with reasons), research (`.workflow/research/phase-8-continuous-intelligence.md`), roadmap §17 + §23 + §24 exit criteria (thesis versioning on new data, watchlist, alerts). Verify brief currency against live code (migration head — 017 landed, confirm 018 free; Phase 5 thesis/invalidation/ledger models + repository; Phase 7 provenance fields + provider_registry; Phase 1 dataquality service; collision-scan vs tree). NOTE: working tree has UNCOMMITTED Phase-13-tinted changes (FRA provider `backend/app/ingestion/fra/provider.py`, EGX official provider `backend/app/ingestion/egx/official_provider.py`, provider_registry, company coverage fields + tests) — rule whether staff-backend builds Phase 8 on a clean tree (stash) or on top, and how to avoid collision. Amend with new R-number (R39) if code disagrees, else authorize staff-backend with a task brief path. Routine per CONTRACT step 26. DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships (carry into brief). Return verification + authorization inline; end NEXT: staff-backend | BLOCKED: <question> | ASK USER: <question> | DONE.
+
+---
+
+From: router · 2026-10-11
 Task: Phase 7 backend verdict. qa-api found R34 conformance (P0-1–P0-6, gates green: 67 disclosure tests, ruff/mypy clean) with F1 (python-multipart declared MIT but installed metadata says Apache-2.0 — likely paperwork fix) + F2 (fact blocks emit UNKNOWN vs AGENTS INSUFFICIENT_DATA literal; TTM blocks use INSUFFICIENT_DATA) + F3 (validation errors 422 vs brief 404/400) + F4 (filing_payload lacks methodology_version) + F5 (8 routes vs brief 7 — count only) + F6 (no 017 round-trip test) + F7 (stress unprobed). Rule each with next R-number: fix now vs accept-and-carry, with reasons. Then verdict: ship / fix-list / rework. Per user instruction this turn ends the run after Phase 7 lands — no Phase 8 kickoff. Return rulings inline; end NEXT: <agent> | BLOCKED | ASK USER: <question> | DONE.
 
 ---

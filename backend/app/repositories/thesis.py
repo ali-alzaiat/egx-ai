@@ -112,6 +112,10 @@ class ThesisRepository:
         )
         return result.scalars().first()
 
+    async def get_thesis_by_id(self, thesis_id: uuid.UUID) -> InvestmentThesis | None:
+        """Get thesis by its primary key ID."""
+        return await self.session.get(InvestmentThesis, thesis_id)
+
     async def upsert_invalidation(
         self,
         thesis_id: uuid.UUID,

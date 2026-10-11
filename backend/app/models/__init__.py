@@ -1,4 +1,14 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.continuous import (
+    ActorType,
+    AlertFamily,
+    AlertFired,
+    AlertRule,
+    Event,
+    EventType,
+    Watchlist,
+    WatchlistEntry,
+)
 from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
 from app.models.disclosure import DisclosureFactDiff, DisclosureFiling
 from app.models.financial import (
@@ -53,7 +63,11 @@ from app.models.valuation import (
 )
 
 __all__ = [
+    "ActorType",
     "AIAnalysis",
+    "AlertFamily",
+    "AlertFired",
+    "AlertRule",
     "AnalysisStatusDB",
     "AnalysisTypeDB",
     "ChunkTypeDB",
@@ -71,6 +85,8 @@ __all__ = [
     "DocumentStatus",
     "EgxSector",
     "EgxSectorGicsMap",
+    "Event",
+    "EventType",
     "FactStatus",
     "FactType",
     "FinancialDocument",
@@ -109,4 +125,6 @@ __all__ = [
     "ValuationModelDB",
     "ValuationResult",
     "ValuationStatusDB",
+    "Watchlist",
+    "WatchlistEntry",
 ]

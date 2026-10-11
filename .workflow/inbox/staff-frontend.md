@@ -54,3 +54,26 @@ Task: Implement the R16 refresh surface + R17-intersecting UX fixes from the aud
 
 ## Handoff
 End with exactly one contract string: NEXT: qa-ui, BLOCKED: <question>, or DONE.
+---
+From: router (Batch A parallel fan-out) · 2026-10-11
+Task S1 — Score card (Batch A1). Own files ONLY (new files + nothing else):
+- Create: `frontend/src/components/ScoreCard.tsx`, `frontend/src/components/ScoreCard.css`, `frontend/src/api/score.ts`, `frontend/src/types/score.ts`.
+- Backend (verify shapes yourself in `backend/app/api/scores.py` + schemas): `GET /api/scores/companies/{company_id}` → `{assessment: null | {components[], confidence, methodology_version, ...}, ...}` (null = never assessed, render empty state + assess button, never a default); `POST …/assess` → recompute. FORBIDDEN: `client.ts`, `types/index.ts`, `CompanyTabs.tsx`, `App.tsx`, any other page/component, backend/**, .workflow/**. No commits, no vite build (router merges + gates); you may run `npx tsc --noEmit` and `npx eslint <your files>` only. Conventions: TanStack Query hooks (`useScore(companyId)`, `assessScore` mutation invalidating `["score", id]`), INSUFFICIENT_DATA badges, `data_as_of` + 90-day staleness banner, methodology_version footnote, rule-10 copy (no BUY). Vercel skill client/rerender/bundle/rendering/js rules. Return: files created, exported component/hook/type names + props, wiring instructions for router (tab registration + hook re-export), tsc/eslint output. End NEXT: router | BLOCKED: <question> | DONE.
+
+---
+From: router (Batch A parallel fan-out) · 2026-10-11
+Task S2 — Shariah v2 upgrade (Batch A2). Own files ONLY:
+- Edit ONLY `frontend/src/pages/ShariahScreening.tsx`; create `frontend/src/components/PurificationCard.tsx`, `frontend/src/components/EgxMembershipCard.tsx`, css, `frontend/src/api/shariah.ts`, `frontend/src/types/shariah.ts`.
+- Backend (verify shapes in `backend/app/api/screening.py`): existing screening GET (per-rule breakdown pass/fail/UNKNOWN + threshold + report_date), `GET/POST …/purification` (EGP math + inputs), `GET/POST …/egx-membership` (side-by-side, reconcile-never-override copy). Keep existing v1 behavior working; add breakdown + purification + EGX33 sections. UNKNOWN rules render as unknown with reason. Same FORBIDDEN list + constraints + conventions + return format as S1. End NEXT: router | BLOCKED: <question> | DONE.
+
+---
+From: router (Batch A parallel fan-out) · 2026-10-11
+Task S3 — Valuation v2 upgrade (Batch A3). Own files ONLY:
+- Edit ONLY `frontend/src/pages/Valuation.tsx`; create `frontend/src/components/FairValueCard.tsx`, `frontend/src/components/SensitivityTable.tsx`, css, `frontend/src/api/valuation.ts`, `frontend/src/types/valuation.ts`.
+- Backend (verify shapes in `backend/app/api/valuation.py`): `GET …/companies/{id}/fair-value` (per-model values, weights, weighted FV, bull/base/bear, ±1% sensitivity, DQ confidence ladder); keep existing `POST …/calculate` flow. Fair value ALWAYS paired with assumptions + sensitivity table; DEGRADED data → widened range + caveat, never a bare point estimate. Same FORBIDDEN list + constraints + conventions + return format as S1. End NEXT: router | BLOCKED: <question> | DONE.
+
+---
+From: router (Batch A parallel fan-out) · 2026-10-11
+Task S4 — Industry peers strip (Batch A4). Own files ONLY (all new):
+- Create: `frontend/src/components/PeersTab.tsx` (or IndustryPeers.tsx), css, `frontend/src/api/industry.ts`, `frontend/src/types/industry.ts`.
+- Backend (verify shapes in `backend/app/api/industry.py` + `IndustryService.peer_snapshot`): `GET /api/industry/companies/{company_id}` (sector/industry, peers, per-metric percentiles + written explanation, profile version), `PUT …/peers` `{peer_company_ids[]}` override (persists, later GETs use it). Percentile bars + explanation text + editable peer list with save. Same FORBIDDEN list + constraints + conventions + return format as S1. End NEXT: router | BLOCKED: <question> | DONE.

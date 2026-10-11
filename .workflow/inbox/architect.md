@@ -1,5 +1,16 @@
 # Inbox: architect
 
+From: router (user directive: frontend far behind backend) · 2026-10-11
+Task: Frontend catch-up contract — map EVERY backend surface with no UI to frontend routes/components/hooks, organized in implementable batches.
+
+Context: backend has 20 routers (`backend/app/api/`: ai, alerts, companies, data_quality, data_sources, disclosures, events, financial, health, industry, ingestion, metrics, scores, screening, signals, technical, theses, triggers, valuation, watchlists). Frontend (`frontend/src/`) has pages for companies/prices/metrics/financials/screening-v1/signals/technical/valuation-v1/data-quality/AI only — hooks in `frontend/src/api/client.ts` (25 hooks, no industry/scores/theses/disclosures/watchlists/alerts/triggers/events). Company nav: `frontend/src/components/CompanyTabs.tsx` (7 views). No UI for Phases 2–8 backends (industry/peers, 4-model valuation, investment scores, theses, Shariah v2 breakdown+purification, disclosures/parse/diffs, watchlists/alerts/triggers/event ledger). Valuation/Screening pages predate their v2 backends — mark what is stale vs missing.
+
+Inputs to read: the backend routers + schemas above (verify request/response shapes yourself — they are the contract source of truth), `frontend/src/api/client.ts`, `App.tsx`, `CompanyTabs.tsx`, research files `.workflow/research/phase-*.md` + `app-wide-ux-patterns.md` (SWS feed-first, Koyfin table mechanics already researched — reuse, don't redo), AGENTS.md rule 10 (no BUY language) + vercel-react-best-practices constraints (client/rerender/bundle/rendering/js rules; Next.js-only N/A).
+
+Deliverable (return inline; router files as `.workflow/design/frontend-catchup-contract.md`): per missing surface — route, components, TanStack Query hooks, backend endpoints consumed (with shapes), loading/empty/error + INSUFFICIENT_DATA + staleness display rules, what existing pages need upgrading (valuation v2, screening v2) vs new pages; batches ordered by dependency (each batch independently shippable + QA-able, with acceptance); what is explicitly NOT in v1. No code, no file writes. End NEXT: ux-expert | BLOCKED: <question> | DONE.
+
+---
+
 From: router (user directive) · 2026-10-09
 Task: Define the contract that closes the two Phase-1 data gaps the user reported.
 
