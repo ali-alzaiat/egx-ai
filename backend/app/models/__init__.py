@@ -1,5 +1,6 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
 from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
+from app.models.disclosure import DisclosureFactDiff, DisclosureFiling
 from app.models.financial import (
     DocumentStatus,
     FactStatus,
@@ -64,6 +65,8 @@ __all__ = [
     "DataQualityStatusDB",
     "DataSource",
     "DataSourceType",
+    "DisclosureFactDiff",
+    "DisclosureFiling",
     "DocumentChunk",
     "DocumentStatus",
     "EgxSector",

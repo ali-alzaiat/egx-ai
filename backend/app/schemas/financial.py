@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -73,6 +74,17 @@ class FinancialFactBase(BaseModel):
     source_line: str | None = Field(None, max_length=100)
     reported_at: datetime | None = None
     normalized_at: datetime | None = None
+    # Phase-7 provenance (all optional; Phase-1 writers omit them).
+    filing_id: UUID | None = None
+    accounting_basis: str | None = Field(None, max_length=20)
+    eas_tags: list[str] | None = None
+    locator: dict[str, Any] | None = None
+    extraction: dict[str, Any] | None = None
+    audit_state: str | None = Field(None, max_length=20)
+    methodology_version: str | None = Field(None, max_length=20)
+    supersedes_id: UUID | None = None
+    is_restated: bool = False
+    unknown_reason: str | None = None
 
 
 class FinancialFactCreate(FinancialFactBase):

@@ -2,10 +2,11 @@ import enum
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     Enum,
@@ -17,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -180,6 +181,30 @@ class FinancialFact(Base):
     source_line: Mapped[str | None] = mapped_column(String(100), nullable=True)
     reported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     normalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Phase-7 document-intelligence provenance (R34 P0-3/P0-4, migration 017).
+    # Facts parsed from disclosure PDFs carry their filing link, cell locator,
+    # extraction report, accounting basis + EAS gotcha tags, audit state, and
+    # restatement chain here; Phase-1 writers leave every column null.
+    filing_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("disclosure_filings.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    accounting_basis: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    eas_tags: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    locator: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    extraction: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    audit_state: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    methodology_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    supersedes_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_facts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_restated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    unknown_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -196,4 +221,5 @@ class FinancialFact(Base):
         Index("ix_financial_facts_reported_label", "reported_label"),
         Index("ix_financial_facts_normalized_label", "normalized_label"),
         Index("ix_financial_facts_status", "status"),
+        Index("ix_financial_facts_filing_id", "filing_id"),
     )

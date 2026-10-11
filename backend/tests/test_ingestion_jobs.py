@@ -122,11 +122,25 @@ async def test_full_refresh_happy_path(client, refresh_env, monkeypatch, db_sess
         == done["assessment"]["companies_assessed"] * 3
     )
 
-    company_count = (await db_session.execute(select(func.count(Company.id)))).scalar_one()
-    rows = (
-        await db_session.execute(select(func.count(DataQualityAssessment.id)))
+    # Count only the companies the stub seeded (COMI + HRHO) so this assertion
+    # is stable on any DB state — R21: the old global census broke on non-empty
+    # dev DBs because pre-existing rows remained visible through the shared engine.
+    stub_tickers = list(_TICKERS["tickers"].split(","))
+    stub_companies = (
+        await db_session.execute(
+            select(func.count(Company.id)).where(Company.ticker.in_(stub_tickers))
+        )
     ).scalar_one()
-    assert rows == company_count * 3
+    stub_assessments = (
+        await db_session.execute(
+            select(func.count(DataQualityAssessment.id)).where(
+                DataQualityAssessment.company_id.in_(
+                    select(Company.id).where(Company.ticker.in_(stub_tickers))
+                )
+            )
+        )
+    ).scalar_one()
+    assert stub_assessments >= stub_companies * 3
 
 
 async def test_single_flight_returns_409(client, refresh_env, monkeypatch):
