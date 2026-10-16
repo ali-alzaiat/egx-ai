@@ -319,6 +319,9 @@ export interface ScreeningRuleResult {
   value: string | null;
   threshold: string | null;
   reason: string;
+  missing_input?: string | null; // v2 provenance
+  source?: string | null; // v2 provenance
+  source_date?: string | null; // v2 provenance
 }
 
 export interface ScreeningResult {
@@ -330,8 +333,11 @@ export interface ScreeningResult {
   methodology_name: string;
   overall_reason: string | null;
   screened_at: string;
+  report_date: string | null;
+  report_date_reason: string | null;
   created_at: string;
   rule_results: ScreeningRuleResult[];
+  data_quality: Record<string, unknown> | null;
 }
 
 // ─── Valuation (GET/POST /api/valuation/companies/{id}[…]) ─
@@ -353,4 +359,425 @@ export interface CalculateValuationsResponse {
   ticker: string;
   valuations: CompanyValuation[];
   calculated_at: string;
+}
+
+// ─── Investment score (GET/POST /api/scores/companies/{id}[…]) ─
+
+export interface ScoreCheck {
+  check_key: string;
+  component: string;
+  status: string; // PASS | FAIL | NOT_RUN | INSUFFICIENT_DATA…
+  threshold: string;
+  inputs: Record<string, string | null>;
+  reason: string;
+}
+
+export interface ScoreComponent {
+  key: string;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA…
+  score: number | null;
+  passes: number;
+  ran: number;
+  total: number;
+  reason: string;
+  checks: ScoreCheck[];
+}
+
+export interface ScoreConfidence {
+  level: string;
+  dq_score: number | null;
+  n_checks_run: number;
+  bands: { level: string; min_dq_score: number; min_checks_run: number }[];
+  reason: string;
+}
+
+export interface ScoreAssessment {
+  company_id: string;
+  ticker: string;
+  as_of: string;
+  computed_at: string;
+  methodology_version: string;
+  valuation_methodology_version: string;
+  profile: { profile_id: string; methodology_version: string; health_track: string };
+  headline: { value: number | null; status: string; reason: string; detail: string };
+  components: Record<string, ScoreComponent>;
+  checks: ScoreCheck[];
+  checks_not_run: string[];
+  n_with_data: number;
+  n_checks_total: number;
+  confidence: ScoreConfidence;
+  buy_zone: Record<string, unknown>;
+  inputs_echo: { inputs: Record<string, string | string[] | null>; sources: Record<string, string | null> };
+  scale: string;
+  disclaimer: string;
+}
+
+export interface ScoreResponse {
+  company_id: string;
+  ticker: string;
+  assessment: ScoreAssessment | null; // null = assessed never; never a default score
+  methodology_version: string;
+  scale: string;
+  disclaimer: string;
+}
+
+// ─── Industry peers (GET/PUT /api/industry/companies/{id}[…]) ─
+
+export interface IndustryPeer {
+  id: string;
+  ticker: string;
+  name: string;
+}
+
+export interface IndustryPercentile {
+  metric_key: string;
+  display_name: string;
+  value: string | null;
+  status: string;
+  unit: string | null;
+  n_peers: number;
+  n_with_data: number;
+  explanation: string;
+  reason: string;
+}
+
+export interface IndustrySnapshot {
+  company: {
+    id: string;
+    ticker: string;
+    name: string;
+    sector: string | null;
+    egx_sector: string | null;
+    gics: Record<string, string> | null;
+  };
+  peers: { basis: string; items: IndustryPeer[] };
+  profile: { profile_id: string; methodology_version: string; metric_keys: string[] };
+  percentiles: IndustryPercentile[];
+  n_peers: number;
+  methodology_version: string;
+  as_of: string;
+}
+
+// ─── Weighted fair value (GET /api/valuation/companies/{id}/fair-value) ─
+
+export interface FairValueLeg {
+  model: string;
+  value: string | null;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA | INVALID
+  reason: string | null;
+  assumptions: Record<string, unknown>;
+}
+
+export interface FairValueScenario {
+  value: string | null;
+  status: string;
+  reason: string | null;
+}
+
+export interface FairValueResponse {
+  company_id: string;
+  ticker: string;
+  as_of: string;
+  computed_at: string;
+  methodology_version: string;
+  profile: {
+    profile_id: string;
+    methodology_version: string;
+    primary_model: string;
+    fallback_model: string;
+    preferred_multiple: string | null;
+  };
+  inputs: Record<string, string | null>;
+  input_sources: Record<string, string | null>;
+  legs: { intrinsic: FairValueLeg; relative: FairValueLeg; fallback: FairValueLeg };
+  weights: Record<string, string>;
+  n_with_data: number;
+  fair_value: { value: string | null; status: string; reason: string | null };
+  current_price: { value: string | null; as_of: string | null };
+  scenarios: { bull: FairValueScenario; base: FairValueScenario; bear: FairValueScenario; note: string };
+  sensitivity: Record<string, string | number | null>[];
+  confidence: {
+    level: string;
+    required_discount: string;
+    dq_score: number | null;
+    dq_status: string;
+    reason: string;
+    methodology_version: string;
+  };
+  verdict: { label: string; detail: string; discount: string | null };
+}
+
+// ─── Purification + EGX33 (GET/POST /api/screening/companies/{id}/…) ─
+
+export interface PurificationEstimate {
+  id?: string;
+  company_id: string;
+  status: string;
+  branch: string;
+  doctrine: string;
+  amount_egp: string | null;
+  dividend_egp: string | null;
+  ratio: string | null;
+  ratio_provenance: string | null;
+  dps: string | null;
+  dps_source: string | null;
+  dps_date: string | null;
+  reason: string | null;
+  missing_input: string | null;
+  note: string | null;
+  methodology_version?: string;
+  computed_at?: string;
+}
+
+export interface EgxMembership {
+  id?: string;
+  company_id: string;
+  member: boolean;
+  review_cycle: string;
+  effective_date: string | null;
+  source: string | null;
+  note: string | null;
+  recorded_at?: string;
+}
+
+// GET /api/screening/companies/{id}/egx-membership — side-by-side envelope
+// (our verdict + latest EGX33 record + history + discrepancy flag).
+export interface EgxMembershipStatus {
+  company_id: string;
+  our_verdict: {
+    is_compliant: boolean | null;
+    status: string;
+    methodology_version: string;
+    screened_at: string;
+    report_date: string | null;
+  } | null;
+  egx33: {
+    member: boolean;
+    review_cycle: string;
+    effective_date: string | null;
+    source: string | null;
+    note: string | null;
+  } | null;
+  history: {
+    member: boolean;
+    review_cycle: string;
+    effective_date: string | null;
+    source: string | null;
+    note: string | null;
+  }[];
+  discrepancy: { flagged: boolean; reason: string | null };
+}
+
+// ─── Investment thesis (GET/POST /api/theses/companies/{id}[…]) ─
+
+export interface ThesisAssumption {
+  metric: string;
+  value: string | null;
+  horizon: string | null;
+  source: string;
+  author: string;
+}
+
+export interface ThesisInvalidation {
+  metric: string;
+  threshold: string;
+  direction: string;
+  period: string;
+  evidence_source: string;
+  action: string;
+  status: string;
+  extraction_confidence: string | null;
+  version: number;
+  methodology_version: string;
+}
+
+export interface ThesisCatalyst {
+  id: string;
+  event: string;
+  date_from: string | null;
+  date_to: string | null;
+  window: string | null;
+  variable: string | null;
+  expectation: string | null;
+  outcome: string;
+  provenance: string;
+  label: string;
+  methodology_version: string;
+}
+
+export interface ThesisLedgerRow {
+  classification: string;
+  variable: string;
+  action: string;
+  rationale: string;
+  evidence: Record<string, unknown>;
+  reviewer: string | null;
+  created_at: string | null;
+  methodology_version: string;
+}
+
+export interface ThesisAssessment {
+  company_id: string;
+  ticker: string;
+  as_of: string;
+  computed_at: string;
+  methodology_version: string;
+  valuation_methodology_version: string;
+  header: {
+    fair_value: { value: string | null; status: string };
+    horizon_years: number;
+    is_shareholder: boolean | null;
+  };
+  narrative: string | null;
+  assumptions: ThesisAssumption[];
+  bulls: string[];
+  bears: string[];
+  scenarios: Record<string, unknown>;
+  sensitivity: Record<string, unknown>;
+  invalidations: ThesisInvalidation[];
+  ledger: ThesisLedgerRow[];
+  catalysts: ThesisCatalyst[];
+  confidence: Record<string, unknown>;
+  dq: Record<string, unknown>;
+  score: number | Record<string, unknown> | null;
+  needs_reassessment: boolean;
+  disclaimer: string;
+}
+
+export interface ThesisResponse {
+  company_id: string;
+  ticker: string;
+  assessment: ThesisAssessment | null; // null = never assessed; never a default thesis
+  methodology_version: string;
+  disclaimer: string;
+}
+
+// ─── Disclosures (POST/GET /api/disclosures/…) ─
+
+export interface DisclosureFiling {
+  id: string;
+  company_id: string;
+  filing_url: string;
+  bulletin_id: string | null;
+  report_date: string;
+  filing_type: string;
+  accounting_basis: string;
+  content_hash: string | null;
+  byte_size: number | null;
+  storage_path: string | null;
+  has_bytes: boolean;
+  downloaded_at: string;
+  created_at: string;
+}
+
+export interface DisclosureFact {
+  id: string;
+  metric: string;
+  value: { value: string | null; status: string; reason: string | null };
+  currency_unit: string | null;
+  period: { end: string | null; type: string | null; audit_state: string | null };
+  source: {
+    filing_url: string | null;
+    bulletin_id: string | null;
+    company: string;
+    report_date: string | null;
+    filing_type: string | null;
+  };
+  locator: Record<string, unknown>;
+  extraction: Record<string, unknown>;
+  accounting_basis: string | null;
+  eas_tags: string[];
+  methodology_version: string;
+  status: string; // OK | UNKNOWN
+  supersedes: string | null;
+  is_restated: boolean;
+  created_at: string | null;
+}
+
+export interface DisclosureDiff {
+  id: string;
+  metric: string;
+  kind: string | null;
+  prior_value: string | null;
+  current_value: string | null;
+  delta: string | null;
+  delta_pct: string | null;
+  prior_period: string | null;
+  current_period: string | null;
+}
+
+// ─── Watchlists / alerts / events (Phase 8) ─
+
+export interface PhaseBadge {
+  value: string | null;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA
+  reason: string | null;
+}
+
+export interface Watchlist {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface WatchlistEntry {
+  id: string;
+  watchlist_id: string;
+  company_id: string;
+  group: string | null;
+  note: string | null;
+  thesis_link: string | null;
+  created_at: string;
+  price: PhaseBadge | null;
+  change: PhaseBadge | null;
+  as_of: PhaseBadge | null;
+  staleness: PhaseBadge | null;
+  score: PhaseBadge | null;
+  shariah_state: PhaseBadge | null;
+  thesis_link_badge: PhaseBadge | null;
+  company_ticker: string | null;
+  company_name: string | null;
+}
+
+export interface AlertRule {
+  id: string;
+  user_id: string;
+  watchlist_id: string | null;
+  company_id: string | null;
+  family: string; // price | valuation_gap | document | score_change
+  params: Record<string, unknown>;
+  methodology_version: string;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface AlertFired {
+  id: string;
+  rule_id: string;
+  company_id: string;
+  inputs_snapshot: Record<string, unknown>;
+  fired_at: string;
+  acked_at: string | null;
+}
+
+export interface PhaseEvent {
+  id: string;
+  ts: string;
+  actor_type: string;
+  actor_id: string;
+  rule_version: string;
+  type: string;
+  symbols: string[];
+  inputs_snapshot: Record<string, unknown>;
+  reason: string;
+  supersedes_id: string | null;
+}
+
+// PUT /api/industry/companies/{id}/peers — override receipt (not a snapshot).
+export interface PeerOverrideReceipt {
+  company_id: string;
+  peer_company_ids: string[];
+  methodology_version: string;
+  updated_at: string;
 }

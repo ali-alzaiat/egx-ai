@@ -3,9 +3,11 @@ import "./Valuation.css";
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { calculateValuations, useCompanyByTicker, useValuations } from '../api/client'
+import { calculateValuations, useCompanyByTicker, useFairValue, useValuations } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
 import CompanyTabs from '../components/CompanyTabs'
+import FairValueCard from '../components/FairValueCard'
+import SensitivityTable from '../components/SensitivityTable'
 import type { CompanyValuation } from '../types'
 
 // Assumption groups for the calculate form (query-param names match
@@ -64,6 +66,12 @@ export default function Valuation() {
     error: valuationsError,
     refetch,
   } = useValuations(company?.id)
+  const {
+    data: fairValue,
+    isLoading: fvLoading,
+    error: fvError,
+    refetch: refetchFv,
+  } = useFairValue(company?.id)
 
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [running, setRunning] = useState(false)
@@ -88,7 +96,9 @@ export default function Valuation() {
       }
       const res = await calculateValuations(company.id, params)
       await queryClient.invalidateQueries({ queryKey: ['valuations'] })
+      await queryClient.invalidateQueries({ queryKey: ['fairValue'] })
       await refetch()
+      await refetchFv()
       const evaluated = res.valuations.filter((v) => v.status === 'AVAILABLE').length
       setToast(`Valuation updated — ${evaluated} evaluated`)
     } catch (err) {
@@ -98,7 +108,7 @@ export default function Valuation() {
     }
   }
 
-  if (companyLoading || valuationsLoading) {
+  if (companyLoading || valuationsLoading || fvLoading) {
     return <div className="loading">Loading company...</div>
   }
 
@@ -192,6 +202,28 @@ export default function Valuation() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {fvError ? (
+        <div className="alert alert-error">
+          Couldn't load the weighted fair value.{' '}
+          <button className="link-btn" onClick={() => refetchFv()}>
+            Retry
+          </button>
+        </div>
+      ) : fairValue ? (
+        <>
+          <FairValueCard fairValue={fairValue} />
+          <SensitivityTable
+            rows={fairValue.sensitivity}
+            baseValue={fairValue.fair_value.value}
+          />
+        </>
+      ) : (
+        <div className="empty">
+          No weighted fair value computed yet. It appears here once calculated —
+          always paired with its assumptions.
         </div>
       )}
     </div>

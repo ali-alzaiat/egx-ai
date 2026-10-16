@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.continuous.constants import CI_METHODOLOGY_VERSION
 from app.models.continuous import (
     AlertFamily,
-    AlertFired,
     AlertRule,
     EventType,
     Watchlist,
@@ -250,38 +249,42 @@ class TestMigration018:
                     text("DELETE FROM companies WHERE id = :id"), {"id": company_id}
                 )
 
-    async def test_foreign_keys_enforced(self, db_session: AsyncSession) -> None:
+    async def test_foreign_keys_enforced(self) -> None:
         """Foreign key constraints should be enforced."""
-        # Creating watchlist_entry with non-existent watchlist_id should fail
+        # Violating INSERTs run on an isolated connection with raw SQL: the
+        # shared db_session fixture must never see a failed flush (it
+        # deassociates the fixture's outer transaction -> SAWarning). Random
+        # UUIDs fail either FK, which is all this test asserts.
         from sqlalchemy.exc import IntegrityError
 
-        company = await _make_company(db_session, "FKTEST")
+        from app.db.session import engine
 
-        entry = WatchlistEntry(
-            id=uuid.uuid4(),
-            watchlist_id=uuid.uuid4(),  # Non-existent
-            company_id=company.id,
-        )
-        db_session.add(entry)
-
-        with pytest.raises(IntegrityError):
-            await db_session.flush()
-
-        await db_session.rollback()
-
-        # Creating alert_fired with non-existent rule_id should fail
-        fired = AlertFired(
-            id=uuid.uuid4(),
-            rule_id=uuid.uuid4(),  # Non-existent
-            company_id=company.id,
-            inputs_snapshot={},
-        )
-        db_session.add(fired)
-
-        with pytest.raises(IntegrityError):
-            await db_session.flush()
-
-        await db_session.rollback()
+        async with engine.begin() as conn:
+            # watchlist_entry with non-existent watchlist_id should fail
+            with pytest.raises(IntegrityError):
+                async with conn.begin_nested():
+                    await conn.execute(
+                        text(
+                            "INSERT INTO watchlist_entries (id, watchlist_id, company_id) "
+                            "VALUES (:id, :wid, :cid)"
+                        ),
+                        {"id": uuid.uuid4(), "wid": uuid.uuid4(), "cid": uuid.uuid4()},
+                    )
+            # alert_fired with non-existent rule_id should fail
+            with pytest.raises(IntegrityError):
+                async with conn.begin_nested():
+                    await conn.execute(
+                        text(
+                            "INSERT INTO alert_fired (id, rule_id, company_id, inputs_snapshot) "
+                            "VALUES (:id, :rid, :cid, :snap)"
+                        ),
+                        {
+                            "id": uuid.uuid4(),
+                            "rid": uuid.uuid4(),
+                            "cid": uuid.uuid4(),
+                            "snap": "{}",
+                        },
+                    )
 
     async def test_indexes_exist(self, db_session: AsyncSession) -> None:
         """Required indexes should exist after migration."""

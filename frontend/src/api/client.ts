@@ -1,28 +1,44 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type {
+  AlertFired,
+  AlertRule,
   CalculateValuationsResponse,
   Company,
   CompanyValuation,
   DailyPrice,
   DataQualityListResponse,
   DataSource,
+  DisclosureDiff,
+  DisclosureFact,
+  DisclosureFiling,
+  EgxMembership,
+  EgxMembershipStatus,
+  FairValueResponse,
   FinancialDocument,
   FinancialFact,
   FinancialMetric,
   FinancialPeriod,
+  IndustrySnapshot,
   PaginatedResponse,
+  PeerOverrideReceipt,
+  PhaseEvent,
+  PurificationEstimate,
   ScreeningResult,
+  ScoreResponse,
   TechnicalIndicator,
   CalculateIndicatorsResponse,
   SignalsResponse,
   SyncJobStatus,
+  ThesisResponse,
   UniverseCoverage,
   MarketSignal,
   ScoringModelInfo,
   SignalRun,
   UnscorableCompany,
   ScreenedCompanySummary,
+  Watchlist,
+  WatchlistEntry,
 } from "../types";
 
 const API_BASE = "/api";
@@ -37,13 +53,6 @@ async function fetchApi<T>(path: string): Promise<T> {
 // renders its not-found state from the first response (F15/F17).
 function retryUnless404(failureCount: number, error: Error): boolean {
   return !error.message.includes("404") && failureCount < 1;
-}
-
-export function useHealthCheck() {
-  return useQuery({
-    queryKey: ["health"],
-    queryFn: () => fetchApi<{ status: string; version: string }>("/health"),
-  });
 }
 
 export function useCompanies(params: {
@@ -429,6 +438,146 @@ export async function calculateMetrics(companyId: string): Promise<{
   return res.json();
 }
 
+// GET /api/scores/companies/{company_id} — 404 means unknown company;
+// a known but unassessed company returns { assessment: null } (empty state).
+export function useScore(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["score", companyId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/scores/companies/${companyId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<ScoreResponse>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/scores/companies/{company_id}/assess — plain async, not useMutation.
+export async function assessScore(companyId: string): Promise<ScoreResponse> {
+  const res = await fetch(`${API_BASE}/scores/companies/${companyId}/assess`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/industry/companies/{company_id}
+export function useIndustrySnapshot(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["industry", companyId],
+    queryFn: () =>
+      fetchApi<IndustrySnapshot>(`/industry/companies/${companyId}`),
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// PUT /api/industry/companies/{company_id}/peers — plain async, not useMutation.
+export async function putPeerOverride(
+  companyId: string,
+  peerCompanyIds: string[],
+): Promise<PeerOverrideReceipt> {
+  const res = await fetch(`${API_BASE}/industry/companies/${companyId}/peers`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ peer_company_ids: peerCompanyIds }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/valuation/companies/{company_id}/fair-value
+export function useFairValue(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["fairValue", companyId],
+    queryFn: () => fetchApi<FairValueResponse>(`/valuation/companies/${companyId}/fair-value`),
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// GET /api/screening/companies/{company_id}/purification — 404 means never estimated.
+export function usePurification(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["purification", companyId],
+    queryFn: async () => {
+      const res = await fetch(
+        `${API_BASE}/screening/companies/${companyId}/purification`,
+      );
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<PurificationEstimate>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/screening/companies/{company_id}/purification — plain async.
+export async function estimatePurification(
+  companyId: string,
+  body: {
+    dividend_egp?: number;
+    dps?: number;
+    shares_held?: number;
+    non_permissible_revenue?: number;
+    total_revenue?: number;
+    ratio_provenance?: string;
+    dps_source?: string;
+    dps_date?: string;
+  },
+): Promise<PurificationEstimate> {
+  const res = await fetch(
+    `${API_BASE}/screening/companies/${companyId}/purification`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/screening/companies/{company_id}/egx-membership — 404 means never recorded.
+// Returns the side-by-side envelope, not the flat POST record.
+export function useEgxMembership(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["egxMembership", companyId],
+    queryFn: async () => {
+      const res = await fetch(
+        `${API_BASE}/screening/companies/${companyId}/egx-membership`,
+      );
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<EgxMembershipStatus>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/screening/companies/{company_id}/egx-membership — plain async.
+export async function recordEgxMembership(
+  companyId: string,
+  body: { member: boolean; review_cycle: string; effective_date?: string; source: string; note?: string },
+): Promise<EgxMembership> {
+  const res = await fetch(
+    `${API_BASE}/screening/companies/${companyId}/egx-membership`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 // POST /api/ingestion/sync — follows the runSignals pattern (plain fetch,
 // not useMutation). 409 means a job is already live: adopt the returned job
 // and start polling it instead of throwing.
@@ -462,4 +611,349 @@ export function useSyncStatus(): UseQueryResult<SyncJobStatus> {
       return status === "accepted" || status === "running" ? 2000 : false;
     },
   });
+}
+
+// ─── Investment thesis (GET/POST /api/theses/companies/{id}[…]) ─
+
+// 404 = unknown company; a known but unassessed company returns { assessment: null }.
+export function useThesis(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["thesis", companyId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/theses/companies/${companyId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<ThesisResponse>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/theses/companies/{company_id}/assess — plain async, not useMutation.
+export async function assessThesis(
+  companyId: string,
+  body: Record<string, unknown> = {},
+): Promise<ThesisResponse> {
+  const res = await fetch(`${API_BASE}/theses/companies/${companyId}/assess`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST /api/theses/companies/{company_id}/update — rationale required server-side.
+export async function updateThesis(
+  companyId: string,
+  body: {
+    rationale: string;
+    reviewer?: string;
+    classification?: string;
+    invalidations?: { metric: string; status: string }[];
+    catalysts?: { catalyst_id: string; outcome: string }[];
+  },
+): Promise<ThesisResponse> {
+  const res = await fetch(`${API_BASE}/theses/companies/${companyId}/update`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ─── Disclosures (POST/GET /api/disclosures/…) ─
+
+// GET /api/disclosures/filings?company_id= — 404 means unknown company.
+export function useFilings(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["filings", companyId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/disclosures/filings?company_id=${companyId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<DisclosureFiling[]>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/disclosures/register — plain async.
+export async function registerFiling(body: {
+  company_id: string;
+  filing_url: string;
+  bulletin_id?: string;
+  report_date: string;
+  filing_type?: string;
+  accounting_basis?: string;
+  content_hash?: string;
+}): Promise<{ filing: DisclosureFiling; created: boolean }> {
+  const res = await fetch(`${API_BASE}/disclosures/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST /api/disclosures/upload — multipart form.
+export async function uploadFiling(form: FormData): Promise<{ filing: DisclosureFiling; created: boolean }> {
+  const res = await fetch(`${API_BASE}/disclosures/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST /api/disclosures/filings/{filing_id}/parse — plain async.
+export async function parseFiling(
+  filingId: string,
+  body: Record<string, unknown> = {},
+): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/disclosures/filings/${filingId}/parse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/disclosures/facts?company_id=&metric= — 404 means unknown company.
+export function useFacts(companyId: string | undefined, metric?: string) {
+  const qs = metric ? `&metric=${encodeURIComponent(metric)}` : "";
+  return useQuery({
+    queryKey: ["facts", companyId, metric],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/disclosures/facts?company_id=${companyId}${qs}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<DisclosureFact[]>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// POST /api/disclosures/facts — plain async.
+export async function recordFact(body: {
+  filing_id: string;
+  metric: string;
+  value?: number;
+  statement_name?: string;
+  page?: number;
+  table_id?: number;
+  row?: number;
+  col?: number;
+  fact_type?: string;
+  currency?: string;
+  audit_state?: string;
+  eas_tags?: string[];
+  estimate?: number;
+}): Promise<unknown> {
+  const res = await fetch(`${API_BASE}/disclosures/facts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// GET /api/disclosures/comparison?company_id=&metric= — 404 unknown, 422 mixed basis.
+export function useComparison(companyId: string | undefined, metric = "revenue") {
+  return useQuery({
+    queryKey: ["comparison", companyId, metric],
+    queryFn: async () => {
+      const res = await fetch(
+        `${API_BASE}/disclosures/comparison?company_id=${companyId}&metric=${encodeURIComponent(metric)}`,
+      );
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<{
+        comparison: Record<string, unknown>;
+        ttm_margin_vs_prior_year: Record<string, unknown>;
+      }>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// GET /api/disclosures/diffs?company_id= — 404 means unknown company.
+export function useDiffs(companyId: string | undefined) {
+  return useQuery({
+    queryKey: ["diffs", companyId],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/disclosures/diffs?company_id=${companyId}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<DisclosureDiff[]>;
+    },
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+// ─── Watchlists (GET/POST/PATCH/DELETE /api/watchlists…) ─
+
+export function useWatchlists() {
+  return useQuery({
+    queryKey: ["watchlists"],
+    queryFn: () => fetchApi<Watchlist[]>("/watchlists"),
+  });
+}
+
+export async function createWatchlist(name: string): Promise<Watchlist> {
+  const res = await fetch(`${API_BASE}/watchlists`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export function useWatchlistEntries(watchlistId: string | undefined) {
+  return useQuery({
+    queryKey: ["watchlistEntries", watchlistId],
+    queryFn: () => fetchApi<WatchlistEntry[]>(`/watchlists/${watchlistId}/entries`),
+    enabled: !!watchlistId,
+  });
+}
+
+export async function addWatchlistEntry(
+  watchlistId: string,
+  body: { company_id: string; group?: string; note?: string; thesis_link?: string },
+): Promise<WatchlistEntry> {
+  const res = await fetch(`${API_BASE}/watchlists/${watchlistId}/entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function updateWatchlistEntry(
+  watchlistId: string,
+  entryId: string,
+  body: { group?: string; note?: string; thesis_link?: string },
+): Promise<WatchlistEntry> {
+  const res = await fetch(`${API_BASE}/watchlists/${watchlistId}/entries/${entryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteWatchlistEntry(watchlistId: string, entryId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/watchlists/${watchlistId}/entries/${entryId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+// ─── Alerts (GET/POST/PATCH/DELETE /api/alerts…) ─
+
+export function useAlertRules(params: { watchlist_id?: string; company_id?: string; family?: string } = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.watchlist_id) searchParams.set("watchlist_id", params.watchlist_id);
+  if (params.company_id) searchParams.set("company_id", params.company_id);
+  if (params.family) searchParams.set("family", params.family);
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: ["alertRules", params],
+    queryFn: () => fetchApi<AlertRule[]>(`/alerts${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export async function createAlertRule(body: {
+  family: string;
+  params?: Record<string, unknown>;
+  watchlist_id?: string;
+  company_id?: string;
+  enabled?: boolean;
+}): Promise<AlertRule> {
+  const res = await fetch(`${API_BASE}/alerts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function updateAlertRule(
+  alertId: string,
+  body: { params?: Record<string, unknown>; enabled?: boolean },
+): Promise<AlertRule> {
+  const res = await fetch(`${API_BASE}/alerts/${alertId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAlertRule(alertId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/alerts/${alertId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+}
+
+export function useFiredAlerts(params: { rule_id?: string; company_id?: string; acked?: boolean } = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.rule_id) searchParams.set("rule_id", params.rule_id);
+  if (params.company_id) searchParams.set("company_id", params.company_id);
+  if (params.acked !== undefined) searchParams.set("acked", String(params.acked));
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: ["firedAlerts", params],
+    queryFn: () => fetchApi<AlertFired[]>(`/alerts/fired${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export async function ackFiredAlert(firedId: string): Promise<AlertFired> {
+  const res = await fetch(`${API_BASE}/alerts/${firedId}/ack`, { method: "POST" });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// ─── Events ledger (GET /api/events…) ─
+
+export function useEvents(params: { symbol?: string; type?: string; date_from?: string; date_to?: string } = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.symbol) searchParams.set("symbol", params.symbol);
+  if (params.type) searchParams.set("type", params.type);
+  if (params.date_from) searchParams.set("date_from", params.date_from);
+  if (params.date_to) searchParams.set("date_to", params.date_to);
+  const qs = searchParams.toString();
+  return useQuery({
+    queryKey: ["events", params],
+    queryFn: () => fetchApi<PhaseEvent[]>(`/events${qs ? `?${qs}` : ""}`),
+  });
+}
+
+export async function exportEvents(params: { symbol?: string; type?: string; date_from?: string; date_to?: string } = {}): Promise<{
+  events: PhaseEvent[];
+  total: number;
+  filters: Record<string, unknown>;
+}> {
+  const searchParams = new URLSearchParams();
+  if (params.symbol) searchParams.set("symbol", params.symbol);
+  if (params.type) searchParams.set("type", params.type);
+  if (params.date_from) searchParams.set("date_from", params.date_from);
+  if (params.date_to) searchParams.set("date_to", params.date_to);
+  const qs = searchParams.toString();
+  const res = await fetch(`${API_BASE}/events/export${qs ? `?${qs}` : ""}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
 }

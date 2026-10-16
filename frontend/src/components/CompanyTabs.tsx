@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 
-// The 7 company views, in reading order (F2/F3: one shared tab row everywhere).
+// The company views, in reading order (F2/F3: one shared tab row everywhere).
 const TABS = [
   { path: '', label: 'Overview' },
   { path: '/financials', label: 'Financial Data' },
@@ -9,6 +9,10 @@ const TABS = [
   { path: '/ai', label: 'AI Insights' },
   { path: '/screening', label: 'Shariah Screening' },
   { path: '/valuation', label: 'Valuation' },
+  { path: '/score', label: 'Score' },
+  { path: '/peers', label: 'Peers' },
+  { path: '/thesis', label: 'Thesis' },
+  { path: '/disclosures', label: 'Disclosures' },
 ]
 
 export default function CompanyTabs({ ticker }: { ticker: string }) {

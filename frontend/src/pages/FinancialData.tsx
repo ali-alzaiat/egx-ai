@@ -1,6 +1,6 @@
 import "./FinancialData.css";
 
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useCompanyByTicker, useFinancialPeriods, useFinancialFacts } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
 import CompanyTabs from '../components/CompanyTabs'
@@ -60,6 +60,9 @@ export default function FinancialData() {
           <h1>Financial Data - {company.ticker}</h1>
           <p className="subtitle">{company.name}</p>
         </div>
+        <Link className="btn btn-secondary" to={`/companies/${company.ticker}/disclosures`}>
+          Disclosures
+        </Link>
       </div>
 
       <CompanyTabs ticker={company.ticker} />

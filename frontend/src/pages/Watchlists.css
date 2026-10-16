@@ -1,0 +1,69 @@
+.wl-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.wl-entries {
+  min-width: 0;
+}
+
+.wl-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.wl-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.wl-list-item-active {
+  border-color: var(--border, #ddd);
+  background: var(--bg-soft, #f6f6f6);
+  font-weight: 600;
+}
+
+.wl-create,
+.wl-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.wl-create input,
+.wl-add input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.wl-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--green-bg, #e6f4ea);
+  color: var(--green-dark, #0e7a4f);
+  white-space: nowrap;
+}
+
+.wl-badge-missing {
+  background: var(--amber-soft, #fef3e2);
+  color: var(--amber-dark, #9a6700);
+}
+
+@media (max-width: 900px) {
+  .wl-layout {
+    grid-template-columns: 1fr;
+  }
+}

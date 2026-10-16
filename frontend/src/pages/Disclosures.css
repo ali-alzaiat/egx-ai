@@ -1,0 +1,90 @@
+.disclosure-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.disclosure-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.disclosure-form input {
+  font-weight: 400;
+}
+
+.disclosure-metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.disclosure-metric-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.disclosure-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.disclosure-record {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.disclosure-record-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 0.75rem;
+}
+
+.disclosure-record-row dt {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.disclosure-record-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.disclosure-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--green-bg, #e6f4ea);
+  color: var(--green-dark, #0e7a4f);
+  white-space: nowrap;
+}
+
+.disclosure-badge-missing {
+  background: var(--amber-soft, #fef3e2);
+  color: var(--amber-dark, #9a6700);
+}
+
+.disclosure-flag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--blue-bg, #e8f0fe);
+  color: var(--blue-dark, #1a56db);
+  white-space: nowrap;
+}

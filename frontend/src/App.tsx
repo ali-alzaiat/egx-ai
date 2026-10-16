@@ -8,6 +8,13 @@ import ShariahScreening from "./pages/ShariahScreening";
 import Valuation from "./pages/Valuation";
 import TechnicalAnalysis from "./pages/TechnicalAnalysis";
 import AIInsights from "./pages/AIInsights";
+import InvestmentScore from "./pages/InvestmentScore";
+import Peers from "./pages/Peers";
+import Thesis from "./pages/Thesis";
+import Disclosures from "./pages/Disclosures";
+import Watchlists from "./pages/Watchlists";
+import Alerts from "./pages/Alerts";
+import Events from "./pages/Events";
 import Layout from "./components/Layout";
 import Rankings from "./pages/Rankings";
 import Screening from "./pages/Screening";
@@ -40,6 +47,13 @@ function App() {
             element={<TechnicalAnalysis />}
           />
           <Route path="/companies/:ticker/ai" element={<AIInsights />} />
+          <Route path="/companies/:ticker/score" element={<InvestmentScore />} />
+          <Route path="/companies/:ticker/peers" element={<Peers />} />
+          <Route path="/companies/:ticker/thesis" element={<Thesis />} />
+          <Route path="/companies/:ticker/disclosures" element={<Disclosures />} />
+          <Route path="/watchlists" element={<Watchlists />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/events" element={<Events />} />
         </Route>
       </Routes>
     </BrowserRouter>

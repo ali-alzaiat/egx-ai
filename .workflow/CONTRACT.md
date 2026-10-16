@@ -33,6 +33,14 @@ Pipeline runs end to end for new features. Pure technical fixes may skip researc
 
 **Parallel rule:** at any stage, dispatch agents whose scopes are disjoint in parallel — backend, frontend (mocked), ux-expert, qa-ui, qa-api, qa-security, and code reviewers. Tech-lead verifies disjointness. Overlapping or dependent scopes run sequentially.
 
+**Never-behind rule (added 2026-10-16):** the frontend is never behind the backend again. Every backend phase ships its frontend surface in the same phase — no backend task is DONE while its UI counterpart is missing, stale, or red. Concretely:
+- Each phase brief must name the UI surface (new page/tab/section or upgrade of an existing one) alongside the endpoints; phases with no user-visible surface must say so explicitly with a reason.
+- At phase kickoff the router lists uncovered backend endpoints in STATUS; at phase close the router verifies each new/changed endpoint is reachable from the UI (or under an explicit logged deferral) before the DONE handoff.
+- A task with any error or warning in its gates (pytest, ruff, mypy, tsc, eslint, build, vitest) is NOT done — warnings are blockers, not advisories. Zero-errors-zero-warnings is the only green.
+- Logged deferrals go to `decisions/` with a reason + owner phase, and stay on the STATUS carry-forward list until shipped.
+
+**Frontend parallel lanes (Batch A, added 2026-10-16):** one staff-frontend agent per lane, each with its own inbox (`inbox/staff-frontend-a1.md` … `a4.md`) and disjoint file ownership (A1: InvestmentScore page; A2: ShariahScreening page; A3: Valuation page; A4: new PeersTab component). Shared files (`api/client.ts`, `types/index.ts`, `App.tsx`, `CompanyTabs.tsx`) are router-owned — lanes return wiring instructions instead of editing them. No lane runs `npm run build`/`npm test` (shared tree); router runs gates after merge.
+
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
 2. Router dispatches tech-lead with the question.
@@ -54,14 +62,13 @@ The router appends every handoffs.log entry and writes every deliverable file un
 - Scope lines (frontend/**, backend/**, .workflow/**) are prose-enforced; bash access grants shell-equivalent file access. Path-pattern edit permissions are unverified in agent frontmatter.
 - Playwright MCP (`@playwright/mcp`, `playwright_*` tools) is available for qa-ui and ux-expert to drive the running frontend (default `http://localhost:5173`). Use it when dispatch asks for live UI verification; paste snapshot/console output as evidence. Requires the dev server to be running. Adding/changing agents or MCP servers needs an opencode restart.
 
-## Model tiers (updated 2026-10-11)
+## Model tiers (updated 2026-10-16)
 
-Two tiers. Use the right one — wrong tier = wasted tokens or wrong decisions.
+Single tier per user directive — all agents run on the parent model.
 
 | Tier | Model | Agents | Rationale |
 |---|---|---|---|
-| **Smart** | `opencode/nemotron-3-ultra-free` | tech-lead, architect, staff-backend, staff-frontend, analyst | High-reasoning tasks: rulings, architecture contracts, production implementation, formula verification |
-| **Fast** | `opencode/muse-spark-1.3-contributor-free` | researcher, pm, qa-api, qa-ui, qa-security, ux-expert | Structured reports, scoping templates, read-only contract conformance, UI/security verification |
+| **All** | `opencode/muse-spark-1.3-contributor-free` | researcher, pm, architect, tech-lead, staff-backend, staff-frontend, analyst, qa-api, qa-ui, qa-security, ux-expert | Parent model everywhere; no tier split |
 
 To change a tier: edit the `model:` line in the agent's `.opencode/agents/<name>.md` frontmatter. Requires an opencode restart to take effect.
 

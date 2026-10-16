@@ -5,6 +5,9 @@ const navItems = [
   { to: '/companies', label: 'Companies' },
   { to: '/rankings', label: 'Market Rankings' },
   { to: '/screening', label: 'Screening' },
+  { to: '/watchlists', label: 'Watchlists' },
+  { to: '/alerts', label: 'Alerts' },
+  { to: '/events', label: 'Events' },
 ]
 
 function isActive(itemTo: string, pathname: string): boolean {

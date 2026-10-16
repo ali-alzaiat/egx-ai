@@ -1,1 +1,58 @@
 /* Shariah Screening specific styles */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* Dividend-method formula shown above the purification estimator. */
+.formula {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+  background: var(--code-bg, rgba(148, 163, 184, 0.08));
+  border: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.2));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+
+/* Side-by-side: our verdict vs EGX33 membership. */
+.egx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.egx-col {
+  border: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.2));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.egx-col h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.egx-col p {
+  margin: 0;
+}
+
+/* Past EGX33 review-cycle records. */
+.history-list {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}

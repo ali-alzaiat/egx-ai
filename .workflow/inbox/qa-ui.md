@@ -1,13 +1,13 @@
 # Inbox: qa-ui
 
-From: router · 2026-10-09
-Task (re-verify after Vercel compliance pass): same gates as before (`npm test`, `npm run lint`, `npm run build` + Playwright MCP live pass if servers up) on the current tree — only change since your last pass is 1 removed dead line in `Rankings.tsx`. Additionally confirm no `0`/`NaN`-renders-0 risk from `&&` conditionals (staff-frontend audited; spot-check). Standing rule going forward: frontend QA includes vercel-react-best-practices applicable-rules check per CONTRACT step 7. End with NEXT: <agent> | BLOCKED | DONE + evidence.
+From: router (frontend parallel lanes, Batches B–D merge) · 2026-10-16
+Task: Live UI verification of all new Batch A–D pages. Start the stack yourself: `docker compose up -d postgres`, backend (`cd backend && .venv/bin/python -m alembic upgrade head && .venv/bin/python -m pytest -q` must be green first — if red, STOP and report BLOCKED), seed if empty (`python -m app.seed.seed`), `uvicorn app.main:app --port 8000`; frontend `cd frontend && npm run dev` (default http://localhost:5173).
 
----
+Verify with Playwright MCP (`@playwright/mcp`, `playwright_*` tools; paste snapshot/console output as evidence):
+- `/companies/COMI/score` (assess flow, components, confidence, staleness copy), `/screening` pages (breakdown + purification + EGX33), `/companies/COMI/valuation` (fair value + assumptions + sensitivity), `/companies/COMI/peers`, `/companies/COMI/thesis` (assess + documented update), `/companies/COMI/disclosures` (+ FinancialData header link), `/watchlists`, `/alerts`, `/events` (nav entries work).
+- Zero console errors on every page; loading/empty/error states render (not blank); INSUFFICIENT_DATA badges visible; rule-10 copy (no BUY/SELL text anywhere — grep the DOM).
+- Run `npm run build && npm run lint && npm test` in frontend/ and paste outputs.
 
-From: router · 2026-10-09 (superseded R16+R17 brief, kept for verdict context)
-Task: Verify staff-frontend's R16+R17 re-implementation (uncommitted working tree) against `.workflow/design/refresh-and-assess-contract.md` (R16), `.workflow/design/app-ux-audit.md` (F1–F17), `.workflow/decisions/R17-ux-overhaul-v1-scope.md`. Read-only: report findings, change nothing.
+Vercel skill check on the new pages (client/rerender/bundle/rendering/js rules; Next.js-only N/A — list skipped rules with reasons); violations are blockers.
 
-Gates: `npm test`, `npm run lint`, `npm run build` in frontend/ (paste outputs). If dev servers are up (frontend http://localhost:5173 + backend :8000), drive the UI via Playwright MCP and paste snapshot/console evidence; if not up, say so and skip live checks (do not start servers yourself).
-
-Flag for tech-lead verdict (do not rule yourself): (1) nav 4th dest labeled `Screening` instead of a second Rankings link; (2) Dashboard does not fetch `/health`. End with exactly one contract string: NEXT: <agent> | BLOCKED: <question> | DONE.
+Return: per-page verdicts + pasted evidence (console output, snapshots). QA findings are blockers. End with exactly one: NEXT: tech-lead | BLOCKED: <question> | DONE.
