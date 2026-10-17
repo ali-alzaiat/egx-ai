@@ -87,10 +87,38 @@ class StatementExtractor:
     def extract(self, content: bytes, content_type: str, document_type: str) -> ExtractionResult:
         lowered = content.lstrip()[:256].lower()
         if content_type in ("application/xml", "text/xml") or lowered.startswith(b"<?xml"):
-            return self._extract_xbrl(content)
-        if content_type == "text/html" or b"<html" in lowered:
-            return self._extract_html(content)
-        raise ValueError(f"unsupported content_type for extraction: {content_type}")
+            result = self._extract_xbrl(content)
+        elif content_type == "text/html" or b"<html" in lowered:
+            result = self._extract_html(content)
+        else:
+            raise ValueError(f"unsupported content_type for extraction: {content_type}")
+        return self._dedupe(result)
+
+    @staticmethod
+    def _dedupe(result: ExtractionResult) -> ExtractionResult:
+        """Keep the first candidate per ontology code; later repeats are drops.
+
+        One document must contribute at most one line per code (uq_stmt_line).
+        Real XBRL filings carry several contexts per code; only the first
+        occurrence survives, the rest drop as DUPLICATE_CODE instead of
+        crashing the pipeline.
+        """
+        kept: list[LineCandidate] = []
+        seen: set[str] = set()
+        for candidate in result.candidates:
+            if candidate.ontology_code in seen:
+                result.drops.append(
+                    DropRecord(
+                        candidate.source_label_reported,
+                        "DUPLICATE_CODE",
+                        f"ontology_code={candidate.ontology_code} already seen in this document",
+                    )
+                )
+                continue
+            seen.add(candidate.ontology_code)
+            kept.append(candidate)
+        result.candidates = kept
+        return result
 
     # ------------------------------------------------------------------ XBRL
     def _extract_xbrl(self, content: bytes) -> ExtractionResult:
@@ -103,8 +131,12 @@ class StatementExtractor:
             )
             return result
 
+        units = self._xbrl_units(root)
         for element in root:
             if not isinstance(element.tag, str):
+                continue
+            tag = element.tag.rsplit("}", 1)[-1]
+            if tag in ("unit", "context", "sis", "footnoteLink", "identifier"):
                 continue
             reported_label = self._xbrl_label(element)
             value = _parse_value(self._xbrl_text(element))
@@ -114,6 +146,16 @@ class StatementExtractor:
                         reported_label,
                         "NO_VALUE",
                         ElementTree.tostring(element, encoding="unicode")[:120],
+                    )
+                )
+                continue
+            currency = self._xbrl_currency(element, units)
+            if currency is None:
+                result.drops.append(
+                    DropRecord(
+                        reported_label,
+                        "NO_CURRENCY",
+                        f"unitRef={element.attrib.get('unitRef', '')!r}",
                     )
                 )
                 continue
@@ -127,7 +169,7 @@ class StatementExtractor:
                     ontology_code=code,
                     ontology_version=_ONTOLOGY_VERSION,
                     value=value,
-                    currency=self._xbrl_currency(element),
+                    currency=currency,
                     source_label_reported=reported_label,
                     source_label_en=reported_label if lang == "en" else None,
                     source_label_ar=reported_label if lang == "ar" else None,
@@ -136,6 +178,21 @@ class StatementExtractor:
                 )
             )
         return result
+
+    def _xbrl_units(self, root: Any) -> dict[str, str]:
+        """Map unit id -> ISO 4217 currency from <xbrli:unit> declarations."""
+        units: dict[str, str] = {}
+        for element in root:
+            tag = element.tag.rsplit("}", 1)[-1]
+            if tag == "unit" and element.attrib.get("id"):
+                for measure in element.iter():
+                    mtag = measure.tag.rsplit("}", 1)[-1]
+                    if mtag == "measure" and measure.text:
+                        text = measure.text.strip()
+                        if text.lower().startswith("iso4217:"):
+                            units[str(element.attrib["id"])] = text.split(":", 1)[1].upper()
+                        break
+        return units
 
     def _xbrl_label(self, element: Any) -> str:
         # Item-style fixture elements carry `item=`; standard XBRL uses the tag name.
@@ -150,9 +207,19 @@ class StatementExtractor:
         text = element.text
         return text.strip() if text else None
 
-    def _xbrl_currency(self, element: Any) -> str:
-        del element  # unitRef present but currency uniformity is a validator gate
-        return "EGP"
+    def _xbrl_currency(self, element: Any, units: dict[str, str]) -> str | None:
+        """Resolve the declared currency for this element.
+
+        Prefers a declared <xbrli:unit> measure; falls back to a 3-letter ISO
+        4217 shorthand used directly as the unitRef. Returns None (drop with
+        NO_CURRENCY) rather than guessing.
+        """
+        unit_ref = str(element.attrib.get("unitRef") or "")
+        if unit_ref in units:
+            return units[unit_ref]
+        if unit_ref.isalpha() and len(unit_ref) == 3:
+            return unit_ref.upper()
+        return None
 
     def _prettify_tag(self, tag: str) -> str:
         spaced = re.sub(r"(?<=[a-z0-9])([A-Z])", r" \1", tag)

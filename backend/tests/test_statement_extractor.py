@@ -76,6 +76,52 @@ class TestXbrlPath:
         )
         assert all(c.currency == "EGP" for c in result.candidates)
 
+    def test_unit_element_resolves_currency(self, extractor: StatementExtractor) -> None:
+        xml = (
+            b"<?xml version='1.0'?><xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance'>"
+            b"<xbrli:unit id='u_usd'><xbrli:measure>iso4217:USD</xbrli:measure></xbrli:unit>"
+            b"<line item='Total Assets' unitRef='u_usd' decimals='-2'>700000</line>"
+            b"<line item='Total Assets' unitRef='nope' decimals='-2'>800000</line>"
+            b"</xbrli:xbrl>"
+        )
+        result = extractor.extract(xml, "application/xml", "annual_report")
+        assert result.candidates[0].value == Decimal("700000")
+        assert result.candidates[0].currency == "USD"
+        assert any(d.reason == "NO_CURRENCY" for d in result.drops)
+
+    def test_undeclared_unit_shorthand_is_used(self, extractor: StatementExtractor) -> None:
+        xml = (
+            b"<?xml version='1.0'?><xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance'>"
+            b"<line item='Total Assets' unitRef='EGP' decimals='-2'>700000</line>"
+            b"</xbrli:xbrl>"
+        )
+        result = extractor.extract(xml, "application/xml", "annual_report")
+        assert result.candidates[0].currency == "EGP"
+
+    def test_long_unit_shorthand_not_guessed(self, extractor: StatementExtractor) -> None:
+        xml = (
+            b"<?xml version='1.0'?><xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance'>"
+            b"<line item='Total Assets' unitRef='millions' decimals='-2'>700000</line>"
+            b"</xbrli:xbrl>"
+        )
+        result = extractor.extract(xml, "application/xml", "annual_report")
+        assert result.candidates == []
+        assert [d.reason for d in result.drops] == ["NO_CURRENCY"]
+
+
+class TestDuplicateCodes:
+    def test_second_occurrence_dropped_not_crashing(self, extractor: StatementExtractor) -> None:
+        xml = (
+            b"<?xml version='1.0'?><xbrli:xbrl xmlns:xbrli='http://www.xbrl.org/2003/instance'>"
+            b"<line item='Total Assets' unitRef='EGP' decimals='-2'>700</line>"
+            b"<line item='Total Assets' unitRef='EGP' decimals='-2'>900</line>"
+            b"</xbrli:xbrl>"
+        )
+        result = extractor.extract(xml, "application/xml", "annual_report")
+        assert len(result.candidates) == 1
+        assert result.candidates[0].value == Decimal("700")
+        assert [d.reason for d in result.drops] == ["DUPLICATE_CODE"]
+
 
 def _run_pytest() -> None:  # pragma: no cover - direct run convenience
     import subprocess

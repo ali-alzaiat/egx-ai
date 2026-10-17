@@ -80,16 +80,16 @@ async def _seed_document(
 
 EN_XML = b"""<?xml version="1.0"?>
 <xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
-  <line item="Total Assets" decimals="-2">700000</line>
-  <line item="Total Liabilities" decimals="-2">200000</line>
-  <line item="Total Equity" decimals="-2">500000</line>
+  <line item="Total Assets" unitRef="EGP" decimals="-2">700000</line>
+  <line item="Total Liabilities" unitRef="EGP" decimals="-2">200000</line>
+  <line item="Total Equity" unitRef="EGP" decimals="-2">500000</line>
 </xbrli:xbrl>"""
 
 RESTATEMENT_XML = b"""<?xml version="1.0"?>
 <xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
-  <line item="Total Assets" decimals="-2">705000</line>
-  <line item="Total Liabilities" decimals="-2">205000</line>
-  <line item="Total Equity" decimals="-2">500000</line>
+  <line item="Total Assets" unitRef="EGP" decimals="-2">705000</line>
+  <line item="Total Liabilities" unitRef="EGP" decimals="-2">205000</line>
+  <line item="Total Equity" unitRef="EGP" decimals="-2">500000</line>
 </xbrli:xbrl>"""
 
 
@@ -115,7 +115,11 @@ class TestPipeline:
         second = await pipeline.process_document(document.id)
         assert second.auto_validated == first.auto_validated
         rows = (
-            await db_session.execute(select(FinancialStatementLine))
+            await db_session.execute(
+                select(FinancialStatementLine).where(
+                    FinancialStatementLine.company_id == company.id
+                )
+            )
         ).scalars().all()
         assert len(rows) == first.auto_validated  # no duplicates
 
@@ -135,10 +139,10 @@ class TestPipeline:
 
 EPS_XML = b"""<?xml version="1.0"?>
 <xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
-  <line item="Total Assets" decimals="-2">700000</line>
-  <line item="Total Liabilities" decimals="-2">200000</line>
-  <line item="Total Equity" decimals="-2">500000</line>
-  <line item="EPS" decimals="-2">1.25</line>
+  <line item="Total Assets" unitRef="EGP" decimals="-2">700000</line>
+  <line item="Total Liabilities" unitRef="EGP" decimals="-2">200000</line>
+  <line item="Total Equity" unitRef="EGP" decimals="-2">500000</line>
+  <line item="EPS" unitRef="EGP" decimals="-2">1.25</line>
 </xbrli:xbrl>"""
 
 class TestSupersession:

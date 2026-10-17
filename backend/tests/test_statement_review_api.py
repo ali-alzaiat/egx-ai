@@ -16,10 +16,10 @@ pytestmark = pytest.mark.asyncio
 
 XML = b"""<?xml version="1.0"?>
 <xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
-  <line item="Total Assets" decimals="-2">700000</line>
-  <line item="Total Liabilities" decimals="-2">200000</line>
-  <line item="Total Equity" decimals="-2">500000</line>
-  <line item="EPS" decimals="-2">1.25</line>
+  <line item="Total Assets" unitRef="EGP" decimals="-2">700000</line>
+  <line item="Total Liabilities" unitRef="EGP" decimals="-2">200000</line>
+  <line item="Total Equity" unitRef="EGP" decimals="-2">500000</line>
+  <line item="EPS" unitRef="EGP" decimals="-2">1.25</line>
 </xbrli:xbrl>"""
 
 

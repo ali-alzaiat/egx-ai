@@ -65,12 +65,12 @@ PDF_BYTES = b"%PDF-1.4\n1 0 obj\n2000 REPORT CONTENT\nx"
 
 
 class TestFeedConfig:
-    def test_feed_for_returns_egx_disclosure(self) -> None:
+    async def test_feed_for_returns_egx_disclosure(self) -> None:
         feed = feed_for("COMI")
         assert feed.ticker == "COMI"
         assert feed.egx_disclosure is True
 
-    def test_ir_urls_not_invented(self) -> None:
+    async def test_ir_urls_not_invented(self) -> None:
         # Ship the config without guessing company IR URLs (AGENTS.md source rule).
         for ticker in ("COMI", "HRHO", "ABUK"):
             assert feed_for(ticker).ir_urls == []
