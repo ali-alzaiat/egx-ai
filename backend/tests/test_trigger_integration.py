@@ -492,3 +492,126 @@ class TestEventOrdering:
         assert EventType.ALERT_FIRED in event_types
         assert EventType.CHECK_EVALUATED in event_types
         assert EventType.THESIS_UPDATED in event_types
+
+
+USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+async def _make_watchlist_with_member(
+    db_session: AsyncSession, member: Company
+) -> uuid.UUID:
+    """Watchlist containing exactly one company; returns the watchlist id."""
+    from app.repositories.continuous import WatchlistRepository
+
+    repo = WatchlistRepository(db_session)
+    watchlist = await repo.create(user_id=USER_ID, name=f"WL {uuid.uuid4().hex[:6]}")
+    await repo.add_entry(
+        watchlist_id=watchlist.id,
+        company_id=member.id,
+        group="core",
+        note=None,
+        thesis_link=None,
+    )
+    return watchlist.id
+
+
+class TestRuleScopeMatching:
+    """Scope-free and list-scoped rules must fire, not just company-scoped ones."""
+
+    async def test_unscoped_price_rule_fires_for_any_company(
+        self, db_session: AsyncSession
+    ) -> None:
+        """A rule with no scope is whole-universe: it fires for every company."""
+        company = await _make_company(db_session, "UNIVERSE")
+        await _add_price(db_session, company, Decimal("55"))
+
+        db_session.add(
+            AlertRule(
+                id=uuid.uuid4(),
+                user_id=USER_ID,
+                company_id=None,
+                watchlist_id=None,
+                family=AlertFamily.PRICE,
+                params={"threshold": 50, "direction": "above"},
+                methodology_version=CI_METHODOLOGY_VERSION,
+                enabled=True,
+            )
+        )
+        await db_session.flush()
+
+        service = TriggerService(db_session)
+        result = await service.on_price_crossing(company.id, Decimal("55"), AS_OF)
+        assert result.alerts_fired == 1
+
+    async def test_watchlist_price_rule_fires_only_for_members(
+        self, db_session: AsyncSession
+    ) -> None:
+        """A list-scoped rule fires for members, never for outsiders."""
+        member = await _make_company(db_session, "WLMEMBER")
+        outsider = await _make_company(db_session, "WLOUTSIDE")
+        await _add_price(db_session, member, Decimal("55"))
+        await _add_price(db_session, outsider, Decimal("55"))
+        watchlist_id = await _make_watchlist_with_member(db_session, member)
+
+        db_session.add(
+            AlertRule(
+                id=uuid.uuid4(),
+                user_id=USER_ID,
+                company_id=None,
+                watchlist_id=watchlist_id,
+                family=AlertFamily.PRICE,
+                params={"threshold": 50, "direction": "above"},
+                methodology_version=CI_METHODOLOGY_VERSION,
+                enabled=True,
+            )
+        )
+        await db_session.flush()
+
+        service = TriggerService(db_session)
+        assert (
+            await service.on_price_crossing(member.id, Decimal("55"), AS_OF)
+        ).alerts_fired == 1
+        assert (
+            await service.on_price_crossing(outsider.id, Decimal("55"), AS_OF)
+        ).alerts_fired == 0
+
+    async def test_watchlist_document_rule_fires_only_for_members(
+        self, db_session: AsyncSession
+    ) -> None:
+        """A per-list document toggle fires when a member lands facts, not outsiders."""
+        member = await _make_company(db_session, "DOCMEMBER")
+        outsider = await _make_company(db_session, "DOCOUT")
+        watchlist_id = await _make_watchlist_with_member(db_session, member)
+
+        db_session.add(
+            AlertRule(
+                id=uuid.uuid4(),
+                user_id=USER_ID,
+                company_id=None,
+                watchlist_id=watchlist_id,
+                family=AlertFamily.DOCUMENT,
+                params={},
+                methodology_version=CI_METHODOLOGY_VERSION,
+                enabled=True,
+            )
+        )
+        await db_session.flush()
+
+        service = TriggerService(db_session)
+        member_facts = await _add_facts(
+            db_session,
+            member,
+            [{"label": "revenue", "value": Decimal("1000"), "audit_state": "verified"}],
+        )
+        assert (
+            await service.on_facts_landed(member.id, [f.id for f in member_facts])
+        ).alerts_fired == 1
+
+        outsider_facts = await _add_facts(
+            db_session,
+            outsider,
+            [{"label": "revenue", "value": Decimal("1000"), "audit_state": "verified"}],
+        )
+        assert (
+            await service.on_facts_landed(outsider.id, [f.id for f in outsider_facts])
+        ).alerts_fired == 0

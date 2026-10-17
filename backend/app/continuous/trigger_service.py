@@ -12,8 +12,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.continuous.alert_service import AlertService
@@ -25,6 +26,7 @@ from app.models.continuous import (
     AlertFamily,
     AlertRule,
     EventType,
+    WatchlistEntry,
 )
 from app.models.financial import FinancialFact
 from app.models.thesis import InvestmentThesis, ThesisInvalidation
@@ -280,26 +282,51 @@ class TriggerService:
             message=f"Price {price} evaluated: {alerts_fired} alerts fired",
         )
 
+    async def _watchlist_ids_for_company(self, company_id: uuid.UUID) -> list[uuid.UUID]:
+        """Watchlists containing the company (entry-based membership)."""
+        result = await self.session.execute(
+            select(WatchlistEntry.watchlist_id).where(
+                WatchlistEntry.company_id == company_id
+            )
+        )
+        return list(result.scalars().all())
+
+    async def _rule_scope_filter(
+        self, company_id: uuid.UUID, family: AlertFamily
+    ) -> Any:
+        """Rules applying to a company: company-scoped, list-scoped
+        (watchlist contains the company), or scope-free (whole universe).
+
+        Previously only company-scoped rules matched, so list-scoped and
+        scope-free rules were stored but could never fire.
+        """
+        member_of = await self._watchlist_ids_for_company(company_id)
+        scope: list[Any] = [AlertRule.company_id == company_id]
+        if member_of:
+            scope.append(AlertRule.watchlist_id.in_(member_of))
+        scope.append(
+            AlertRule.company_id.is_(None) & AlertRule.watchlist_id.is_(None)
+        )
+        return AlertRule.family == family, AlertRule.enabled.is_(True), or_(*scope)
+
     async def _get_doc_rules_for_company(self, company_id: uuid.UUID) -> list[AlertRule]:
         """Get enabled document alert rules for a company."""
-        stmt = select(AlertRule).where(
-            AlertRule.company_id == company_id,
-            AlertRule.family == AlertFamily.DOCUMENT,
-            AlertRule.enabled.is_(True),
+        family, enabled, scope = await self._rule_scope_filter(
+            company_id, AlertFamily.DOCUMENT
         )
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(
+            select(AlertRule).where(family, enabled, scope)
+        )
         return list(result.scalars().all())
 
     async def _get_rules_for_company(
         self, company_id: uuid.UUID, family: AlertFamily
     ) -> list[AlertRule]:
         """Get enabled rules of a specific family for a company."""
-        stmt = select(AlertRule).where(
-            AlertRule.company_id == company_id,
-            AlertRule.family == family,
-            AlertRule.enabled.is_(True),
+        fam, enabled, scope = await self._rule_scope_filter(company_id, family)
+        result = await self.session.execute(
+            select(AlertRule).where(fam, enabled, scope)
         )
-        result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     @dataclass

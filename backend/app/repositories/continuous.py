@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.continuous import (
@@ -209,11 +209,29 @@ class AlertRepository:
         return result.scalars().all()
 
     async def list_for_company(self, company_id: uuid.UUID) -> Sequence[AlertRule]:
-        """List enabled rules for a specific company (for evaluation)."""
+        """List enabled rules applying to a company (for evaluation).
+
+        Company-scoped, list-scoped (watchlist contains the company), or
+        scope-free (whole universe) — mirrors TriggerService scope matching
+        so manual evaluation and arrival evaluation agree.
+        """
+        member_of = (
+            await self.session.execute(
+                select(WatchlistEntry.watchlist_id).where(
+                    WatchlistEntry.company_id == company_id
+                )
+            )
+        ).scalars().all()
+        scope = [AlertRule.company_id == company_id]
+        if member_of:
+            scope.append(AlertRule.watchlist_id.in_(member_of))
+        scope.append(
+            AlertRule.company_id.is_(None) & AlertRule.watchlist_id.is_(None)
+        )
         result = await self.session.execute(
             select(AlertRule)
-            .where(AlertRule.company_id == company_id)
             .where(AlertRule.enabled.is_(True))
+            .where(or_(*scope))
         )
         return result.scalars().all()
 
