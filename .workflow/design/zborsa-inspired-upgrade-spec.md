@@ -29,8 +29,8 @@ presented as FRA-licensed investment advice):
   plan.
 
 Core data addition: real financial statements (income, balance sheet, cash flow) for the
-top-10 EGX companies with 8 historical quarters + 3 annual years, curated from published
-reports, and every downstream calculation (ratios, Shariah screening, valuation, score,
+top-10 EGX companies with 8 historical quarters + 3 annual years, fetched and parsed
+automatically from their published filings and every downstream calculation (ratios, Shariah screening, valuation, score,
 and the signals layer above) re-fed from those statements.
 
 ## Non-goals (explicit)
@@ -39,15 +39,16 @@ and the signals layer above) re-fed from those statements.
 - Any signal/level presented as certainty, FRA-licensed advice, or guaranteed returns —
   copy rules stay "potentially/under these assumptions".
 - Real PSP credentials/integration (open blocker; adapter interface only).
-- Auto-parsing statements from filings (heavier path; later phase).
-- Coverage beyond the first top-10 batch (schema supports more; curation is the cost).
+- Coverage beyond the first top-10 batch (schema supports more; pipeline is the cost).
+- Circumventing CAPTCHAs/authentication/robots on any data source (AGENTS.md source rule).
 
 ## Coverage batch ("top 10, deep history")
 
 First batch = 10 most-liquid EGX30 names (selection recorded in `EGX30` order, final list
-locked in the seed data file with each company's document URLs). Per company:
-8 latest quarters + 3 latest fiscal years. Any period/line the public record does not
-clearly publish stays empty with `INSUFFICIENT_DATA`; nothing is approximated.
+locked with each company's IR/disclosure feed URLs in the fetch config). Per company:
+8 latest quarters + 3 latest fiscal years, pulled automatically from published filings.
+Any period/line automation cannot extract confidently stays empty with
+`INSUFFICIENT_DATA`; nothing is approximated or hand-invented.
 
 ## Part 1 — Data model (backend, migration 019)
 
@@ -55,11 +56,18 @@ clearly publish stays empty with `INSUFFICIENT_DATA`; nothing is approximated.
 
 - `period_id` → FinancialPeriod (existing), `company_id` (denormalized for queries)
 - `ontology_code` (string, canonical), `value` numeric(20,4), `currency`
-- provenance: `source_document_id` → FinancialDocument (nullable if curated pre-Phase-7),
-  `source_label_reported`, `source_label_en`, `source_label_ar`, `source_page`
-  (free-text, e.g. "p.12/23"), `published_date`
+- provenance: `source_document_id` → FinancialDocument, `source_label_reported`,
+  `source_label_en`, `source_label_ar`, `source_page` (e.g. "p.12/23"), `extraction_method`
+  (`downloaded_document_table` | `downloaded_document_text` | `xbrl` | `manual_seed`),
+  `ext_status` (`extraction_candidate` | `auto_validated` | `approved` | `rejected`),
+  `published_date`
 - `ontology_version` (string, e.g. "stmt-ontology-1.0") — versioned like Shariah methodology
 - unique(period_id, ontology_code) — one value per canonical line per period
+
+`FinancialDocument` (existing table) gains fetch metadata (`source_kind` = IR | EGX
+disclosure, `fetched_at`, `content_hash`) and `FinancialDocumentBlob` stores the raw
+downloaded file bytes (pdf/html) so every extraction is re-runnable against the same bytes
+(provenance invariant: same hash → same extraction).
 
 Migrations and repositories follow existing patterns (018 continuous migration as template).
 
@@ -74,20 +82,49 @@ interest_bearing_debt, total_equity, minority_interests`
 
 Cash flow: `cfo, cfi, cff, capex, dividends_paid, debt_repayment`
 
-Applied to `FinancialFact` when filing facts exist (fact→ontology) and to curated lines;
-ontology is a single source of truth for label translations (EN/AR per code) shipped as a
-Python constant, mirrored in the REST contract and TS types.
+Applied to `FinancialFact` when filing facts exist (fact→ontology) and to pipeline-extracted
+lines; ontology is a single source of truth for label translations (EN/AR per code) shipped
+as a Python constant, mirrored in the REST contract and TS types.
 
-## Part 2 — Ingestion & curation
+## Part 2 — Automated fetch → parse → validate pipeline (no hardcoded numbers)
 
-Seed loader (backend service + script) ingests curated statement lines per company/period
-from a reviewed data file (`data/statement-seed/*.json` in repo, with `source_url`,
-`source_label_reported`, `published_date` per value). Loader rejects duplicates and
-validates arithmetic identities where possible (assets = liabilities + equity; gross profit
-= revenue − cost of revenue) with tolerance; violations fail ingestion loudly — no silent
-patching. Curation happens during implementation from company IR/EGX disclosures; each file
-records retrieval date. DB unchanged for companies without curated data (still
-`INSUFFICIENT_DATA`).
+`FetchService`:
+- Per-company config lists official feeds: company IR pages + EGX disclosures, ordered,
+  robots/auth/CAPTCHA-respecting (AGENTS.md source rule), request rate-limited, ETag/
+  content-hash de-duplication against `FinancialDocumentBlob`.
+- Triggered on demand + scheduled job → registers documents, stores raw bytes, links to
+  `FinancialPeriod` by the document's own date fields, emits `fact.landed` continuous
+  events for the existing event ledger.
+
+`StatementExtractor` (pure, fixture-tested):
+- Input: document bytes + type (annual report, quarterly, XBRL when present).
+- XBRL path first (deterministic tags when the filing ships them); otherwise pdf
+  table/text extraction (pdfplumber-class tools) with table boundaries + page numbers
+  recorded per cell.
+- Arabic + English label matching maps reported lines → ontology codes via an explicit,
+  versioned alias table (`source_label variants → code`), never position-guessed alone.
+- Output: candidate `FinancialStatementLine`s with full provenance; ambiguous matches
+  (same alias to 2 codes, off-balance values, wrong currency) are dropped, not guessed.
+
+`StatementValidator` (pure gates before anything is shown):
+- arithmetic identities with tolerance: assets = liabilities + equity, gross_profit =
+  revenue − cost_of_revenue, CFO + CFI + CFF ≈ net cash movement, EPS ≈ net_income /
+  shares (where share count available);
+- currency uniformity per document; sign conventions; period-span sanity (fiscal year
+  boundaries);
+- gates decide: `auto_validated` (all identities pass) vs `extraction_candidate`
+  (extracted but unproven — visible ONLY in the review queue), `rejected` (fail loudly
+  with the failing identity in the reason).
+
+Human-in-the-loop only as approval, not data entry: an Ops review queue (extends the
+existing `PendingFinancialData` pattern) lists candidates with the document page snapshot;
+`approved` lines flow to statements/Shariah/valuation; nothing marked
+`extraction_candidate` ever reaches user-facing calculations.
+
+Retry/upsert semantics: re-running the pipeline on the same document hash replaces
+candidates idempotently; a restatement (new doc for same period) supersedes earlier lines
+per-period with the supersession recorded in provenance (both kept, latest wins for
+calculations).
 
 ## Part 3 — Calculation services (all deterministic, unit-tested)
 
@@ -103,8 +140,9 @@ missing lines.
 
 `ShariahScreeningService` re-feed: existing versioned methodology (v2, AAOIFI-based,
 thresholds from the stored methodology record — unchanged) now reads real inputs where
-curated data exists: `interest_bearing_debt / market_cap` (market side from quotes as
-today), `interest_bearing_assets / total_assets`, non-compliant income share. Output keeps
+approved-stream data exists (never synthetic): `interest_bearing_debt / market_cap`
+(market side from quotes as today), `interest_bearing_assets / total_assets`,
+non-compliant income share. Output keeps
 the version + reason strings; companies without data stay `INSUFFICIENT_DATA` instead of
 synthetic pass/fail.
 
@@ -172,8 +210,12 @@ missing; existing synthetic-data banner stays visible until Phase 13.
 ## Part 6 — Testing & gates
 
 - Unit: ontology constants — EN/AR labels resolve per version; RatioService formulas
-  (zero/negative/missing/insufficient); statement assembly; seed-loader identity validation;
-  Shariah re-feed with real inputs (pass/limit-breached/insufficient); SignalService rubric
+  (zero/negative/missing/insufficient); statement assembly; extractor fixture tests (real
+  sample filings in `backend/tests/fixtures/filings/` incl. one Arabic + one English pdf,
+  one XBRL) covering: label aliases → codes, identity gates (pass/fail/tolerance),
+  supersession, idempotent re-runs; validator gates reject loudly; Shariah re-feed with
+  approved inputs (pass/limit-breached/insufficient); user-facing calculations read only
+  the `approved`/`auto_validated` stream (candidates excluded); SignalService rubric
   (confidence caps, INSUFFICIENT_DATA gating, stance↔limitations invariant) and
   entitlements enforcement (free/pro/max cuts); webhook verification rejects bad
   signatures.
@@ -185,9 +227,11 @@ missing; existing synthetic-data banner stays visible until Phase 13.
 
 ## Sequence
 
-1. Ontology + model + migration 019 + repos → 2. Seed loader + top-10 curated data (real
-sources) → 3. RatioService + Shariah re-feed + tests → 4. Statements + ratio endpoints →
-5. SignalService + valuation scenario levels + tests → 6. Entitlements + plan tables +
-manual/test payment provider → 7. Frontend hub/statements/ratios → 8. Signals tab + radar
-→ 9. Bilingual → 10. Savings calculator + pricing page → 11. Gates, workflow records,
+1. Ontology + model + migration 019 + repos → 2. FetchService (feeds config, de-dup,
+storage, robots rules) → 3. StatementExtractor + alias table + XML/pdf
+fixtures → 4. StatementValidator gates + review queue (approved/candidate exclusion) → 5.
+RatioService + Shariah re-feed + tests → 6. Statements + ratio endpoints →
+7. SignalService + valuation scenario levels + tests → 8. Entitlements + plan tables +
+manual/test payment provider → 9. Frontend hub/statements/ratios → 10. Signals tab + radar
+→ 11. Bilingual → 12. Savings calculator + pricing page → 13. Gates, workflow records,
 spec-review ruling.
