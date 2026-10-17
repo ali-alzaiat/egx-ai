@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--FIXTURE (SYNTHETIC SPECIMEN): a reported label that matches TWO ontology
+     codes ("Total liabilities and equity" is listed under both total_liabilities
+     and total_assets) — the extractor must DROP it (AMBIGUOUS_ALIAS), never guess.-->
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <context id="fy2024">
+    <entity><identifier scheme="http://www.egx.com.eg">FIXTUREDUP</identifier></entity>
+  </context>
+  <line item="Total liabilities and equity" contextRef="fy2024" unitRef="EGP" decimals="-2">123456</line>
+  <line item="Total Assets" contextRef="fy2024" unitRef="EGP" decimals="-2">700000</line>
+</xbrli:xbrl>

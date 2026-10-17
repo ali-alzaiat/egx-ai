@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--FIXTURE (SYNTHETIC SPECIMEN - not real company data): XBRL subset used by
+     tests/test_statement_extractor.py to exercise the alias->ontology mapping.-->
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance"
+            xmlns:us-gaap="http://xbrl.fasb.org/usgaap/2024"
+            xmlns:ifrs-full="http://xbrl.ifrs.org/taxonomy/2024-03-27/ifrs-full">
+  <context id="fy2024">
+    <entity><identifier scheme="http://www.egx.com.eg">FIXTURECO</identifier></entity>
+  </context>
+  <us-gaap:Revenues contextRef="fy2024" unitRef="EGP" decimals="-2">1200000</us-gaap:Revenues>
+  <us-gaap:CostOfRevenue contextRef="fy2024" unitRef="EGP" decimals="-2">700000</us-gaap:CostOfRevenue>
+  <us-gaap:GrossProfit contextRef="fy2024" unitRef="EGP" decimals="-2">500000</us-gaap:GrossProfit>
+  <us-gaap:OperatingExpenses contextRef="fy2024" unitRef="EGP" decimals="-2">260000</us-gaap:OperatingExpenses>
+  <us-gaap:OperatingIncomeLoss contextRef="fy2024" unitRef="EGP" decimals="-2">240000</us-gaap:OperatingIncomeLoss>
+  <us-gaap:InterestExpense contextRef="fy2024" unitRef="EGP" decimals="-2">40000</us-gaap:InterestExpense>
+  <us-gaap:IncomeTaxExpenseBenefit contextRef="fy2024" unitRef="EGP" decimals="-2">20000</us-gaap:IncomeTaxExpenseBenefit>
+  <us-gaap:NetIncomeLoss contextRef="fy2024" unitRef="EGP" decimals="-2">180000</us-gaap:NetIncomeLoss>
+  <ifrs-full:Assets contextRef="fy2024" unitRef="EGP" decimals="-2">2500000</ifrs-full:Assets>
+  <ifrs-full:Liabilities contextRef="fy2024" unitRef="EGP" decimals="-2">1000000</ifrs-full:Liabilities>
+  <ifrs-full:Equity contextRef="fy2024" unitRef="EGP" decimals="-2">1500000</ifrs-full:Equity>
+  <ifrs-full:CashFlowsFromUsedInOperatingActivities contextRef="fy2024" unitRef="EGP" decimals="-2">220000</ifrs-full:CashFlowsFromUsedInOperatingActivities>
+  <ifrs-full:CashFlowsFromUsedInInvestingActivities contextRef="fy2024" unitRef="EGP" decimals="-2">-50000</ifrs-full:CashFlowsFromUsedInInvestingActivities>
+  <ifrs-full:PaymentsForPropertyPlantAndEquipment contextRef="fy2024" unitRef="EGP" decimals="-2">60000</ifrs-full:PaymentsForPropertyPlantAndEquipment>
+</xbrli:xbrl>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--FIXTURE (SYNTHETIC SPECIMEN - not real company data): Arabic reported labels
+     resolved through the AR side of the alias table.-->
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance">
+  <context id="fy2024">
+    <entity><identifier scheme="http://www.egx.com.eg">FIXTUREAR</identifier></entity>
+  </context>
+  <line item="صافي الربح" contextRef="fy2024" unitRef="EGP" decimals="-2">90000</line>
+  <line item="إجمالي الأصول" contextRef="fy2024" unitRef="EGP" decimals="-2">1400000</line>
+  <line item="إجمالي الخصوم" contextRef="fy2024" unitRef="EGP" decimals="-2">500000</line>
+  <line item="إجمالي حقوق الملكية" contextRef="fy2024" unitRef="EGP" decimals="-2">900000</line>
+</xbrli:xbrl>
