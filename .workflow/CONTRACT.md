@@ -37,6 +37,7 @@ Pipeline runs end to end for new features. Pure technical fixes may skip researc
 - Each phase brief must name the UI surface (new page/tab/section or upgrade of an existing one) alongside the endpoints; phases with no user-visible surface must say so explicitly with a reason.
 - At phase kickoff the router lists uncovered backend endpoints in STATUS; at phase close the router verifies each new/changed endpoint is reachable from the UI (or under an explicit logged deferral) before the DONE handoff.
 - A task with any error or warning in its gates (pytest, ruff, mypy, tsc, eslint, build, vitest) is NOT done — warnings are blockers, not advisories. Zero-errors-zero-warnings is the only green.
+- Backend gates run with dev servers stopped (`uvicorn`, `vite dev` share the dev database and can cause transient lock/contention failures — seen 2026-10-16).
 - Logged deferrals go to `decisions/` with a reason + owner phase, and stay on the STATUS carry-forward list until shipped.
 
 **Frontend parallel lanes (Batch A, added 2026-10-16):** one staff-frontend agent per lane, each with its own inbox (`inbox/staff-frontend-a1.md` … `a4.md`) and disjoint file ownership (A1: InvestmentScore page; A2: ShariahScreening page; A3: Valuation page; A4: new PeersTab component). Shared files (`api/client.ts`, `types/index.ts`, `App.tsx`, `CompanyTabs.tsx`) are router-owned — lanes return wiring instructions instead of editing them. No lane runs `npm run build`/`npm test` (shared tree); router runs gates after merge.
