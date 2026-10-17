@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Protocol
 
 from sqlalchemy import delete, func, select
@@ -9,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.financial import FinancialDocument
 from app.models.statements import (
-    ExtractionMethod,
     ExtStatus,
     FinancialDocumentBlob,
     FinancialStatementLine,
@@ -28,7 +28,7 @@ class StatementLineLike(Protocol):
     def ontology_version(self) -> str: ...
 
     @property
-    def value(self) -> str | float | int | None: ...
+    def value(self) -> Decimal | str | float | int | None: ...
 
     @property
     def currency(self) -> str: ...
@@ -46,10 +46,10 @@ class StatementLineLike(Protocol):
     def source_page(self) -> str | None: ...
 
     @property
-    def extraction_method(self) -> ExtractionMethod: ...
+    def extraction_method(self) -> str: ...
 
     @property
-    def ext_status(self) -> ExtStatus: ...
+    def ext_status(self) -> str: ...
 
     @property
     def ext_reason(self) -> str | None: ...
@@ -69,15 +69,15 @@ class StatementLineRepository:
         period_id: uuid.UUID,
         lines: Sequence[StatementLineLike],
     ) -> int:
-        """Idempotently replace this document's non-approved candidate rows.
+        """Idempotently replace this document's candidate/outcome rows.
 
-        Re-running the pipeline on the same document hash replaces candidates;
-        rows already ``approved`` by ops are never touched.
+        Re-running the pipeline on the same document hash replaces everything
+        except rows already ``approved`` by Ops — those are never touched.
         """
         await self.session.execute(
             delete(FinancialStatementLine).where(
                 FinancialStatementLine.source_document_id == document_id,
-                FinancialStatementLine.ext_status.notin_(CalculationStatuses),
+                FinancialStatementLine.ext_status != ExtStatus.approved,
             )
         )
         created = 0

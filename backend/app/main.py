@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
     from app.api.scores import router as scores_router
     from app.api.screening import router as screening_router
     from app.api.signals import router as signals_router
+    from app.api.statements import router as statements_router
     from app.api.technical import router as technical_router
     from app.api.theses import router as theses_router
     from app.api.triggers import router as triggers_router
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     from app.api.watchlists import router as watchlists_router
 
     app.include_router(health_router)
+    app.include_router(statements_router)
     app.include_router(ai_router)
     app.include_router(alerts_router)
     app.include_router(companies_router)
