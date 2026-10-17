@@ -9,12 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.models.statements import ExtStatus
+from app.repositories.company import CompanyRepository
 from app.repositories.statements import StatementLineRepository
 from app.schemas.statements import (
     ReviewDecisionRead,
     ReviewDecisionRequest,
     ReviewQueueItemRead,
 )
+from app.statements.service import StatementService
 
 router = APIRouter(prefix="/api/statements", tags=["statements"])
 
@@ -102,3 +104,27 @@ async def reject_line(
         ext_status=rejected.ext_status.value,
         ext_reason=rejected.ext_reason,
     )
+
+
+@router.get("/companies/{ticker}/statements")
+async def company_statements(
+    ticker: str,
+    session: AsyncSession = Depends(get_session),
+) -> JSONResponse:
+    company_obj = await CompanyRepository(session).get_by_ticker(ticker)
+    if company_obj is None:
+        return JSONResponse(status_code=404, content={"detail": "company not found"})
+    bundle = await StatementService(session).company_statements(company_obj.id)
+    return JSONResponse(status_code=200, content=bundle.model_dump(mode="json"))
+
+
+@router.get("/companies/{ticker}/ratios")
+async def company_ratios(
+    ticker: str,
+    session: AsyncSession = Depends(get_session),
+) -> JSONResponse:
+    company_obj = await CompanyRepository(session).get_by_ticker(ticker)
+    if company_obj is None:
+        return JSONResponse(status_code=404, content={"detail": "company not found"})
+    bundle = await StatementService(session).company_ratios(company_obj.id)
+    return JSONResponse(status_code=200, content=bundle.model_dump(mode="json"))
