@@ -18,17 +18,15 @@ depends_on = None
 def upgrade() -> None:
     # Create indicator_type enum
     indicator_type = sa.Enum(
-        "sma", "ema", "rsi", "macd", "bollinger", "obv", "vwap",
+        "SMA", "EMA", "RSI", "MACD", "BOLLINGER", "OBV", "VWAP",
         name="indicator_type",
     )
-    indicator_type.create(op.get_bind(), checkfirst=True)
 
     # Create indicator_status enum
     indicator_status = sa.Enum(
         "AVAILABLE", "INSUFFICIENT_DATA", "INVALID",
         name="indicator_status",
     )
-    indicator_status.create(op.get_bind(), checkfirst=True)
 
     # Create technical_indicators table
     op.create_table(

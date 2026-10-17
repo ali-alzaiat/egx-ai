@@ -16,12 +16,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create screening_status enum
+    # screening_status is created as a side effect of the first create_table
+    # (see 004→005 enum fix): pre-creating it before create_table made asyncpg
+    # emit CREATE TYPE a second time and would fail on any fresh database.
+    op.execute("DROP TYPE IF EXISTS screening_status CASCADE;")
     screening_status = sa.Enum(
         "COMPLIANT", "NON_COMPLIANT", "INSUFFICIENT_DATA",
         name="screening_status",
     )
-    screening_status.create(op.get_bind(), checkfirst=True)
 
     # Create shariah_screening_results table
     op.create_table(

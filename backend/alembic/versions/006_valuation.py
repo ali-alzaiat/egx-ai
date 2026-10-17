@@ -18,18 +18,18 @@ depends_on = None
 def upgrade() -> None:
     # Create valuation_model enum
     valuation_model = sa.Enum(
-        "price_to_earnings", "price_to_book", "ev_to_ebitda", "discounted_cash_flow",
+        "PE", "PB", "EV_EBITDA", "DCF",
         name="valuation_model",
     )
-    valuation_model.create(op.get_bind(), checkfirst=True)
+    # Enums are created as a side effect of the first create_table (see the
+    # 004→005 enum fix): pre-creating them before create_table made asyncpg
+    # emit CREATE TYPE a second time and fails on any fresh database.
 
     # Create valuation_status enum
     valuation_status = sa.Enum(
         "AVAILABLE", "INSUFFICIENT_DATA", "INVALID",
         name="valuation_status",
     )
-    valuation_status.create(op.get_bind(), checkfirst=True)
-
     # Create valuation_results table
     op.create_table(
         "valuation_results",

@@ -25,26 +25,25 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
     # Create chunk_type enum
+    # Values are the SQLAlchemy enum NAMES as persisted by the ORM layer
+    # (app.models.ai.ChunkTypeDB, Enum(ChunkTypeDB) stores member names).
     chunk_type = sa.Enum(
-        "financial_fact", "metric", "valuation", "screening", "document_text",
+        "FINANCIAL_FACT", "METRIC", "VALUATION", "SCREENING", "DOCUMENT_TEXT",
         name="chunk_type",
     )
-    chunk_type.create(op.get_bind(), checkfirst=True)
 
     # Create analysis_type enum
     analysis_type = sa.Enum(
-        "company_synthesis", "document_summary", "metric_explanation",
-        "screening_explanation", "valuation_explanation",
+        "COMPANY_SYNTHESIS", "DOCUMENT_SUMMARY", "METRIC_EXPLANATION",
+        "SCREENING_EXPLANATION", "VALUATION_EXPLANATION",
         name="analysis_type",
     )
-    analysis_type.create(op.get_bind(), checkfirst=True)
 
     # Create analysis_status enum
     analysis_status = sa.Enum(
-        "completed", "failed", "insufficient_data",
+        "COMPLETED", "FAILED", "INSUFFICIENT_DATA",
         name="analysis_status",
     )
-    analysis_status.create(op.get_bind(), checkfirst=True)
 
     # Create document_chunks table
     op.create_table(
