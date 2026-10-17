@@ -47,6 +47,12 @@ from app.models.signals import (
     SignalTierDB,
     UniverseCoverageSnapshot,
 )
+from app.models.statements import (
+    ExtractionMethod,
+    ExtStatus,
+    FinancialDocumentBlob,
+    FinancialStatementLine,
+)
 from app.models.technical import IndicatorStatusDB, IndicatorTypeDB, TechnicalIndicator
 from app.models.thesis import (
     InvestmentThesis,
@@ -87,13 +93,17 @@ __all__ = [
     "EgxSectorGicsMap",
     "Event",
     "EventType",
+    "ExtStatus",
+    "ExtractionMethod",
     "FactStatus",
     "FactType",
     "FinancialDocument",
+    "FinancialDocumentBlob",
     "FinancialFact",
     "FinancialMetric",
     "FinancialMetricInput",
     "FinancialPeriod",
+    "FinancialStatementLine",
     "GicsIndustry",
     "GicsIndustryGroup",
     "GicsSector",

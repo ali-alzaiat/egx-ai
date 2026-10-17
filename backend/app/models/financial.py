@@ -120,6 +120,11 @@ class FinancialDocument(Base):
     filing_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     fiscal_year_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # zborsa-upgrade fetch metadata (migration 019): where the bytes came from,
+    # when they were fetched, and the content hash that de-duplicates them.
+    source_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -136,6 +141,7 @@ class FinancialDocument(Base):
         Index("ix_financial_documents_period_id", "period_id"),
         Index("ix_financial_documents_source_id", "source_id"),
         Index("ix_financial_documents_document_status", "document_status"),
+        Index("ix_financial_documents_content_hash", "content_hash"),
         Index("ix_financial_documents_publication_date", "publication_date"),
     )
 
