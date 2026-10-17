@@ -67,3 +67,16 @@
     grid-template-columns: 1fr;
   }
 }
+
+.wl-chip {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-3, rgba(127, 127, 127, 0.15));
+  font-size: 0.78rem;
+}
+.wl-chip-stale {
+  background: rgba(230, 162, 60, 0.18);
+  color: var(--warning, #b26a00);
+  margin-top: 0.25rem;
+}

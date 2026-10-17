@@ -1,16 +1,20 @@
 import './Watchlists.css'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   addWatchlistEntry,
   createWatchlist,
   deleteWatchlistEntry,
+  getCompanyByTicker,
   updateWatchlistEntry,
+  useCompanies,
   useWatchlistEntries,
   useWatchlists,
 } from '../api/client'
 import type { PhaseBadge, WatchlistEntry } from '../types'
+import { formatAsOf, formatPrice } from '../lib/format'
 
 function isAvailable(badge: PhaseBadge | null): boolean {
   return (
@@ -38,6 +42,46 @@ function EntryBadge({ badge }: { badge: PhaseBadge | null }) {
       INSUFFICIENT_DATA
     </span>
   )
+}
+
+// Badge with a one-line next step when the input is missing (W3).
+function NextStepBadge({ badge, hint }: { badge: PhaseBadge | null; hint: string }) {
+  if (isAvailable(badge)) return <EntryBadge badge={badge} />;
+  return (
+    <>
+      <EntryBadge badge={badge} />
+      <div className="muted">{hint}</div>
+    </>
+  );
+}
+
+const STALE_AFTER_DAYS = 7;
+
+function staleDays(staleness: PhaseBadge | null): number | null {
+  if (!staleness || staleness.value === null || staleness.value === undefined) return null;
+  const n = Number.parseInt(String(staleness.value), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// One price column: value + as-of sub-line; change and staleness fold into
+// the tooltip, with an amber chip only when the quote is stale (W3).
+function PriceCell({ entry }: { entry: WatchlistEntry }) {
+  if (!isAvailable(entry.price)) return <EntryBadge badge={entry.price} />;
+  const days = staleDays(entry.staleness);
+  const stale = days !== null && days > STALE_AFTER_DAYS;
+  const title = [
+    entry.change && isAvailable(entry.change) ? `Change ${entry.change.value}` : null,
+    entry.staleness?.reason ?? null,
+  ]
+    .filter((bit): bit is string => bit !== null && bit !== '')
+    .join(' · ');
+  return (
+    <span title={title || undefined}>
+      {formatPrice(entry.price?.value)}
+      <div className="muted">as of {formatAsOf(entry.as_of?.value)}</div>
+      {stale ? <div className="wl-chip wl-chip-stale">{days}d old</div> : null}
+    </span>
+  );
 }
 
 interface EntryRowProps {
@@ -83,7 +127,7 @@ const EntryRow = memo(function EntryRow({ entry, watchlistId, onChanged }: Entry
   }
 
   const handleDelete = async (): Promise<void> => {
-    if (!window.confirm(`Remove ${entry.company_ticker ?? entry.company_id} from this list?`)) return
+    if (!window.confirm(`Remove ${entry.company_ticker ?? entry.company_id.slice(0, 8) + '…'} from this list?`)) return
     setBusy(true)
     setError(null)
     try {
@@ -98,19 +142,25 @@ const EntryRow = memo(function EntryRow({ entry, watchlistId, onChanged }: Entry
   return (
     <tr>
       <td>
-        <strong>{entry.company_ticker ?? entry.company_id}</strong>
+        {entry.company_ticker ? (
+          <strong>
+            <Link to={`/companies/${entry.company_ticker}`}>{entry.company_ticker}</Link>
+          </strong>
+        ) : (
+          <strong title={entry.company_id}>{entry.company_id.slice(0, 8)}…</strong>
+        )}
         {entry.company_name ? <div className="muted">{entry.company_name}</div> : null}
+        {editing ? (
+          <input
+            aria-label="Group"
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            placeholder="e.g. banks"
+          />
+        ) : entry.group ? (
+          <div><span className="wl-chip" title="Custom group for this entry">{entry.group}</span></div>
+        ) : null}
       </td>
-      <td>{editing ? (
-        <input
-          aria-label="Group"
-          value={group}
-          onChange={(e) => setGroup(e.target.value)}
-          placeholder="e.g. banks"
-        />
-      ) : (
-        entry.group ?? '—'
-      )}</td>
       <td>{editing ? (
         <input
           aria-label="Note"
@@ -121,33 +171,29 @@ const EntryRow = memo(function EntryRow({ entry, watchlistId, onChanged }: Entry
       ) : (
         entry.note ?? '—'
       )}</td>
+      <td><PriceCell entry={entry} /></td>
+      <td><NextStepBadge badge={entry.score} hint="Not yet assessed — open the company, then Score → Assess." /></td>
+      <td><NextStepBadge badge={entry.shariah_state} hint="Not screened yet — open the company, then Screening → Run screening." /></td>
       <td>
         {editing ? (
           <input
             aria-label="Thesis link"
             value={thesisLink}
             onChange={(e) => setThesisLink(e.target.value)}
-            placeholder="thesis id or url"
+            placeholder="Thesis URL, or leave blank"
           />
-        ) : entry.thesis_link ? (
+        ) : entry.thesis_link && entry.company_ticker ? (
           <>
-            <span>{entry.thesis_link}</span>
+            <Link to={`/companies/${entry.company_ticker}/thesis`}>Open thesis</Link>
             <div className="muted">
               Validate or invalidate your narrative against the badges in this row —
               a link is context, not advice.
             </div>
           </>
         ) : (
-          '—'
+          <NextStepBadge badge={entry.thesis_link_badge} hint="No thesis linked — open the company, then Thesis → Assess." />
         )}
       </td>
-      <td><EntryBadge badge={entry.price} /></td>
-      <td><EntryBadge badge={entry.change} /></td>
-      <td><EntryBadge badge={entry.as_of} /></td>
-      <td><EntryBadge badge={entry.staleness} /></td>
-      <td><EntryBadge badge={entry.score} /></td>
-      <td><EntryBadge badge={entry.shariah_state} /></td>
-      <td><EntryBadge badge={entry.thesis_link_badge} /></td>
       <td>
         {editing ? (
           <>
@@ -192,12 +238,28 @@ export default function Watchlists() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  const [companyId, setCompanyId] = useState('')
+  const [ticker, setTicker] = useState('')
   const [addGroup, setAddGroup] = useState('')
   const [addNote, setAddNote] = useState('')
   const [addThesisLink, setAddThesisLink] = useState('')
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+
+  const { data: companiesPage1 } = useCompanies({ page_size: 200 })
+  const { data: companiesPage2 } = useCompanies({ page_size: 200, page: 2 })
+
+  const companyOptions = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const page of [companiesPage1, companiesPage2]) {
+      for (const c of page?.items ?? []) {
+        if (!seen.has(c.ticker)) seen.set(c.ticker, c.name)
+      }
+    }
+    return [...seen.entries()]
+      .map(([tick, name]) => ({ ticker: tick, name }))
+      .sort((a, b) => a.ticker.localeCompare(b.ticker))
+  }, [companiesPage1, companiesPage2])
+  const companiesLoading = companiesPage1 === undefined && companiesPage2 === undefined
 
   // Derived during render (rerender-derived-state-no-effect): no effect needed.
   const lists = watchlists ?? []
@@ -236,18 +298,31 @@ export default function Watchlists() {
 
   const handleAdd = async (): Promise<void> => {
     if (!selectedId) return
-    const id = companyId.trim()
-    if (id === '') return
+    const rawTicker = ticker.trim().toUpperCase()
+    if (rawTicker === '') return
     setAdding(true)
     setAddError(null)
     try {
+      // Resolve the friendly ticker to the internal company id. The API
+      // speaks UUIDs; users should never have to.
+      let company = null
+      try {
+        company = await getCompanyByTicker(rawTicker)
+      } catch (err) {
+        setAddError(err instanceof Error ? err.message : 'Could not look up that ticker.')
+        return
+      }
+      if (!company) {
+        setAddError(`No company with ticker "${rawTicker}" — pick one from the list.`)
+        return
+      }
       await addWatchlistEntry(selectedId, {
-        company_id: id,
+        company_id: company.id,
         group: addGroup.trim() === '' ? undefined : addGroup.trim(),
         note: addNote.trim() === '' ? undefined : addNote.trim(),
         thesis_link: addThesisLink.trim() === '' ? undefined : addThesisLink.trim(),
       })
-      setCompanyId('')
+      setTicker('')
       setAddGroup('')
       setAddNote('')
       setAddThesisLink('')
@@ -336,12 +411,19 @@ export default function Watchlists() {
               <div className="card">
                 <h2>{selected.name} — add a company</h2>
                 <div className="wl-add">
-                  <input
-                    aria-label="Company ID"
-                    value={companyId}
-                    onChange={(e) => setCompanyId(e.target.value)}
-                    placeholder="Company ID (required)"
-                  />
+                  <select
+                    aria-label="Company ticker"
+                    value={ticker}
+                    onChange={(e) => setTicker(e.target.value)}
+                    disabled={adding || companiesLoading}
+                  >
+                    <option value="">Select a company…</option>
+                    {companyOptions.map((c) => (
+                      <option key={c.ticker} value={c.ticker}>
+                        {c.ticker} — {c.name}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     aria-label="Group"
                     value={addGroup}
@@ -363,7 +445,7 @@ export default function Watchlists() {
                   <button
                     className="btn btn-primary"
                     onClick={handleAdd}
-                    disabled={adding || companyId.trim() === ''}
+                    disabled={adding || ticker.trim() === ''}
                   >
                     {adding ? 'Adding…' : 'Add entry'}
                   </button>
@@ -386,13 +468,8 @@ export default function Watchlists() {
                     <thead>
                       <tr>
                         <th>Company</th>
-                        <th>Group</th>
                         <th>Note</th>
-                        <th>Thesis link</th>
                         <th>Price</th>
-                        <th>Change</th>
-                        <th>Data as of</th>
-                        <th>Staleness</th>
                         <th>Score</th>
                         <th>Shariah</th>
                         <th>Thesis</th>

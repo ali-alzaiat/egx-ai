@@ -424,6 +424,13 @@ export async function calculateValuations(
   return res.json();
 }
 
+export async function getCompanyByTicker(ticker: string): Promise<Company | null> {
+  const res = await fetch(`${API_BASE}/companies/ticker/${encodeURIComponent(ticker)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 // POST /api/metrics/companies/{company_id}/calculate — plain async, not useMutation.
 export async function calculateMetrics(companyId: string): Promise<{
   company_id: string;

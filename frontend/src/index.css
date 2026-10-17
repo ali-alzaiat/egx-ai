@@ -2,26 +2,41 @@
 
 /* ─── Design Tokens ─────────────────────────────────────────────────── */
 :root {
-  --bg-primary:    #080b14;
-  --bg-secondary:  #0d1120;
-  --bg-card:       #111827;
-  --bg-card-hover: #141d2e;
-  --border:        rgba(99, 102, 241, 0.15);
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --text-primary:  #f0f2fc;
-  --text-secondary:#8892b0;
-  --text-muted:    #4a5568;
-  --accent:        #6366f1;
-  --accent-hover:  #818cf8;
-  --accent-glow:   rgba(99, 102, 241, 0.25);
-  --green:         #10b981;
-  --green-bg:      rgba(16, 185, 129, 0.12);
-  --red:           #f43f5e;
-  --red-bg:        rgba(244, 63, 94, 0.12);
-  --yellow:        #f59e0b;
-  --yellow-bg:     rgba(245, 158, 11, 0.12);
-  --blue:          #3b82f6;
-  --blue-bg:       rgba(59, 130, 246, 0.12);
+  color-scheme: dark;
+  --bg-primary:    #17181a;
+  --bg-secondary:  #1d1f22;
+  --bg-card:       #232529;
+  --bg-card-hover: #2a2c31;
+  --border:        rgba(226, 193, 138, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --text-primary:  #f4f1ea;
+  --text-secondary:#b8b3a8;
+  --text-muted:    #8f8a80;
+  --accent:        #e0a458;
+  --accent-hover:  #eebd85;
+  --accent-ink:    #221a0e;
+  --accent-glow:   rgba(224, 164, 88, 0.22);
+  --green:         #7ab98e;
+  --green-bg:      rgba(122, 185, 142, 0.13);
+  --red:           #e07a6e;
+  --red-bg:        rgba(224, 122, 110, 0.13);
+  --yellow:        #d9a441;
+  --yellow-bg:     rgba(217, 164, 65, 0.13);
+  --blue:          #7fa8bf;
+  --blue-bg:       rgba(127, 168, 191, 0.13);
+  /* Aliases used across page stylesheets; kept dark-theme so their
+     light-theme hardcoded fallbacks never need to apply. */
+  --green-dark:    #7ab98e;
+  --amber-soft:    rgba(217, 164, 65, 0.13);
+  --amber-dark:    #e2b95f;
+  --blue-dark:     #7fa8bf;
+  --warning:       #d9a441;
+  --code-bg:       #17181a;
+  --bg-soft:       #1d1f22;
+  --text:          #f4f1ea;
+  --surface-3:     rgba(255, 255, 255, 0.06);
+  --chip-bg:       rgba(255, 255, 255, 0.05);
+  --card-bg:       #232529;
   --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
   --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --radius-sm:     0.375rem;
@@ -42,6 +57,10 @@
 
 html { scroll-behavior: smooth; }
 
+input[type="checkbox"], input[type="radio"], input[type="range"], progress {
+  accent-color: var(--accent);
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg-primary);
@@ -49,8 +68,6 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 60%);
 }
 
 /* ─── Layout ─────────────────────────────────────────────────────────── */
@@ -114,12 +131,12 @@ body {
 
 .sidebar-link:hover {
   color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(224, 164, 88, 0.08);
 }
 
 .sidebar-link.active {
   color: var(--accent-hover);
-  background: rgba(99, 102, 241, 0.14);
+  background: rgba(224, 164, 88, 0.14);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -157,10 +174,6 @@ body {
   font-size: 1.875rem;
   font-weight: 700;
   letter-spacing: -0.025em;
-  background: linear-gradient(135deg, #f0f2fc 0%, #a5b4fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
   margin-bottom: 0;
 }
 
@@ -189,15 +202,13 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   border-color: var(--accent);
-  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
+  background: var(--accent-hover);
   transform: translateY(-1px);
 }
 
@@ -234,7 +245,7 @@ body {
   font-size: inherit;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(99,102,241,0.4);
+  text-decoration-color: rgba(224, 164, 88, 0.4);
   transition: color var(--transition);
   padding: 0;
   font-family: inherit;
@@ -253,14 +264,14 @@ body {
 
 .alert-error {
   background: var(--red-bg);
-  border-color: rgba(244, 63, 94, 0.3);
-  color: #fca5a5;
+  border-color: rgba(224, 122, 110, 0.3);
+  color: #eba49b;
 }
 
 .alert-warning {
   background: var(--yellow-bg);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: #fcd34d;
+  border-color: rgba(217, 164, 65, 0.3);
+  color: #e2b95f;
 }
 
 /* ─── Coverage Banner ────────────────────────────────────────────────── */
@@ -324,7 +335,7 @@ body {
   transition: all var(--transition);
 }
 .unscorable-chip:hover {
-  background: rgba(99,102,241,0.08);
+  background: rgba(224, 164, 88, 0.08);
   border-color: var(--accent);
   color: var(--text-primary);
 }
@@ -333,8 +344,8 @@ body {
 .model-note {
   font-size: 0.8125rem;
   color: var(--text-secondary);
-  background: rgba(99,102,241,0.06);
-  border: 1px solid rgba(99,102,241,0.15);
+  background: rgba(224, 164, 88, 0.06);
+  border: 1px solid rgba(224, 164, 88, 0.15);
   border-radius: var(--radius);
   padding: 0.625rem 1rem;
 }
@@ -451,7 +462,7 @@ tbody tr {
 }
 
 tbody tr:hover td {
-  background: rgba(99, 102, 241, 0.04);
+  background: rgba(224, 164, 88, 0.04);
 }
 
 tr:last-child td {
@@ -505,15 +516,15 @@ tr:last-child td {
 }
 
 .tier-strongest {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(122, 185, 142, 0.15);
+  color: #7ab98e;
+  border-color: rgba(122, 185, 142, 0.3);
 }
 
 .tier-strong {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(127, 168, 191, 0.15);
+  color: #7fa8bf;
+  border-color: rgba(127, 168, 191, 0.3);
 }
 
 .tier-neutral {
@@ -523,15 +534,15 @@ tr:last-child td {
 }
 
 .tier-weak {
-  background: rgba(245, 158, 11, 0.12);
-  color: #fbbf24;
-  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(217, 164, 65, 0.13);
+  color: #dcb262;
+  border-color: rgba(217, 164, 65, 0.3);
 }
 
 .tier-weakest {
-  background: rgba(244, 63, 94, 0.12);
-  color: #fb7185;
-  border-color: rgba(244, 63, 94, 0.3);
+  background: rgba(224, 122, 110, 0.13);
+  color: #e28b81;
+  border-color: rgba(224, 122, 110, 0.3);
 }
 
 /* ─── Status Badges ──────────────────────────────────────────────────── */
@@ -582,7 +593,7 @@ tr:last-child td {
   transition: color var(--transition);
   letter-spacing: 0.02em;
 }
-.ticker-link:hover { color: #c7d2fe; }
+.ticker-link:hover { color: #f0d9b8; }
 
 /* ─── Card Grid ──────────────────────────────────────────────────────── */
 .card-grid {
@@ -607,14 +618,14 @@ tr:last-child td {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(99,102,241,0.04) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(224, 164, 88, 0.04) 0%, transparent 60%);
   opacity: 0;
   transition: opacity var(--transition);
   pointer-events: none;
 }
 
 .card:hover {
-  border-color: rgba(99,102,241,0.35);
+  border-color: rgba(224, 164, 88, 0.35);
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(0,0,0,0.35);
 }
@@ -790,7 +801,7 @@ tr:last-child td {
 .pagination-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--accent-hover);
-  background: rgba(99,102,241,0.08);
+  background: rgba(224, 164, 88, 0.08);
 }
 
 .pagination-btn:disabled {
@@ -839,15 +850,15 @@ tr:last-child td {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(99,102,241,0.25);
+  background: rgba(224, 164, 88, 0.25);
   border-radius: 99px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.45); }
+::-webkit-scrollbar-thumb:hover { background: rgba(224, 164, 88, 0.45); }
 
 /* ─── Selection ──────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(99, 102, 241, 0.3);
-  color: #fff;
+  background: rgba(224, 164, 88, 0.35);
+  color: #221a0e;
 }
 
 /* ─── Data Quality Card ──────────────────────────────────────────────── */
@@ -1037,12 +1048,12 @@ tr:last-child td {
 
 .company-tab:hover {
   color: var(--text-primary);
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(224, 164, 88, 0.08);
 }
 
 .company-tab.active {
   color: var(--accent-hover);
-  background: rgba(99, 102, 241, 0.14);
+  background: rgba(224, 164, 88, 0.14);
 }
 
 /* ─── Breadcrumb ─────────────────────────────────────────────────────── */
