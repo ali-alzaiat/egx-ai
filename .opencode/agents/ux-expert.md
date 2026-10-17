@@ -1,6 +1,6 @@
 ---
 description: UX reviewer. Flags anything that would annoy or confuse a user; no decoration without function; read-only, returns findings inline.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: deny

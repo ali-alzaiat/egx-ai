@@ -1,6 +1,6 @@
 ---
 description: Staff backend implementer. Python/FastAPI tasks scoped to backend/**; follows repo conventions; runs pytest, ruff and mypy before reporting.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: allow

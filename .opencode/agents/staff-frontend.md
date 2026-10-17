@@ -1,6 +1,6 @@
 ---
 description: Staff frontend implementer. React 19/TypeScript tasks scoped to frontend/**; follows repo conventions; runs build, lint and tests before reporting.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: allow

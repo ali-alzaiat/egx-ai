@@ -1,6 +1,6 @@
 ---
 description: Competitive/market researcher. Web research with a URL cited for every claim; returns findings for the router to file under .workflow/research/.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: deny

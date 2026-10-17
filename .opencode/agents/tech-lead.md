@@ -1,6 +1,6 @@
 ---
 description: Escalation authority. Authors task briefs, arbitrates technical disputes, rules on task reviews, resumes the roadmap from the SDD ledger. Only agent that may ask the user.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: allow

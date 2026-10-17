@@ -1,6 +1,6 @@
 ---
 description: API QA. Checks contract correctness, error-shape conformance and stress behavior; read-only, reports findings to tech-lead.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: deny

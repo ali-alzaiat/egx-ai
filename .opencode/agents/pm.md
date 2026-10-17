@@ -1,6 +1,6 @@
 ---
 description: Product manager. Turns research and the roadmap into prioritized requirements; cuts scope ruthlessly; writes to .workflow/ only.
-model: opencode/muse-spark-1.3-contributor-free
+model: opencode/glm-5.3-flash-free
 mode: subagent
 permission:
   edit: allow
