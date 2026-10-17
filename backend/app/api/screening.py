@@ -302,6 +302,78 @@ async def screen_company(
     }
 
 
+@router.post("/companies/{company_id}/screen-statements")
+async def screen_company_from_statements(
+    company_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Screen a company using approved statement lines as inputs."""
+    from fastapi.responses import JSONResponse
+
+    from app.repositories.company import CompanyRepository
+    from app.repositories.statements import StatementLineRepository
+    from app.screening.statement_input import build_screening_input_from_statements
+
+    company_repo = CompanyRepository(session)
+    company = await company_repo.get_by_id(company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    stmt_repo = StatementLineRepository(session)
+    lines = await stmt_repo.latest_approved(company_id)
+    screening_input, reason = build_screening_input_from_statements(
+        company_id=company_id,
+        company=company,
+        lines=lines,
+        market_cap=None,
+    )
+    if screening_input is None:
+        return JSONResponse(
+            status_code=409,
+            content={"status": "INSUFFICIENT_DATA", "reason": reason},
+        )
+
+    service = ShariahScreeningService(session)
+    output = await service.screen_company(screening_input)
+
+    screening_repo = ScreeningRepository(session)
+    result = await screening_repo.upsert_screening_result(
+        company_id=company_id,
+        is_compliant=output.is_compliant,
+        methodology_version=output.methodology_version,
+        methodology_name=DEFAULT_METHODOLOGY.name,
+        overall_reason=output.overall_reason,
+        screened_at=output.screened_at,
+        report_date=output.report_date,
+        report_date_reason=output.report_date_reason,
+    )
+    for rule_result in output.rule_results:
+        await screening_repo.add_rule_result(
+            screening_result_id=result.id,
+            rule_name=rule_result.rule_name,
+            verdict=rule_result.verdict.value,
+            value=float(rule_result.value) if rule_result.value is not None else None,
+            threshold=float(rule_result.threshold) if rule_result.threshold is not None else None,
+            reason=rule_result.reason,
+            missing_input=rule_result.missing_input,
+            source=rule_result.source,
+            source_date=rule_result.source_date,
+        )
+    await session.commit()
+
+    return {
+        "company_id": str(company_id),
+        "ticker": output.ticker,
+        "is_compliant": output.is_compliant,
+        "methodology_version": output.methodology_version,
+        "overall_reason": output.overall_reason,
+        "rule_results": [_rule_payload(r) for r in output.rule_results],
+        "screened_at": output.screened_at.isoformat(),
+        "report_date": output.report_date.isoformat() if output.report_date else None,
+        "report_date_reason": output.report_date_reason,
+    }
+
+
 @router.post("/companies/{company_id}/purification")
 async def estimate_purification(
     company_id: uuid.UUID,

@@ -37,6 +37,12 @@ import type {
   SignalRun,
   UnscorableCompany,
   ScreenedCompanySummary,
+  StatementBundle,
+  RatioResult,
+  StanceResult,
+  StanceRadarResponse,
+  BillingPlan,
+  BillingMe,
   Watchlist,
   WatchlistEntry,
 } from "../types";
@@ -964,3 +970,53 @@ export async function exportEvents(params: { symbol?: string; type?: string; dat
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
+export function useStatements(ticker: string | undefined) {
+  return useQuery({
+    queryKey: ["statements", ticker],
+    queryFn: () => fetchApi<StatementBundle>(`/statements/companies/${ticker}/statements`),
+    enabled: !!ticker,
+  });
+}
+
+export function useRatios(ticker: string | undefined) {
+  return useQuery({
+    queryKey: ["ratios", ticker],
+    queryFn: () => fetchApi<RatioResult[]>(`/statements/companies/${ticker}/ratios`),
+    enabled: !!ticker,
+  });
+}
+
+export function useStance(ticker: string | undefined, params?: { entry_price?: number; stop_pct?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.entry_price !== undefined) sp.set("entry_price", String(params.entry_price));
+  if (params?.stop_pct !== undefined) sp.set("stop_pct", String(params.stop_pct));
+  const qs = sp.toString();
+  return useQuery({
+    queryKey: ["stance", ticker, params],
+    queryFn: () => fetchApi<StanceResult>(`/stance/companies/${ticker}${qs ? `?${qs}` : ""}`),
+    enabled: !!ticker,
+  });
+}
+
+export function useStanceRadar(pageSize = 50) {
+  return useQuery({
+    queryKey: ["stanceRadar", pageSize],
+    queryFn: () => fetchApi<StanceRadarResponse>(`/stance/radar?page_size=${pageSize}`),
+  });
+}
+
+export function useBillingPlans() {
+  return useQuery({
+    queryKey: ["billingPlans"],
+    queryFn: () => fetchApi<BillingPlan[]>(`/billing/plans`),
+  });
+}
+
+export function useMyBilling(userKey: string | undefined) {
+  return useQuery({
+    queryKey: ["billingMe", userKey],
+    queryFn: () => fetchApi<BillingMe>(`/billing/me?user_key=${encodeURIComponent(userKey!)}`),
+    enabled: !!userKey,
+  });
+}
+

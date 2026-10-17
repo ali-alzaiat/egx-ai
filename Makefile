@@ -6,6 +6,11 @@ dev:
 	cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000 &
 	cd frontend && npm run dev
 
+dev-windows:
+	docker compose up -d postgres
+	cd backend && .venv\Scripts\activate.bat && uvicorn app.main:app --reload --port 8000
+	cd frontend && npm run dev
+
 # Testing
 test:
 	cd backend && source .venv/bin/activate && pytest
@@ -46,6 +51,10 @@ docker-restart:
 # Setup
 setup:
 	cd backend && python3.12 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
+	cd frontend && npm install
+
+setup-windows:
+	cd backend && py -3.13 -m venv .venv && .venv\Scripts\python -m pip install -e ".[dev]" --only-binary :all:
 	cd frontend && npm install
 
 # Clean

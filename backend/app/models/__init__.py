@@ -1,4 +1,5 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.billing import Plan, PlanTier, Subscription, SubscriptionStatus, UsageCounter, WebhookEventLog
 from app.models.continuous import (
     ActorType,
     AlertFamily,

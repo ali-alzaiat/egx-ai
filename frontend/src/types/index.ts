@@ -781,3 +781,92 @@ export interface PeerOverrideReceipt {
   methodology_version: string;
   updated_at: string;
 }
+
+
+export interface StatementLineRead {
+  ontology_code: string
+  section: 'INCOME' | 'BALANCE' | 'CASH_FLOW'
+  label_en: string
+  label_ar: string
+  value: string | null
+  currency: string
+  status: 'AVAILABLE' | 'INSUFFICIENT_DATA'
+  source_label_reported: string | null
+  source_page: string | null
+  published_date: string | null
+}
+
+export interface PeriodStatements {
+  period_id: string
+  fiscal_year: number
+  period_type: string
+  published_date: string | null
+  income: StatementLineRead[]
+  balance: StatementLineRead[]
+  cash_flow: StatementLineRead[]
+}
+
+export interface StatementBundle {
+  periods: PeriodStatements[]
+}
+
+export interface RatioResult {
+  code: string
+  value: string | null
+  status: 'AVAILABLE' | 'INSUFFICIENT_DATA'
+  reason: string | null
+}
+
+export interface TargetLevel {
+  value: string | null
+  status: string
+  reason: string | null
+}
+
+export interface StanceReason {
+  engine: string
+  inputs: Record<string, string>
+  text: string
+}
+
+export interface StanceResult {
+  company_id: string
+  ticker: string
+  stance: 'buy' | 'hold' | 'reduce'
+  confidence: number
+  reasons: StanceReason[]
+  limitations: string[]
+  targets: Record<string, TargetLevel>
+  stop_level: TargetLevel
+  statement_freshness: string | null
+  rules_version: string
+  as_of: string
+}
+
+export interface StanceRadarItem {
+  ticker: string
+  company_id: string
+  stance: string | null
+  confidence: number | null
+}
+
+export interface StanceRadarResponse {
+  items: StanceRadarItem[]
+  count: number
+}
+
+export interface BillingPlan {
+  id: string
+  tier: string
+  price_egp: string
+  entitlements: Record<string, unknown>
+  active: boolean
+}
+
+export interface BillingMe {
+  user_key: string
+  tier: string
+  status: string
+  period_start: string
+  period_end: string
+}

@@ -25,5 +25,8 @@ class Settings(BaseSettings):
     # Market refresh job
     SYNC_JOB_TIMEOUT_SECONDS: int = 1800
 
+    # Billing (manual/test provider only; real PSP is an open blocker)
+    BILLING_WEBHOOK_SECRET: str = "dev-secret-rotate-me"
+
 
 settings = Settings()

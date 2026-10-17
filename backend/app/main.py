@@ -25,6 +25,7 @@ def create_app() -> FastAPI:
     )
 
     from app.api.ai import router as ai_router
+    from app.api.billing import router as billing_router
     from app.api.alerts import router as alerts_router
     from app.api.companies import router as companies_router
     from app.api.data_quality import router as data_quality_router
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     from app.api.scores import router as scores_router
     from app.api.screening import router as screening_router
     from app.api.signals import router as signals_router
+    from app.api.stance import router as stance_router
     from app.api.statements import router as statements_router
     from app.api.technical import router as technical_router
     from app.api.theses import router as theses_router
@@ -49,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(statements_router)
     app.include_router(ai_router)
+    app.include_router(billing_router)
     app.include_router(alerts_router)
     app.include_router(companies_router)
     app.include_router(data_quality_router)
@@ -62,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(scores_router)
     app.include_router(screening_router)
     app.include_router(signals_router)
+    app.include_router(stance_router)
     app.include_router(technical_router)
     app.include_router(theses_router)
     app.include_router(triggers_router)
