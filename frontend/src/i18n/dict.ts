@@ -119,16 +119,16 @@ export const SHORT_COPY = {
   plan_pro_name: { en: "Pro", ar: "احترافي" },
   plan_max_name: { en: "Max", ar: "أقصى" },
   plan_free_desc: {
-    en: "3 stance lookups per day · 1 radar scan per day",
-    ar: "3 استعلامات موقف يوميًا · مسحة رادار واحدة يوميًا",
+    en: "3 stance lookups per day\n1 radar scan per day\nFull company hub",
+    ar: "3 استعلامات موقف يوميًا\nمسحة رادار واحدة يوميًا\nلوحة الشركة الكاملة",
   },
   plan_pro_desc: {
-    en: "Unlimited stance lookups and radar scans · full company hub",
-    ar: "استعلامات موقف ورادار بلا حدود · لوحة الشركة الكاملة",
+    en: "Unlimited stance lookups\nUnlimited radar scans\nFull company hub\nStatement & ratio library",
+    ar: "استعلامات موقف بلا حدود\nمسحات رادار بلا حدود\nلوحة الشركة الكاملة\nمكتبة القوائم والنسب المالية",
   },
   plan_max_desc: {
-    en: "All Pro capabilities, on the highest data tier",
-    ar: "كل قدرات الاحترافي، أعلى مستوى بيانات",
+    en: "Everything in Pro\nHighest data tier & priority processing\nEarliest document coverage",
+    ar: "كل قدرات الاحترافي\nأعلى مستوى بيانات وأولوية معالجة\nأوسع تغطية للوثائق",
   },
   billing_current_plan: { en: "Current plan", ar: "خطتك الحالية" },
 } as const;

@@ -25,16 +25,7 @@ export default function Layout() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="sidebar-logo">EGX AI</div>
-        <button
-          type="button"
-          onClick={() => setLang(lang === "en" ? "ar" : "en")}
-          lang={lang === "en" ? "ar" : "en"}
-          className="lang-toggle"
-          aria-label={t("lang_toggle_aria")}
-        >
-          {lang === "en" ? "AR" : "EN"}
-        </button>
+        <div className="sidebar-logo">EGX·AI</div>
         <nav className="sidebar-nav" aria-label={t("sidebar_aria")}>
           {navItems.map((item) => {
             const active = isActive(item.to, location.pathname);
@@ -50,6 +41,17 @@ export default function Layout() {
             );
           })}
         </nav>
+        <button
+          type="button"
+          onClick={() => setLang(lang === "en" ? "ar" : "en")}
+          lang={lang === "en" ? "ar" : "en"}
+          className="lang-toggle sidebar-lang"
+          aria-label={t("lang_toggle_aria")}
+        >
+          <span className={lang === "en" ? "on" : ""}>EN</span>
+          <span aria-hidden>·</span>
+          <span className={lang === "ar" ? "on" : ""}>ع</span>
+        </button>
       </aside>
       <main className="main-content">
         <Outlet />

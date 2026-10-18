@@ -40,21 +40,23 @@ export default function Pricing() {
           return (
             <div key={p.id} className={`pricing-card pricing-${p.tier}`}>
               <h2>{t(nameKey)}</h2>
-              <p className="pricing-price" dir="ltr">
+              <p className="pricing-price">
                 {fmtNum(locale, p.price_egp, { minimumFractionDigits: 0 })}
                 {" "}
                 {t("egp")}
                 {" · "}
                 {t("pricing_per_month")}
               </p>
-              <p className="pricing-features" title={JSON.stringify(p.entitlements)}>
-                {t(descKey)}
-              </p>
+              <ul className="pricing-features" title={JSON.stringify(p.entitlements)}>
+                {t(descKey).split("\n").map((line: string) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
             </div>
           );
         })}
       </div>
-      <Link to="/">{t("back")}</Link>
+      <Link to="/" className="back-link">{t("back")}</Link>
     </div>
   );
 }
