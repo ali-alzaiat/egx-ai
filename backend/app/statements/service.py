@@ -8,16 +8,19 @@ newest period first.
 import uuid
 from datetime import date
 from decimal import Decimal  # noqa: TC003 — kept local for clarity
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.financial import FinancialDocument, FinancialPeriod, ReportingPeriodType
-from app.models.statements import FinancialStatementLine
 from app.repositories.statements import StatementLineRepository
 from app.statements.ontology import STATEMENT_LINES, LineSection
 from app.statements.ratios import RATIO_VERSION, RatioService
+
+if TYPE_CHECKING:
+    from app.models.statements import FinancialStatementLine
 
 _PERIOD_TYPE_ORDER = {
     ReportingPeriodType.ANNUAL: 0,
@@ -96,7 +99,12 @@ class StatementService:
         )).scalars().all()
         period_by_id = {p.id: p for p in period_rows if p.id in line_map}
 
-        doc_ids = {row.source_document_id for rows in line_map.values() for row in rows if row.source_document_id}
+        doc_ids = {
+            row.source_document_id
+            for rows in line_map.values()
+            for row in rows
+            if row.source_document_id
+        }
         documents = {}
         if doc_ids:
             doc_rows = (await self.session.execute(
@@ -117,7 +125,8 @@ class StatementService:
             by_code_latest: dict[str, FinancialStatementLine] = {}
             for row in period_lines:
                 prev = by_code_latest.get(row.ontology_code)
-                if prev is None or (row.published_date or date.min) > (prev.published_date or date.min):
+                prev_date = prev.published_date if prev else None
+                if prev is None or (row.published_date or date.min) > (prev_date or date.min):
                     by_code_latest[row.ontology_code] = row
             for line in STATEMENT_LINES.values():
                 table = (
@@ -146,8 +155,12 @@ class StatementService:
                         source_page=line_row.source_page if line_row else None,
                         published_date=line_row.published_date if line_row else None,
                         document_url=(
-                            documents[row.source_document_id].document_url
-                            if line_row is not None and line_row.source_document_id in documents
+                            documents[line_row.source_document_id].document_url
+                            if (
+                                line_row is not None
+                                and line_row.source_document_id is not None
+                                and line_row.source_document_id in documents
+                            )
                             else None
                         ),
                     )
@@ -156,14 +169,24 @@ class StatementService:
                 PeriodStatements(
                     period_id=period_id,
                     fiscal_year=fperiod.fiscal_year,
-                    period_type=fperiod.period_type.value if hasattr(fperiod.period_type, "value") else str(fperiod.period_type),
+                    period_type=(
+                        fperiod.period_type.value
+                        if hasattr(fperiod.period_type, "value")
+                        else str(fperiod.period_type)
+                    ),
                     published_date=published,
                     income=income,
                     balance=balance,
                     cash_flow=cash_flow,
                 )
             )
-        periods.sort(key=lambda p: (-p.fiscal_year, _PERIOD_TYPE_ORDER.get(ReportingPeriodType(p.period_type), 99), p.published_date or date.min))
+        periods.sort(
+            key=lambda p: (
+                -p.fiscal_year,
+                _PERIOD_TYPE_ORDER.get(ReportingPeriodType(p.period_type), 99),
+                p.published_date or date.min,
+            )
+        )
         return StatementBundle(periods=periods)
 
     async def company_ratios(
@@ -192,6 +215,9 @@ class StatementService:
         return RatioBundle(
             fiscal_year=bundle.periods[0].fiscal_year,
             ratios_version=RATIO_VERSION,
-            ratios=[RatioRead(code=r.code, value=r.value, status=r.status, reason=r.reason) for r in computed],
+            ratios=[
+                RatioRead(code=r.code, value=r.value, status=r.status, reason=r.reason)
+                for r in computed
+            ],
         )
 

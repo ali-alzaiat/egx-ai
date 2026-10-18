@@ -38,7 +38,7 @@ import type {
   UnscorableCompany,
   ScreenedCompanySummary,
   StatementBundle,
-  RatioResult,
+  RatioBundle,
   StanceResult,
   StanceRadarResponse,
   BillingPlan,
@@ -981,7 +981,7 @@ export function useStatements(ticker: string | undefined) {
 export function useRatios(ticker: string | undefined) {
   return useQuery({
     queryKey: ["ratios", ticker],
-    queryFn: () => fetchApi<RatioResult[]>(`/statements/companies/${ticker}/ratios`),
+    queryFn: () => fetchApi<RatioBundle>(`/statements/companies/${ticker}/ratios`),
     enabled: !!ticker,
   });
 }

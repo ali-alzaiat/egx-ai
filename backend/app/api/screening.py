@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -302,14 +303,12 @@ async def screen_company(
     }
 
 
-@router.post("/companies/{company_id}/screen-statements")
+@router.post("/companies/{company_id}/screen-statements", response_model=None)
 async def screen_company_from_statements(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
+) -> dict[str, Any] | JSONResponse:
     """Screen a company using approved statement lines as inputs."""
-    from fastapi.responses import JSONResponse
-
     from app.repositories.company import CompanyRepository
     from app.repositories.statements import StatementLineRepository
     from app.screening.statement_input import build_screening_input_from_statements

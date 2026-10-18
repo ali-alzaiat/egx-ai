@@ -131,8 +131,8 @@ class TestStatementService:
         latest = bundle.periods[0]
         codes = {line.ontology_code for line in latest.income}
         assert {"revenue", "net_income", "eps"} <= codes
-        assert any(l.ontology_code == "total_assets" for l in latest.balance)
-        assert any(l.ontology_code == "cfo" for l in latest.cash_flow)
+        assert any(ln.ontology_code == "total_assets" for ln in latest.balance)
+        assert any(ln.ontology_code == "cfo" for ln in latest.cash_flow)
 
     async def test_full_ontology_rendered_null_not_zero(
         self, db_session: AsyncSession
@@ -140,14 +140,14 @@ class TestStatementService:
         company, _p24, _p23, _doc = await _seed_two_years(db_session)
         bundle = await StatementService(db_session).company_statements(company.id)
         latest = bundle.periods[0]
-        revenue = next(l for l in latest.income if l.ontology_code == "revenue")
+        revenue = next(ln for ln in latest.income if ln.ontology_code == "revenue")
         assert Decimal(revenue.value or "0") == Decimal("1200000")
         assert revenue.status == "AVAILABLE"
-        eps = next(l for l in latest.income if l.ontology_code == "eps")
+        eps = next(ln for ln in latest.income if ln.ontology_code == "eps")
         assert eps.value is None
         assert eps.status == "INSUFFICIENT_DATA"  # candidate excluded, never zero
         finance_costs = next(
-            l for l in latest.income if l.ontology_code == "finance_costs"
+            ln for ln in latest.income if ln.ontology_code == "finance_costs"
         )
         assert finance_costs.value is None
 
@@ -157,7 +157,7 @@ class TestStatementService:
         company, _p24, _p23, _doc = await _seed_two_years(db_session)
         bundle = await StatementService(db_session).company_statements(company.id)
         revenue = next(
-            l for l in bundle.periods[0].income if l.ontology_code == "revenue"
+            ln for ln in bundle.periods[0].income if ln.ontology_code == "revenue"
         )
         assert revenue.label_en == "Revenue"
         assert revenue.label_ar == "الإيرادات"
@@ -171,7 +171,7 @@ class TestStatementService:
         assert latest.period_id == p24.id
         assert latest.fiscal_year == 2024
         assert latest.published_date == date(2024, 12, 31)
-        revenue = next(l for l in latest.income if l.ontology_code == "revenue")
+        revenue = next(ln for ln in latest.income if ln.ontology_code == "revenue")
         assert revenue.source_label_reported == "Revenue"
         assert revenue.document_url == "https://svc.test/fy2024.xml"
 
@@ -218,29 +218,44 @@ class TestRatioServiceGolden:
         return next(r for r in results if r.code == code)
 
     async def test_gross_margin(self) -> None:
-        r = self._compute_one("gross_margin", {"gross_profit": Decimal("500"), "revenue": Decimal("1000")})
+        r = self._compute_one(
+            "gross_margin",
+            {"gross_profit": Decimal("500"), "revenue": Decimal("1000")},
+        )
         assert r.value == str(Decimal("500") / Decimal("1000"))
         assert r.status == "AVAILABLE"
 
     async def test_operating_and_net_margin(self) -> None:
-        lines = {"operating_profit": Decimal("240"), "net_income": Decimal("150"), "revenue": Decimal("1200")}
+        lines = {
+            "operating_profit": Decimal("240"),
+            "net_income": Decimal("150"),
+            "revenue": Decimal("1200"),
+        }
         om = self._compute_one("operating_margin", lines)
         nm = self._compute_one("net_margin", lines)
         assert om.value == str(Decimal("240") / Decimal("1200"))
         assert nm.value == str(Decimal("150") / Decimal("1200"))
 
     async def test_roe_roa(self) -> None:
-        lines = {"net_income": Decimal("180"), "total_equity": Decimal("1500"), "total_assets": Decimal("2500")}
+        lines = {
+            "net_income": Decimal("180"),
+            "total_equity": Decimal("1500"),
+            "total_assets": Decimal("2500"),
+        }
         assert self._compute_one("roe", lines).value == str(Decimal("180") / Decimal("1500"))
         assert self._compute_one("roa", lines).value == str(Decimal("180") / Decimal("2500"))
 
     async def test_leverage_and_current_ratio(self) -> None:
         lines = {
-            "interest_bearing_debt": Decimal("500"), "total_equity": Decimal("1000"),
-            "current_assets": Decimal("800"), "current_liabilities": Decimal("400"),
+            "interest_bearing_debt": Decimal("500"),
+            "total_equity": Decimal("1000"),
+            "current_assets": Decimal("800"),
+            "current_liabilities": Decimal("400"),
         }
         assert self._compute_one("leverage", lines).value == str(Decimal("500") / Decimal("1000"))
-        assert self._compute_one("current_ratio", lines).value == str(Decimal("800") / Decimal("400"))
+        assert self._compute_one("current_ratio", lines).value == str(
+            Decimal("800") / Decimal("400")
+        )
 
     async def test_eps_from_line_and_from_shares(self) -> None:
         r = self._compute_one("eps", {"eps": Decimal("1.25")})
@@ -252,14 +267,18 @@ class TestRatioServiceGolden:
         assert eps2.value == str(Decimal("180") / Decimal("120"))
 
     async def test_zero_equity_roe_insufficient(self) -> None:
-        results = self.svc.compute({"net_income": Decimal("1"), "total_equity": Decimal("0")}, None, None)
+        results = self.svc.compute(
+            {"net_income": Decimal("1"), "total_equity": Decimal("0")}, None, None
+        )
         roe = next(r for r in results if r.code == "roe")
         assert roe.status == "INSUFFICIENT_DATA"
         assert roe.reason == "ZERO_EQUITY"
         assert roe.value is None
 
     async def test_negative_income_margin_is_negative_value(self) -> None:
-        nm = self._compute_one("net_margin", {"net_income": Decimal("-50"), "revenue": Decimal("1000")})
+        nm = self._compute_one(
+            "net_margin", {"net_income": Decimal("-50"), "revenue": Decimal("1000")}
+        )
         assert nm.status == "AVAILABLE"
         assert nm.value == "-0.05"
 

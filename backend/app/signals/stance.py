@@ -9,24 +9,24 @@ methodology version, the inputs used, and a non-empty limitations list.
 from __future__ import annotations
 
 import logging
-import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.market import Company
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.repositories.company import CompanyRepository
 from app.repositories.price import PriceRepository
 from app.repositories.screening import ScreeningRepository
 from app.repositories.statements import StatementLineRepository
 from app.scores.service import ScoreService
 from app.technical.indicators import calculate_sma
-from app.technical.service import TechnicalInput, TechnicalService
+from app.technical.service import TechnicalService
 from app.valuation.service import FairValueInput, FairValueService
 
 logger = logging.getLogger(__name__)
@@ -103,9 +103,7 @@ class StanceService:
         price_rows, _ = await self.prices.get_prices(company.id, page_size=90)
         price_rows_asc = sorted(price_rows, key=lambda r: r.date)
         closes = [r.close for r in price_rows_asc if r.close is not None]
-        highs = [r.high for r in price_rows_asc if r.high is not None]
         lows = [r.low for r in price_rows_asc if r.low is not None]
-        volumes = [r.volume for r in price_rows_asc if r.volume is not None]
         current_price = closes[-1] if closes else None
 
         # Technical
@@ -150,7 +148,9 @@ class StanceService:
             fv_payload = await self.valuation.fair_value(company.id, FairValueInput())
         except Exception:
             fv_payload = None
-        scenarios_raw = (fv_payload or {}).get("scenarios", {}) if isinstance(fv_payload, dict) else {}
+        scenarios_raw = (
+            (fv_payload or {}).get("scenarios", {}) if isinstance(fv_payload, dict) else {}
+        )
         targets: dict[str, TargetLevel] = {}
         valuation_available = False
         base_value: Decimal | None = None
@@ -178,15 +178,20 @@ class StanceService:
                 bull_value = val_dec
         if base_value is not None:
             valuation_available = True
-        # scenario order guard
-        if bull_value is not None and base_value is not None and bear_value is not None:
-            if not (bear_value < base_value < bull_value):
-                for key in ("bull", "base", "bear"):
-                    targets[key] = TargetLevel(
-                        value=targets[key].value,
-                        status="INSUFFICIENT_DATA",
-                        reason="SCENARIO_ORDER",
-                    )
+        # scenario order guard (incomplete scenario set: nothing to compare)
+        scenario_order_ok = (
+            bull_value is None
+            or base_value is None
+            or bear_value is None
+            or bear_value < base_value < bull_value
+        )
+        if not scenario_order_ok:
+            for key in ("bull", "base", "bear"):
+                targets[key] = TargetLevel(
+                    value=targets[key].value,
+                    status="INSUFFICIENT_DATA",
+                    reason="SCENARIO_ORDER",
+                )
                 base_value = None
                 valuation_available = False
         val_points = 0
@@ -308,7 +313,9 @@ class StanceService:
                 stop_value = min(lows)
                 stop_level = TargetLevel(value=str(stop_value), status="AVAILABLE", reason=None)
             else:
-                stop_level = TargetLevel(value=None, status="INSUFFICIENT_DATA", reason="no price range")
+                stop_level = TargetLevel(
+                    value=None, status="INSUFFICIENT_DATA", reason="no price range"
+                )
         limitations.append(STOP_COPY)
 
         return StanceResult(

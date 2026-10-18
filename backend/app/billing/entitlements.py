@@ -17,8 +17,12 @@ class Entitlements:
     company_hub_full: bool
 
 
+_UNLIMITED = Entitlements(
+    daily_stance_quota=10_000, daily_radar=100_000, company_hub_full=True
+)
+
 PLAN_ENTITLEMENTS: dict[PlanTier, Entitlements] = {
     PlanTier.FREE: Entitlements(daily_stance_quota=3, daily_radar=1, company_hub_full=False),
-    PlanTier.PRO: Entitlements(daily_stance_quota=10_000, daily_radar=100_000, company_hub_full=True),
-    PlanTier.MAX: Entitlements(daily_stance_quota=10_000, daily_radar=100_000, company_hub_full=True),
+    PlanTier.PRO: _UNLIMITED,
+    PlanTier.MAX: _UNLIMITED,
 }

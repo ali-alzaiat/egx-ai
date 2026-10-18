@@ -97,7 +97,10 @@ class TestValidatorGates:
         candidates[6] = _c("total_liabilities", "800000", currency="USD")
         summary = StatementValidator().validate(candidates)
         assert summary.rejected_count == len(candidates)
-        assert all(v.failure is not None and "currency" in (v.failure or "").lower() for v in summary.lines)
+        assert all(
+            v.failure is not None and "currency" in (v.failure or "").lower()
+            for v in summary.lines
+        )
 
     def test_negative_revenue_rejected_sign_rule(self) -> None:
         candidates = [_c("revenue", "-5000"), _c("cost_of_revenue", "1000")]

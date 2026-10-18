@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Cairo:wght@300..700&display=swap');
 
 /* ─── Design Tokens ─────────────────────────────────────────────────── */
 :root {
@@ -39,6 +39,7 @@
   --card-bg:       #232529;
   --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
   --font-sans:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-arabic:   'Cairo', 'Noto Naskh Arabic', 'Geeza Pro', sans-serif;
   --radius-sm:     0.375rem;
   --radius:        0.625rem;
   --radius-lg:     0.875rem;
@@ -1081,4 +1082,160 @@ tr:last-child td {
   .card-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .page-header { flex-direction: column; }
   .page-header h1 { font-size: 1.5rem; }
+}
+
+
+/* ─── Arabic (RTL) typography ─────────────────────────────────────────── */
+/* Cairo is a connected Arabic script: any tracking kills the joins.      */
+[lang="ar"],
+[lang="ar"] input,
+[lang="ar"] button {
+  font-family: var(--font-arabic);
+}
+html[dir="rtl"] body,
+html[dir="rtl"] button,
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select {
+  letter-spacing: 0 !important;
+  word-spacing: normal;
+}
+/* Headings in Arabic need the same correction. */
+html[dir="rtl"] h1,
+html[dir="rtl"] h2,
+html[dir="rtl"] h3 {
+  letter-spacing: 0 !important;
+  line-height: 1.25;
+}
+/* Bilingual disclaimer line: LTR English + RTL Arabic share the line. */
+[lang="ar"] .stance-disclaimer,
+html[dir="rtl"] .stance-disclaimer {
+  direction: rtl;
+}
+/* Numeric tables stay LTR cells, already marked .num[dir=ltr]. */
+.num {
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+
+/* ─── zborsa pages: statements / ratios / stance / pricing ────────────── */
+.page {
+  max-width: 1040px;
+  overflow-x: hidden;
+}
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4, 16px);
+  margin: 24px 0;
+}
+.pricing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+}
+.pricing-card h2 {
+  margin: 0 0 8px;
+  letter-spacing: 0;
+}
+.pricing-price {
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.pricing-features {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.statements-table,
+.ratios-table,
+.stance-targets {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.statements-table caption,
+.ratios-table caption,
+.stance-targets caption {
+  caption-side: top;
+  text-align: start;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 8px 4px;
+}
+.statements-table th,
+.ratios-table th {
+  text-align: start;
+  color: var(--text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px 10px;
+}
+.statements-table td,
+.ratios-table td,
+.stance-targets td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.statements-table td:last-child,
+.ratios-table td:nth-child(2),
+.stance-targets td:nth-child(2) {
+  color: var(--text-primary);
+}
+.ratio-reason {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.published-date {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 0.9rem;
+}
+
+.stance-stance strong {
+  font-size: 1.05rem;
+}
+.stance-badge {
+  padding: 2px 10px;
+  border-radius: 6px;
+  letter-spacing: 0;
+}
+.stance-buy {
+  color: var(--green);
+  background: var(--green-bg);
+}
+.stance-hold {
+  color: var(--yellow);
+  background: var(--yellow-bg);
+}
+.stance-reduce {
+  color: var(--red);
+  background: var(--red-bg);
+}
+.stance-reasons,
+.stance-limitations {
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+.stance-why-title,
+.stance-limits-title {
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin: 16px 0 4px;
+}
+.stance-disclaimer {
+  color: var(--accent);
+  font-size: 0.95rem;
+  margin-top: 16px;
+}
+.stance-freshness {
+  color: var(--text-muted);
+  margin-top: 12px;
 }

@@ -1,41 +1,44 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from "react-router-dom";
+import { useLang } from "../i18n/useLang";
+import type { CopyKey } from "../i18n";
 
-const TABS = [
-  { path: '', label: 'Overview' },
-  { path: '/signals', label: 'Signals' },
-  { path: '/financials', label: 'Financial Data' },
-  { path: '/statements', label: 'Statements' },
-  { path: '/ratios', label: 'Ratios' },
-  { path: '/metrics', label: 'Metrics' },
-  { path: '/technical', label: 'Technical' },
-  { path: '/valuation', label: 'Valuation' },
-  { path: '/score', label: 'Score' },
-  { path: '/screening', label: 'Shariah Screening' },
-  { path: '/peers', label: 'Peers' },
-  { path: '/thesis', label: 'Thesis' },
-  { path: '/disclosures', label: 'Disclosures' },
-]
+const TABS: { path: string; key: CopyKey }[] = [
+  { path: "", key: "tab_overview" },
+  { path: "/signals", key: "tab_signals" },
+  { path: "/financials", key: "tab_financials" },
+  { path: "/statements", key: "tab_statements" },
+  { path: "/ratios", key: "tab_ratios" },
+  { path: "/metrics", key: "tab_metrics" },
+  { path: "/technical", key: "tab_technical" },
+  { path: "/valuation", key: "tab_valuation" },
+  { path: "/score", key: "tab_score" },
+  { path: "/screening", key: "tab_screening" },
+  { path: "/peers", key: "tab_peers" },
+  { path: "/thesis", key: "tab_thesis" },
+  { path: "/disclosures", key: "tab_disclosures" },
+];
 
 export default function CompanyTabs({ ticker }: { ticker: string }) {
-  const { pathname } = useLocation()
-  const base = `/companies/${ticker}`
+  const { pathname } = useLocation();
+  const { t } = useLang();
+  const base = `/companies/${ticker}`;
 
   return (
-    <nav className="company-tabs" aria-label="Company sections">
+    <nav className="company-tabs" aria-label={t("company_sections_aria")}>
       {TABS.map((tab) => {
-        const to = `${base}${tab.path}`
-        const active = pathname === to
+        const to = `${base}${tab.path}`;
+        const active = pathname === to;
         return (
           <Link
             key={tab.path}
             to={to}
-            className={`company-tab${active ? ' active' : ''}`}
-            aria-current={active ? 'page' : undefined}
+            className={`company-tab${active ? " active" : ""}`}
+            aria-current={active ? "page" : undefined}
           >
-            {tab.label}
+            {t(tab.key)}
           </Link>
-        )
+        );
       })}
     </nav>
-  )
+  );
 }

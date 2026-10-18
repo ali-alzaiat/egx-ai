@@ -1,8 +1,10 @@
 """API endpoints for the deterministic stance layer (signal-rules-1.0)."""
 
-import uuid
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import TYPE_CHECKING, Any, NoReturn
+
+if TYPE_CHECKING:
+    from app.billing.service import QuotaExceeded
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,14 @@ from app.repositories.company import CompanyRepository
 from app.signals.stance import StanceService
 
 router = APIRouter(prefix="/api/stance", tags=["stance"])
+
+
+def _raise_quota(exc: "QuotaExceeded") -> "NoReturn":
+    """Map the domain quota error to the 429 API error shape. Always raises."""
+    raise HTTPException(
+        status_code=429,
+        detail={"error": "QUOTA_EXCEEDED", "quota": exc.quota, "tier": exc.tier},
+    )
 
 
 def _serialize(result: Any) -> dict[str, Any]:
@@ -58,18 +68,15 @@ async def get_stance(
             await BillingService(session).assert_quota(user_key, "stance")
             await session.commit()
         except QuotaExceeded as exc:
-            raise HTTPException(
-                status_code=429,
-                detail={"error": "QUOTA_EXCEEDED", "quota": exc.quota, "tier": exc.tier},
-            )
+            _raise_quota(exc)
     try:
         ep = Decimal(str(entry_price)) if entry_price is not None else None
-    except (InvalidOperation, ValueError):
-        raise HTTPException(status_code=422, detail="invalid entry_price")
+    except (InvalidOperation, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="invalid entry_price") from exc
     try:
         sp = Decimal(str(stop_pct))
-    except (InvalidOperation, ValueError):
-        raise HTTPException(status_code=422, detail="invalid stop_pct")
+    except (InvalidOperation, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="invalid stop_pct") from exc
 
     service = StanceService(session)
     result = await service.compute(ticker, entry_price=ep, stop_pct=sp)
@@ -89,16 +96,12 @@ async def stance_radar(
             await BillingService(session).assert_quota(user_key, "radar")
             await session.commit()
         except QuotaExceeded as exc:
-            raise HTTPException(
-                status_code=429,
-                detail={"error": "QUOTA_EXCEEDED", "quota": exc.quota, "tier": exc.tier},
-            )
-    from app.repositories.company import CompanyRepository
+            _raise_quota(exc)
 
     company_repo = CompanyRepository(session)
     companies, _ = await company_repo.list_companies(page_size=page_size)
     service = StanceService(session)
-    items = []
+    items: list[dict[str, Any]] = []  # radar row: ticker, stance or nulls
     for company in companies:
         try:
             res = await service.compute(company.ticker)
@@ -111,12 +114,11 @@ async def stance_radar(
                 }
             )
         except Exception:
-            items.append(
-                {
-                    "ticker": company.ticker,
-                    "company_id": str(company.id),
-                    "stance": None,
-                    "confidence": None,
-                }
-            )
+            radar_item: dict[str, int | str | None] = {  # stance unavailable
+                "ticker": company.ticker,
+                "company_id": str(company.id),
+                "stance": None,
+                "confidence": None,
+            }
+            items.append(radar_item)
     return {"items": items, "count": len(items)}

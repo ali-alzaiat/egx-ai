@@ -11,17 +11,19 @@ than a synthetic pass/fail (no fabricated data).
 
 from __future__ import annotations
 
-import uuid
 from collections import defaultdict
-from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING
 
-from app.models.market import Company
-from app.models.statements import FinancialStatementLine
 from app.screening.service import ScreeningInput
 
+if TYPE_CHECKING:
+    import uuid
+    from collections.abc import Sequence
+
+    from app.models.market import Company
+    from app.models.statements import FinancialStatementLine
 
 _REQUIRED_CODES: tuple[str, ...] = (
     "interest_bearing_debt",

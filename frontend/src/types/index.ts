@@ -785,15 +785,15 @@ export interface PeerOverrideReceipt {
 
 export interface StatementLineRead {
   ontology_code: string
-  section: 'INCOME' | 'BALANCE' | 'CASH_FLOW'
   label_en: string
   label_ar: string
   value: string | null
-  currency: string
   status: 'AVAILABLE' | 'INSUFFICIENT_DATA'
+  currency: string
   source_label_reported: string | null
   source_page: string | null
   published_date: string | null
+  document_url: string | null
 }
 
 export interface PeriodStatements {
@@ -815,6 +815,12 @@ export interface RatioResult {
   value: string | null
   status: 'AVAILABLE' | 'INSUFFICIENT_DATA'
   reason: string | null
+}
+
+export interface RatioBundle {
+  fiscal_year: number | null
+  ratios_version: string
+  ratios: RatioResult[]
 }
 
 export interface TargetLevel {

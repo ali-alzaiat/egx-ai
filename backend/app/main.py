@@ -25,8 +25,8 @@ def create_app() -> FastAPI:
     )
 
     from app.api.ai import router as ai_router
-    from app.api.billing import router as billing_router
     from app.api.alerts import router as alerts_router
+    from app.api.billing import router as billing_router
     from app.api.companies import router as companies_router
     from app.api.data_quality import router as data_quality_router
     from app.api.data_sources import router as data_sources_router

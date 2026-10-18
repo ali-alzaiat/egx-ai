@@ -3,8 +3,9 @@
 import enum
 import uuid
 from datetime import date, datetime
+from typing import Any
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,10 +28,19 @@ class Plan(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tier: Mapped[PlanTier] = mapped_column(
-        Enum(PlanTier, name="plan_tier", create_constraint=True), nullable=False, unique=True
+        Enum(
+            PlanTier,
+            name="plan_tier",
+            create_constraint=True,
+            # DB enum stores the lowercase VALUES; SQLAlchemy defaults to
+            # member NAMES — bridge it (same pattern as Event.type).
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+        unique=True,
     )
     price_egp: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    entitlements: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    entitlements: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default="{}")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
@@ -43,7 +53,12 @@ class Subscription(Base):
         Enum(PlanTier, name="plan_tier", create_constraint=True), nullable=False
     )
     status: Mapped[SubscriptionStatus] = mapped_column(
-        Enum(SubscriptionStatus, name="subscription_status", create_constraint=True),
+        Enum(
+            SubscriptionStatus,
+            name="subscription_status",
+            create_constraint=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         nullable=False,
         default=SubscriptionStatus.ACTIVE,
     )

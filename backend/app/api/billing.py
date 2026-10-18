@@ -1,17 +1,16 @@
 """Billing API (manual/test provider only)."""
 
-import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
-from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.billing.manual_provider import ManualPaymentProvider
-from app.billing.service import BillingService, QuotaExceeded
+from app.billing.provider import PaymentProviderSignatureError
+from app.billing.service import BillingService
 from app.db.session import get_session
-from app.models.billing import Subscription
+from app.models.billing import Plan, PlanTier
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
@@ -42,17 +41,16 @@ async def checkout(
     sub = await service.subscription_for(user_key)
     # manual provider: no real checkout URL
     provider = ManualPaymentProvider()
-    from app.models.billing import Plan, PlanTier
-
     plan = await session.execute(select(Plan).where(Plan.tier == PlanTier(tier)))
     plan_row = plan.scalar_one_or_none()
     if plan_row is None:
         raise HTTPException(status_code=404, detail="plan not found")
     checkout = provider.create_checkout(sub, plan_row)
-    return {"provider": checkout.provider, "url": checkout.url, "external_id": checkout.external_id}
-
-
-from fastapi import Request
+    return {
+        "provider": checkout.provider,
+        "url": checkout.url,
+        "external_id": checkout.external_id,
+    }
 
 
 @router.post("/webhooks/manual")
@@ -65,11 +63,8 @@ async def webhook_manual(
     service = BillingService(session)
     try:
         await service.handle_webhook(body, signature)
-    except Exception as exc:
-        from app.billing.provider import PaymentProviderSignatureError
-
-        if isinstance(exc, PaymentProviderSignatureError):
-            raise HTTPException(status_code=401, detail=str(exc))
+    except PaymentProviderSignatureError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
         raise
     await session.commit()
     return {"status": "ok"}

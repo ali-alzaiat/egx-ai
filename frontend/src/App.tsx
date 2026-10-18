@@ -22,10 +22,12 @@ import Events from "./pages/Events";
 import Layout from "./components/Layout";
 import Rankings from "./pages/Rankings";
 import Screening from "./pages/Screening";
+import { LangProvider } from "./i18n/useLang";
 
 function App() {
   return (
-    <BrowserRouter>
+    <LangProvider>
+      <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
@@ -62,9 +64,10 @@ function App() {
           <Route path="/watchlists" element={<Watchlists />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/events" element={<Events />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </LangProvider>
   );
 }
 

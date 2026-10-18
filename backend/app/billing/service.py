@@ -1,17 +1,26 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from datetime import UTC, date, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
-from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.billing.entitlements import PLAN_ENTITLEMENTS, PlanTier as BillingPlanTier
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.billing.entitlements import PLAN_ENTITLEMENTS
+from app.billing.entitlements import PlanTier as BillingPlanTier
 from app.billing.manual_provider import ManualPaymentProvider
 from app.billing.provider import PaymentProviderSignatureError, WebhookEvent
-from app.models.billing import Plan, PlanTier, Subscription, SubscriptionStatus, UsageCounter, WebhookEventLog
+from app.models.billing import (
+    Plan,
+    PlanTier,
+    Subscription,
+    SubscriptionStatus,
+    UsageCounter,
+    WebhookEventLog,
+)
 
 
 class QuotaExceeded(Exception):
@@ -44,7 +53,7 @@ class BillingService:
             status=SubscriptionStatus.ACTIVE,
             period_start=today,
             period_end=today + timedelta(days=30),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self.session.add(sub)
         await self.session.flush()
@@ -93,7 +102,7 @@ class BillingService:
         if existing.scalar_one_or_none() is not None:
             raise PaymentProviderSignatureError("replayed event")
         self.session.add(
-            WebhookEventLog(event_id=event.event_id, received_at=datetime.now(timezone.utc))
+            WebhookEventLog(event_id=event.event_id, received_at=datetime.now(UTC))
         )
 
         result = await self.session.execute(
