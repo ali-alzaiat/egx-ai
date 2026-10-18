@@ -615,10 +615,14 @@ export async function startMarketRefresh(params?: {
 }
 
 // GET /api/ingestion/sync/status — polls every 2 s only while a job is live.
+export async function getSyncStatus(): Promise<SyncJobStatus> {
+  return fetchApi<SyncJobStatus>("/ingestion/sync/status");
+}
+
 export function useSyncStatus(): UseQueryResult<SyncJobStatus> {
   return useQuery({
     queryKey: ["syncStatus"],
-    queryFn: () => fetchApi<SyncJobStatus>("/ingestion/sync/status"),
+    queryFn: getSyncStatus,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status === "accepted" || status === "running" ? 2000 : false;

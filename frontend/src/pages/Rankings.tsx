@@ -7,9 +7,24 @@ import {
   useScoringModel,
   useUnscorable,
   runSignals,
+  startMarketRefresh,
+  getSyncStatus,
 } from '../api/client'
 import { useQueryClient } from '@tanstack/react-query'
-import type { SignalTier } from '../types'
+import type { SignalTier, SyncJobStatus } from '../types'
+
+const TERMINAL_SYNC: SyncJobStatus['status'][] = ['done', 'partial', 'failed']
+
+// Price refresh runs as a backend job (202 → poll status) — the same flow the
+// company page uses. `idle` here means the job vanished (backend restarted).
+async function waitForPrices(): Promise<SyncJobStatus> {
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    const job = await getSyncStatus()
+    if (TERMINAL_SYNC.includes(job.status)) return job
+    if (job.status === 'idle') throw new Error('Price refresh job was lost — retry')
+  }
+}
 
 const TIERS: (SignalTier | '')[] = ['', 'STRONGEST', 'STRONG', 'NEUTRAL', 'WEAK', 'WEAKEST']
 
@@ -71,14 +86,25 @@ export default function Rankings() {
   const { data: model } = useScoringModel()
   const { data: unscorable } = useUnscorable()
 
-  const handleRun = async () => {
+  const handleRun = async (): Promise<void> => {
     setRunning(true)
     setRunError(null)
     setToast(null)
     try {
+      // Scores were ranking stale bars; pull fresh prices first (409 adopts a
+      // live job), wait it out, then score what just landed.
+      await startMarketRefresh()
+      const job = await waitForPrices()
+      if (job.status === 'failed') {
+        throw new Error(job.error ?? 'Price refresh failed; scores not re-run')
+      }
       const run = await runSignals()
       await queryClient.invalidateQueries({ queryKey: ['signals'] })
-      setToast(`Scoring complete — results are as of ${run.as_of}.`)
+      setToast(
+        job.status === 'partial'
+          ? `Prices partially refreshed — scored as of ${run.as_of}; some tickers failed.`
+          : `Fresh prices pulled — scoring complete, results as of ${run.as_of}.`
+      )
       window.setTimeout(() => setToast(null), 6000)
     } catch (err) {
       setRunError(err instanceof Error ? err.message : 'Failed to run the scoring engine')
@@ -101,7 +127,7 @@ export default function Rankings() {
           </p>
         </div>
         <button onClick={handleRun} disabled={running || isFetching} className="btn btn-primary">
-          {running ? 'Scoring…' : 'Re-run scoring'}
+          {running ? 'Refreshing prices & scoring…' : 'Re-run scoring'}
         </button>
       </div>
 
