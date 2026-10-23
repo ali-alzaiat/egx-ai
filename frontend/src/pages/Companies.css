@@ -1,1 +1,118 @@
-/* Companies list specific styles */
+/* Companies radar table (Task 12) — badges use shape + text, never color alone. */
+
+.radar-table th {
+  white-space: nowrap;
+}
+
+.radar-sort-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.radar-sort-btn:hover {
+  color: var(--accent-hover);
+}
+
+.radar-header-note {
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.radar-name {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Missing / insufficient values: dash, never zero. */
+.radar-missing {
+  color: var(--text-muted);
+  font-weight: 500;
+  cursor: default;
+}
+
+/* Stance badges — shape (▲ ● ▼) + word, distinct color per stance. */
+.radar-stance {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+.radar-stance-buy {
+  background: rgba(122, 185, 142, 0.15);
+  color: #7ab98e;
+  border-color: rgba(122, 185, 142, 0.3);
+}
+
+.radar-stance-hold {
+  background: rgba(217, 164, 65, 0.13);
+  color: #dcb262;
+  border-color: rgba(217, 164, 65, 0.3);
+}
+
+.radar-stance-reduce {
+  background: rgba(224, 122, 110, 0.13);
+  color: #e28b81;
+  border-color: rgba(224, 122, 110, 0.3);
+}
+
+/* Shariah badges — ✓ / ✕ + word. */
+.radar-shariah {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+  border: 1px solid transparent;
+}
+
+.radar-shariah-ok {
+  background: rgba(122, 185, 142, 0.15);
+  color: #7ab98e;
+  border-color: rgba(122, 185, 142, 0.3);
+}
+
+.radar-shariah-non {
+  background: rgba(224, 122, 110, 0.13);
+  color: #e28b81;
+  border-color: rgba(224, 122, 110, 0.3);
+}
+
+/* Coverage dot: filled / half / empty shape carries the level, % text repeats it. */
+.radar-coverage {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.radar-price {
+  white-space: nowrap;
+}
+
+.radar-price-date {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}

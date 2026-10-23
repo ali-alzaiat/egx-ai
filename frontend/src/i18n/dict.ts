@@ -131,6 +131,30 @@ export const SHORT_COPY = {
     ar: "كل قدرات الاحترافي\nأعلى مستوى بيانات وأولوية معالجة\nأوسع تغطية للوثائق",
   },
   billing_current_plan: { en: "Current plan", ar: "خطتك الحالية" },
+
+  // ---- Checkout surfaces (manual/test provider; button renders only when a
+  // provider URL is returned — see zborsa plan Task 14) ----
+  pricing_checkout: { en: "Choose plan", ar: "اختر الخطة" },
+  pricing_no_provider: {
+    en: "No payment provider is configured yet — nothing was charged.",
+    ar: "لم يتم إعداد مزوّد دفع بعد — لم يُخصم أي مبلغ.",
+  },
+  pricing_checkout_error: {
+    en: "Checkout could not start. Please try again.",
+    ar: "لم يبدأ إتمام الدفع. حاول مرة أخرى.",
+  },
+
+  // ---- Savings calculator (deterministic, illustrative only) ----
+  savings_title: { en: "Savings calculator", ar: "حاسبة التوفير" },
+  savings_monthly_amount: { en: "Monthly amount (EGP)", ar: "المبلغ الشهري (جنيه)" },
+  savings_months: { en: "Months", ar: "عدد الشهور" },
+  savings_annual_rate: { en: "Annual rate (%)", ar: "المعدل السنوي (%)" },
+  savings_table_month: { en: "Month", ar: "الشهر" },
+  savings_table_balance: { en: "Balance (EGP)", ar: "الرصيد (جنيه)" },
+  savings_illustrative: {
+    en: "Illustrative projection with monthly compounding — not a promise of returns.",
+    ar: "توقّع توضيحي بتركيب شهري — وليس وعداً بعوائد.",
+  },
 } as const;
 
 export type CopyKey = keyof typeof SHORT_COPY;
