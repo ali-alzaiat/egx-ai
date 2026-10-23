@@ -432,7 +432,7 @@ function PriceAsOfCell({ companyId }: { companyId: string }) {
 
 function GrossMarginCell({ ticker }: { ticker: string }) {
   const { data, isLoading, error } = useRatios(ticker)
-  const margin = data?.find((ratio) => ratio.code === 'gross_margin')
+  const margin = data?.ratios.find((ratio) => ratio.code === 'gross_margin')
   if (margin && margin.status === 'AVAILABLE') {
     if (margin.value !== null) {
       return (

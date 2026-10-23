@@ -876,3 +876,10 @@ export interface BillingMe {
   period_start: string
   period_end: string
 }
+
+/** POST /api/billing/checkout — provider url absent in dev (no real PSP). */
+export interface CheckoutResult {
+  provider: string
+  url: string | null
+  external_id: string | null
+}

@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type {
   AlertFired,
@@ -43,6 +43,7 @@ import type {
   StanceRadarResponse,
   BillingPlan,
   BillingMe,
+  CheckoutResult,
   Watchlist,
   WatchlistEntry,
 } from "../types";
@@ -51,6 +52,17 @@ const API_BASE = "/api";
 
 async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+// POST variant — plain fetch with a JSON body (billing checkout).
+async function postApi<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -1021,6 +1033,13 @@ export function useMyBilling(userKey: string | undefined) {
     queryKey: ["billingMe", userKey],
     queryFn: () => fetchApi<BillingMe>(`/billing/me?user_key=${encodeURIComponent(userKey!)}`),
     enabled: !!userKey,
+  });
+}
+
+export function useCheckout() {
+  return useMutation({
+    mutationFn: (payload: { user_key: string; tier: string }) =>
+      postApi<CheckoutResult>(`/billing/checkout`, payload),
   });
 }
 

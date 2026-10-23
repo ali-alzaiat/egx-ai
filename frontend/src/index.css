@@ -1207,6 +1207,63 @@ html[dir="rtl"] .stance-disclaimer {
   content: '▸ ';
   color: var(--accent);
 }
+.pricing-no-provider {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  margin: 8px 0 0;
+}
+.pricing-no-provider[role="alert"] {
+  color: var(--red);
+}
+
+/* Savings calculator (deterministic; illustrative only) */
+.savings-card {
+  margin-top: 12px;
+}
+.savings-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 8px 0 4px;
+}
+.savings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+.savings-field input {
+  width: 9em;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+.savings-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 10px 0;
+  background: var(--glass);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  overflow: hidden;
+  max-height: 40vh;
+}
+.savings-table th,
+.savings-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.86rem;
+}
+.savings-note {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
 
 .statements-table,
 .ratios-table,
