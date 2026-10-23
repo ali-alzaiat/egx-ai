@@ -1038,8 +1038,12 @@ export function useMyBilling(userKey: string | undefined) {
 
 export function useCheckout() {
   return useMutation({
+    // backend takes user_key/tier as QUERY params (verified in Task 10 tests)
     mutationFn: (payload: { user_key: string; tier: string }) =>
-      postApi<CheckoutResult>(`/billing/checkout`, payload),
+      postApi<CheckoutResult>(
+        `/billing/checkout?user_key=${encodeURIComponent(payload.user_key)}&tier=${encodeURIComponent(payload.tier)}`,
+        {},
+      ),
   });
 }
 
