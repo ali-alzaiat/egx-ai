@@ -893,6 +893,20 @@ export interface StanceRadarItem {
   shariah: ShariahStatus | null
 }
 
+/** GET /api/companies/overview — one Companies-table page in one request. */
+export interface CompanyOverviewRow {
+  company_id: string
+  stance: { stance: 'buy' | 'hold' | 'reduce'; confidence: number; reasons: string[] } | null
+  latest_price: { close: string; date: string } | null
+  gross_margin: { value: string | null; status: string; reason: string | null } | null
+}
+
+export interface CompaniesOverviewResponse {
+  items: Record<string, CompanyOverviewRow>
+  missing: string[]
+  price_date: string | null
+}
+
 export interface StanceRadarResponse {
   items: StanceRadarItem[]
   count: number

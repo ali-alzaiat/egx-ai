@@ -1,3 +1,4 @@
+import logging
 import math
 import uuid
 from datetime import date
@@ -11,6 +12,8 @@ from app.models.market import CompanyStatus
 from app.repositories.company import CompanyRepository
 from app.repositories.price import PriceRepository
 from app.schemas.company import CompanyRead
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/companies", tags=["companies"])
 
@@ -40,6 +43,76 @@ async def list_companies(
         "page": page,
         "page_size": page_size,
         "total_pages": math.ceil(total / page_size) if total > 0 else 0,
+    }
+
+
+MAX_OVERVIEW_TICKERS = 50
+
+
+@router.get("/overview")
+async def companies_overview(
+    tickers: str = Query(..., description="Comma-separated tickers (at most 50)"),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, Any]:
+    """Everything one Companies-table page needs, in one request.
+
+    Per ticker: the default stance (cached per price date), the latest stored
+    price and the gross-margin ratio. Replaces ~3 requests per table row.
+    Missing values stay null with their INSUFFICIENT_DATA reason, never zero.
+    """
+    from app.screening.status import shariah_statuses
+    from app.signals.stance import StanceService
+    from app.statements.service import StatementService
+
+    wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))
+    if not wanted or len(wanted) > MAX_OVERVIEW_TICKERS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"tickers must list 1 to {MAX_OVERVIEW_TICKERS} symbols",
+        )
+    companies = await CompanyRepository(session).list_by_tickers(wanted)
+    prices = PriceRepository(session)
+    price_date = await prices.latest_price_date()
+    shariah = await shariah_statuses(session, [c.id for c in companies])
+    stance_service = StanceService(session)
+    statements = StatementService(session)
+
+    items: dict[str, dict[str, Any]] = {}
+    for company in companies:
+        latest = await prices.get_latest(company.id)
+        bundle = await statements.company_ratios(company.id)
+        margin = next((r for r in bundle.ratios if r.code == "gross_margin"), None)
+        stance: dict[str, Any] | None
+        try:
+            result = await stance_service.compute_cached(
+                company.ticker, price_date, shariah=shariah.get(company.id)
+            )
+            stance = {
+                "stance": result.stance.value,
+                "confidence": result.confidence,
+                "reasons": [f"{r.engine}: {r.text}" for r in result.reasons],
+            }
+        except Exception:
+            logger.warning("stance unavailable for %s", company.ticker, exc_info=True)
+            stance = None
+        items[company.ticker] = {
+            "company_id": str(company.id),
+            "stance": stance,
+            "latest_price": (
+                {"close": str(latest.close), "date": latest.date.isoformat()}
+                if latest is not None
+                else None
+            ),
+            "gross_margin": (
+                {"value": margin.value, "status": margin.status, "reason": margin.reason}
+                if margin is not None
+                else None
+            ),
+        }
+    return {
+        "items": items,
+        "missing": [t for t in wanted if t not in items],
+        "price_date": price_date.isoformat() if price_date else None,
     }
 
 

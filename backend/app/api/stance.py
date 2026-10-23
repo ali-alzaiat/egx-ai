@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_STOP_PCT = Decimal("10")
+
 router = APIRouter(prefix="/api/stance", tags=["stance"])
 
 
@@ -79,7 +81,7 @@ def _serialize(result: StanceResult) -> dict[str, Any]:
 async def get_stance(
     ticker: str,
     entry_price: float | None = Query(None),
-    stop_pct: float = Query(10.0),
+    stop_pct: float = Query(float(DEFAULT_STOP_PCT)),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     if stop_pct <= 0 or stop_pct > 90:
@@ -94,7 +96,11 @@ async def get_stance(
         raise HTTPException(status_code=422, detail="invalid stop_pct") from exc
 
     service = StanceService(session)
-    result = await service.compute(ticker, entry_price=ep, stop_pct=sp)
+    if ep is None and sp == DEFAULT_STOP_PCT:
+        price_date = await PriceRepository(session).latest_price_date()
+        result = await service.compute_cached(ticker, price_date)
+    else:
+        result = await service.compute(ticker, entry_price=ep, stop_pct=sp)
     return _serialize(result)
 
 
@@ -111,9 +117,9 @@ async def stance_radar(
     if shariah == "egx33":
         members = await ScreeningRepository(session).latest_egx_memberships()
         scope = [cid for cid, row in members.items() if row.member]
-    ranked = await PriceRepository(session).most_traded_company_ids(
-        page_size, company_ids=scope
-    )
+    prices = PriceRepository(session)
+    ranked = await prices.most_traded_company_ids(page_size, company_ids=scope)
+    price_date = await prices.latest_price_date()
     companies = {c.id: c for c in await CompanyRepository(session).list_by_ids(ranked)}
     shariah_blocks = await shariah_statuses(session, ranked)
     service = StanceService(session)
@@ -123,7 +129,9 @@ async def stance_radar(
         if company is None:
             continue
         try:
-            res = await service.compute(company.ticker, shariah=shariah_blocks.get(company.id))
+            res = await service.compute_cached(
+                company.ticker, price_date, shariah=shariah_blocks.get(company.id)
+            )
         except Exception:
             logger.warning("stance unavailable for %s", company.ticker, exc_info=True)
             items.append(

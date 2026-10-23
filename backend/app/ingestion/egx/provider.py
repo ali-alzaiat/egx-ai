@@ -18,11 +18,18 @@ from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any
 
 import anyio
-import yfinance as yf  # type: ignore[import-untyped]
 
 from app.ingestion.egx.universe import create_universe_source
 from app.ingestion.provider import CompanyData, DailyPriceData, MarketDataProvider
 from app.models.market import CompanyStatus
+
+
+def _yfinance() -> Any:
+    """Import yfinance on first use: it pulls in pandas/numpy (~1.3 s), which
+    would otherwise be paid on every API start even when no sync runs."""
+    import yfinance  # type: ignore[import-untyped]
+
+    return yfinance
 
 if TYPE_CHECKING:
     from app.ingestion.egx.universe import UniverseEntry, UniverseSource
@@ -129,7 +136,7 @@ class EGXMarketDataProvider(MarketDataProvider):
     async def _fetch_info(self, ticker: str) -> dict[str, object]:
         def _load() -> dict[str, object]:
             try:
-                info = yf.Ticker(to_yahoo_ticker(ticker)).info or {}
+                info = _yfinance().Ticker(to_yahoo_ticker(ticker)).info or {}
             except Exception:  # noqa: BLE001 - metadata is best effort
                 return {}
             return {k: v for k, v in info.items() if isinstance(v, (str, int, float))}
@@ -148,7 +155,7 @@ class EGXMarketDataProvider(MarketDataProvider):
 
         def _load() -> Any:
             try:
-                return yf.Ticker(to_yahoo_ticker(ticker)).history(
+                return _yfinance().Ticker(to_yahoo_ticker(ticker)).history(
                     start=start, end=end, interval="1d", auto_adjust=False
                 )
             except Exception:  # noqa: BLE001 - missing coverage is expected

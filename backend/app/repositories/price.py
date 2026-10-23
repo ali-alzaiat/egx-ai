@@ -97,6 +97,10 @@ class PriceRepository:
 
         return prices, total
 
+    async def latest_price_date(self) -> date | None:
+        """Newest stored price date across all companies (the stance cache key)."""
+        return (await self.session.execute(select(func.max(DailyPrice.date)))).scalar()
+
     async def most_traded_company_ids(
         self,
         limit: int,
@@ -108,7 +112,7 @@ class PriceRepository:
         The window is ``lookback_days`` calendar days back from the newest
         stored price date, so a stale database still ranks consistently.
         """
-        latest = (await self.session.execute(select(func.max(DailyPrice.date)))).scalar()
+        latest = await self.latest_price_date()
         if latest is None:
             return []
         avg_value = func.avg(DailyPrice.close * DailyPrice.volume)

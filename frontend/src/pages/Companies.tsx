@@ -2,33 +2,17 @@ import "./Companies.css";
 
 /*
  * Companies radar (Task 12): dense sortable table replacing the plain
- * list. Per-row data sources are wired through the existing hooks —
- * no new API client functions:
- *   stance value  → useStanceRadar (batch), reasons → useStance (per row)
- *   price as-of   → useLatestPrice (per row)
+ * list. Data comes from three batch requests, never per row:
+ *   stance, price as-of, gross margin → useCompaniesOverview (this page's tickers)
  *   score/tier/coverage → useSignals (single batch)
  *   shariah       → useScreenedCompanies (single batch)
- *   gross margin  → useRatios (per row, code "gross_margin")
  * Missing data renders as "—" with an INSUFFICIENT_DATA note — never zero.
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import {
-  useCompanies,
-  useLatestPrice,
-  useRatios,
-  useScreenedCompanies,
-  useSignals,
-  useStance,
-  useStanceRadar,
-} from '../api/client'
-import type {
-  MarketSignal,
-  ScreenedCompanySummary,
-  StanceRadarItem,
-  StanceResult,
-} from '../types'
+import { useCompanies, useCompaniesOverview, useScreenedCompanies, useSignals } from '../api/client'
+import type { CompanyOverviewRow, MarketSignal, ScreenedCompanySummary } from '../types'
 import { debounce } from '../lib/debounce'
 import { sortRadarRows, type RadarSortDir, type RadarSortKey } from './companies/radarSort'
 
@@ -100,13 +84,9 @@ export default function Companies() {
   const { data: universe } = useCompanies({ page_size: 1 })
   const universeTotal = universe?.total ?? data?.total ?? 0
 
-  // ── Radar enrichment (batch hooks keyed for row lookup) ────────────────
-  const { data: radar } = useStanceRadar()
-  const stanceByTicker = useMemo(() => {
-    const map = new Map<string, StanceRadarItem>()
-    for (const item of radar?.items ?? []) map.set(item.ticker, item)
-    return map
-  }, [radar])
+  // ── Row enrichment (batch hooks keyed for row lookup) ──────────────────
+  const pageTickers = useMemo(() => (data?.items ?? []).map((c) => c.ticker), [data])
+  const { data: overview, isLoading: overviewLoading } = useCompaniesOverview(pageTickers)
 
   const { data: signals } = useSignals({ limit: 500 })
   const signalByTicker = useMemo(() => {
@@ -131,14 +111,14 @@ export default function Companies() {
         companyId: company.id,
         ticker: company.ticker,
         name: company.name,
-        stance: stanceByTicker.get(company.ticker)?.stance ?? null,
+        stance: overview?.items[company.ticker]?.stance?.stance ?? null,
         score: signal?.score ?? null,
         tier: signal?.tier ?? null,
         shariah: summary?.status ?? null,
         coverage: signal?.data_coverage ?? null,
       }
     })
-  }, [data, stanceByTicker, signalByTicker, screenByCompanyId])
+  }, [data, overview, signalByTicker, screenByCompanyId])
 
   const sortedRows = useMemo(
     () => sortRadarRows(rows, sortKey, sortDir),
@@ -268,11 +248,9 @@ export default function Companies() {
                       </Link>
                       <div className="radar-name">{row.name}</div>
                     </td>
+                    {/* Cell order must match the header: sortable columns, then price, then margin. */}
                     <td>
-                      <StanceCell ticker={row.ticker} stance={row.stance} />
-                    </td>
-                    <td>
-                      <PriceAsOfCell companyId={row.companyId} />
+                      <StanceCell row={overview?.items[row.ticker]} />
                     </td>
                     <td className="num">
                       {row.score !== null ? row.score.toFixed(1) : <MissingDash label="no score" />}
@@ -286,10 +264,16 @@ export default function Companies() {
                       )}
                     </td>
                     <td>
-                      <GrossMarginCell ticker={row.ticker} />
+                      <CoverageCell coverage={row.coverage} />
                     </td>
                     <td>
-                      <CoverageCell coverage={row.coverage} />
+                      <PriceAsOfCell row={overview?.items[row.ticker]} />
+                    </td>
+                    <td>
+                      <GrossMarginCell
+                        row={overview?.items[row.ticker]}
+                        loading={overviewLoading}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -334,28 +318,22 @@ function MissingDash({ label }: { label: string }) {
 }
 
 /*
- * Note on data sources (kept honest, per the task brief):
- * - The radar batch only covers the 50 most-traded names, so the stance falls
- *   back to the per-company fetch (which also feeds the reasons tooltip) for
- *   rows outside it.
- * - Gross margin is wired through the existing per-ticker ratios hook.
- * When a fetch fails or the value is missing, the cell renders a dash with
- * an INSUFFICIENT_DATA note — never a zero.
+ * Stance, price and gross margin come from the page's single overview batch.
+ * When the batch is pending, failed, or the value is missing, the cell renders
+ * a dash with an INSUFFICIENT_DATA note — never a zero.
  */
-function StanceCell({ ticker, stance: radarStance }: { ticker: string; stance: string | null }) {
-  // Radar value renders immediately when present; the per-company fetch fills
-  // in rows outside the radar and supplies the reason summary.
-  const { data: stanceResult } = useStance(ticker)
-  const stance = radarStance ?? stanceResult?.stance ?? null
-
-  if (!stance) {
+function StanceCell({ row }: { row: CompanyOverviewRow | undefined }) {
+  const result = row?.stance
+  if (!result) {
     return <MissingDash label="stance absent or stance fetch failed" />
   }
+  const stance = result.stance
   const shape = STANCE_SHAPES[stance] ?? '○'
   const className = STANCE_CLASSES[stance] ?? 'radar-stance-neutral'
-  const title = stanceResult
-    ? stanceSummary(stanceResult)
-    : `Confidence pending — full reasons on the company Signals tab`
+  const title = [
+    `${stance.toUpperCase()} · confidence ${result.confidence}/100`,
+    ...result.reasons,
+  ].join('\n')
   return (
     <span className={`radar-stance ${className}`} title={title}>
       {shape} {stance.toUpperCase()}
@@ -373,11 +351,6 @@ const STANCE_CLASSES: Record<string, string> = {
   buy: 'radar-stance-buy',
   hold: 'radar-stance-hold',
   reduce: 'radar-stance-reduce',
-}
-
-function stanceSummary(result: StanceResult): string {
-  const lines = result.reasons.map((r) => `${r.engine}: ${r.text}`)
-  return [`${result.stance.toUpperCase()} · confidence ${result.confidence}/100`, ...lines].join('\n')
 }
 
 function TierBadge({ tier }: { tier: string }) {
@@ -419,8 +392,8 @@ function CoverageCell({ coverage }: { coverage: number | null }) {
   )
 }
 
-function PriceAsOfCell({ companyId }: { companyId: string }) {
-  const { data } = useLatestPrice(companyId)
+function PriceAsOfCell({ row }: { row: CompanyOverviewRow | undefined }) {
+  const data = row?.latest_price
   if (!data) {
     return <MissingDash label="no stored price" />
   }
@@ -432,9 +405,14 @@ function PriceAsOfCell({ companyId }: { companyId: string }) {
   )
 }
 
-function GrossMarginCell({ ticker }: { ticker: string }) {
-  const { data, isLoading, error } = useRatios(ticker)
-  const margin = data?.ratios.find((ratio) => ratio.code === 'gross_margin')
+function GrossMarginCell({
+  row,
+  loading,
+}: {
+  row: CompanyOverviewRow | undefined
+  loading: boolean
+}) {
+  const margin = row?.gross_margin
   if (margin && margin.status === 'AVAILABLE') {
     if (margin.value !== null) {
       return (
@@ -443,7 +421,7 @@ function GrossMarginCell({ ticker }: { ticker: string }) {
     }
     return <MissingDash label={margin.reason ?? 'gross margin missing'} />
   }
-  if (isLoading || error || !margin) {
+  if (loading || !margin) {
     return <MissingDash label="gross margin not available (no data)" />
   }
   return <MissingDash label={margin.reason ?? 'gross margin insufficient'} />

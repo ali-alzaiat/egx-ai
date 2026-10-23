@@ -25,6 +25,7 @@ from app.repositories.price import PriceRepository
 from app.repositories.statements import StatementLineRepository
 from app.scores.service import ScoreService
 from app.screening.status import shariah_statuses
+from app.signals import stance_cache
 from app.signals.rules import (
     LOW_LIQUIDITY_EGP,
     SIGNAL_RULES_VERSION,
@@ -273,6 +274,20 @@ class StanceService:
             rules_version=SIGNAL_RULES_VERSION,
             as_of=as_of,
         )
+
+    async def compute_cached(
+        self,
+        ticker: str,
+        price_date: date | None,
+        shariah: dict[str, Any] | None = None,
+    ) -> StanceResult:
+        """Default-parameter stance, reused until new prices land (or the TTL)."""
+        cached = stance_cache.get(ticker, price_date)
+        if cached is not None:
+            return cached
+        result = await self.compute(ticker, shariah=shariah)
+        stance_cache.put(ticker, price_date, result)
+        return result
 
     async def _scenario_targets(
         self, company_id: Any

@@ -41,6 +41,7 @@ import type {
   RatioBundle,
   StanceResult,
   StanceRadarResponse,
+  CompaniesOverviewResponse,
   Watchlist,
   WatchlistEntry,
 } from "../types";
@@ -997,6 +998,16 @@ export function useStance(ticker: string | undefined, params?: { entry_price?: n
     queryKey: ["stance", ticker, params],
     queryFn: () => fetchApi<StanceResult>(`/stance/companies/${ticker}${qs ? `?${qs}` : ""}`),
     enabled: !!ticker,
+  });
+}
+
+export function useCompaniesOverview(tickers: string[]) {
+  const key = tickers.join(",");
+  return useQuery({
+    queryKey: ["companiesOverview", key],
+    queryFn: () =>
+      fetchApi<CompaniesOverviewResponse>(`/companies/overview?tickers=${encodeURIComponent(key)}`),
+    enabled: tickers.length > 0,
   });
 }
 

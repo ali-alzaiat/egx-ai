@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/egx_ai"
 
+    # Connection pool. Tests set DATABASE_NULLPOOL: pytest-asyncio gives each
+    # test its own event loop, and pooled asyncpg connections are loop-bound.
+    DATABASE_NULLPOOL: bool = False
+    DATABASE_POOL_SIZE: int = 5
+    DATABASE_MAX_OVERFLOW: int = 10
+
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
 

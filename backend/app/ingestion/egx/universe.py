@@ -19,8 +19,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-import requests
-
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
@@ -147,6 +145,8 @@ class PublicListingUniverseSource:
         import anyio
 
         def _get() -> str:
+            import requests  # imported lazily: only needed for a live fetch, not at app start
+
             response = requests.get(self.url, headers=BROWSER_HEADERS, timeout=self.timeout)
             response.raise_for_status()
             return response.text

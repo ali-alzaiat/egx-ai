@@ -94,6 +94,14 @@ class CompanyRepository:
         result = await self.session.execute(select(Company).where(Company.ticker == ticker.upper()))
         return result.scalar_one_or_none()
 
+    async def list_by_tickers(self, tickers: list[str]) -> Sequence[Company]:
+        """Companies for the given tickers (case-insensitive); unknown tickers are skipped."""
+        if not tickers:
+            return []
+        upper = [t.upper() for t in tickers]
+        result = await self.session.execute(select(Company).where(Company.ticker.in_(upper)))
+        return result.scalars().all()
+
     async def get_by_isin(self, isin: str) -> Company | None:
         result = await self.session.execute(select(Company).where(Company.isin == isin))
         return result.scalar_one_or_none()
