@@ -52,7 +52,7 @@ Never substitute zero for missing information.
 
 ## Agent team
 
-Eleven named subagents live in `.opencode/agents/`: researcher, pm, tech-lead,
+Eleven named subagents live in `.claude/agents/` (Claude Code) and `.opencode/agents/` (opencode): researcher, pm, tech-lead,
 architect, staff-frontend, staff-backend, ux-expert, qa-ui, qa-security,
 qa-api, analyst. The main session is the router: read
 `.workflow/CONTRACT.md` before dispatching, seed the target agent's inbox,

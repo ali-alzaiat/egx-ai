@@ -119,3 +119,6 @@
 2026-10-23 | router -> - | .workflow/CONTRACT.md | DONE: data-first gate (python -m app.dataquality.real_data, currently BLOCKED at 0 companies), real-data check (python -m app.signals.sanity), fast lane, isolated test DB + CI, worktree rule for parallel sessions
 2026-10-23 | router -> - | - | DONE (fast lane): app speed - connection pool (NullPool tests only), stance cache per price date, /api/companies/overview batch (Companies page ~65 -> 5 requests), header/cell column alignment fix
 2026-10-23 | router -> - | backend/app/statements/{vendor_import,intake}.py | DONE: provisional vendor statements imported (212 companies, 1053 FY, 19010 lines validated, 99 rejected, 1829 held); data-first gate PASSED (203 companies); real-data check: reduce 84% explained by breadth (median -14.3%/20 sessions, 88% falling); official-filings intake (EGX33 + 30 most traded) shipped
+2026-10-23 | router -> - | .claude/agents/*.md | DONE: team ported to Claude Code (11 agents, personas verbatim, tools by role, Windows/browser runtime notes); CONTRACT runtimes section added
+2026-10-23 | router -> researcher | .workflow/inbox/researcher.md | dispatched: UI/UX direction research for the redesign
+2026-10-23 | router -> pm | .workflow/inbox/pm.md | dispatched: R43 show data not forms (company pages)

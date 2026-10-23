@@ -2,6 +2,12 @@
 
 The main session is the router. Subagents never dispatch each other.
 
+## Runtimes (added 2026-10-23)
+
+The same eleven-agent team runs under two runtimes; the rules below apply to both.
+- **Claude Code:** agent definitions in `.claude/agents/<name>.md`. The router is the main Claude Code session and dispatches with the Agent tool (`subagent_type: <name>`); disjoint scopes run as parallel dispatches. Models inherit the router's model. Browser QA uses the built-in browser tools (`mcp__Claude_Browser__*`). Only the router commits and merges.
+- **opencode:** agent definitions in `.opencode/agents/<name>.md` (unchanged).
+
 ## Files
 - STATUS.md — board: current phase, current task, next actor, open escalations
 - handoffs.log — append-only; line format: `YYYY-MM-DD | from -> to | artifact path or - | result or question`
