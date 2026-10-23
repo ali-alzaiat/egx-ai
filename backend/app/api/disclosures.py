@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.ingestion.disclosures.constants import DISCLOSURE_METHODOLOGY_VERSION
+from app.ingestion.disclosures.constants import DISCLOSURE_METHODOLOGY_VERSION, MAX_PDF_BYTES
 from app.ingestion.disclosures.service import DisclosureService
 
 router = APIRouter(prefix="/api/disclosures", tags=["disclosures"])
@@ -64,6 +64,21 @@ def _dec(value: float | None) -> Decimal | None:
     return Decimal(str(value)) if value is not None else None
 
 
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+async def _read_capped(file: UploadFile) -> bytes:
+    """Read the upload in chunks, refusing (413) as soon as it passes the byte cap."""
+    buffer = bytearray()
+    while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+        buffer.extend(chunk)
+        if len(buffer) > MAX_PDF_BYTES:
+            raise HTTPException(
+                status_code=413, detail=f"Upload exceeds the {MAX_PDF_BYTES} byte cap"
+            )
+    return bytes(buffer)
+
+
 def _service(session: AsyncSession) -> DisclosureService:
     return DisclosureService(session)
 
@@ -106,7 +121,7 @@ async def upload_filing(
         filing, created = await _service(session).upload(
             company_id=company_id,
             filename=file.filename or "filing.pdf",
-            data=await file.read(),
+            data=await _read_capped(file),
             bulletin_id=bulletin_id,
             report_date=report_date,
             filing_type=filing_type,

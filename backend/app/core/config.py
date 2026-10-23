@@ -4,7 +4,12 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+    # Repo-root .env (shared with docker compose and the Vite proxy), then backend/.env.
+    model_config = {
+        "env_file": ("../.env", ".env"),
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
     APP_NAME: str = "EGX AI"
     APP_VERSION: str = "0.1.0"
@@ -25,8 +30,16 @@ class Settings(BaseSettings):
     # Market refresh job
     SYNC_JOB_TIMEOUT_SECONDS: int = 1800
 
-    # Billing (manual/test provider only; real PSP is an open blocker)
-    BILLING_WEBHOOK_SECRET: str = "dev-secret-rotate-me"
+    # Auth: shared bearer token (>= 32 chars) required on every API route
+    # except health. Empty means every protected request is refused.
+    API_TOKEN: str = ""
+
+    # Interactive API docs (/docs, /redoc, /openapi.json) are off unless enabled.
+    API_DOCS_ENABLED: bool = False
+
+    # Camelot shells out to Ghostscript, which has a history of exploitable bugs
+    # on hostile PDFs; keep it off unless uploads come from trusted sources.
+    CAMELOT_ENABLED: bool = False
 
 
 settings = Settings()

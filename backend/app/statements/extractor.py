@@ -123,6 +123,13 @@ class StatementExtractor:
     # ------------------------------------------------------------------ XBRL
     def _extract_xbrl(self, content: bytes) -> ExtractionResult:
         result = ExtractionResult()
+        # Filings are fetched from the network: refuse DTDs/entities outright
+        # (entity-expansion and external-entity payloads) instead of parsing them.
+        if b"<!DOCTYPE" in content or b"<!ENTITY" in content:
+            result.drops.append(
+                DropRecord(label="[xbrl]", reason="UNSAFE_XML", detail="DTD/entity declarations")
+            )
+            return result
         try:
             root = ElementTree.fromstring(content)
         except ElementTree.ParseError as exc:

@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type {
   AlertFired,
@@ -41,9 +41,6 @@ import type {
   RatioBundle,
   StanceResult,
   StanceRadarResponse,
-  BillingPlan,
-  BillingMe,
-  CheckoutResult,
   Watchlist,
   WatchlistEntry,
 } from "../types";
@@ -52,17 +49,6 @@ const API_BASE = "/api";
 
 async function fetchApi<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
-// POST variant — plain fetch with a JSON body (billing checkout).
-async function postApi<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
@@ -1018,32 +1004,6 @@ export function useStanceRadar(pageSize = 50) {
   return useQuery({
     queryKey: ["stanceRadar", pageSize],
     queryFn: () => fetchApi<StanceRadarResponse>(`/stance/radar?page_size=${pageSize}`),
-  });
-}
-
-export function useBillingPlans() {
-  return useQuery({
-    queryKey: ["billingPlans"],
-    queryFn: () => fetchApi<BillingPlan[]>(`/billing/plans`),
-  });
-}
-
-export function useMyBilling(userKey: string | undefined) {
-  return useQuery({
-    queryKey: ["billingMe", userKey],
-    queryFn: () => fetchApi<BillingMe>(`/billing/me?user_key=${encodeURIComponent(userKey!)}`),
-    enabled: !!userKey,
-  });
-}
-
-export function useCheckout() {
-  return useMutation({
-    // backend takes user_key/tier as QUERY params (verified in Task 10 tests)
-    mutationFn: (payload: { user_key: string; tier: string }) =>
-      postApi<CheckoutResult>(
-        `/billing/checkout?user_key=${encodeURIComponent(payload.user_key)}&tier=${encodeURIComponent(payload.tier)}`,
-        {},
-      ),
   });
 }
 

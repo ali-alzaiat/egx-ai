@@ -38,6 +38,7 @@ from app.schemas.financial import FinancialDocumentCreate, FinancialPeriodCreate
 FACT_LANDED_RULE_VERSION = "CI-1.0"
 USER_AGENT = "EGXResearchBot/0.1 (research tool; respects robots.txt)"
 MIN_REQUEST_INTERVAL_SECONDS = 1.0
+MAX_REDIRECTS = 5
 
 
 @dataclass
@@ -80,6 +81,25 @@ class FetchService:
             parser.parse(response.text.splitlines())
             self._robots[host] = parser
         return parser
+
+    async def _get_respecting_robots(
+        self, client: httpx.AsyncClient, url: str
+    ) -> httpx.Response:
+        """GET ``url``, following redirects by hand so every hop is robots-checked."""
+        for _ in range(MAX_REDIRECTS + 1):
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise RobotsDisallowed(f"refusing non-http(s) URL: {url}")
+            host = f"{parsed.scheme}://{parsed.netloc}"
+            robots = await self._load_robots(client, host)
+            if not (robots.can_fetch(USER_AGENT, url) or robots.can_fetch("*", url)):
+                raise RobotsDisallowed(f"robots.txt disallows: {url}")
+            await self._throttle(host)
+            response = await client.get(url, follow_redirects=False)
+            if not response.has_redirect_location:
+                return response
+            url = str(response.url.join(response.headers["location"]))
+        raise httpx.TooManyRedirects(f"more than {MAX_REDIRECTS} redirects", request=None)
 
     async def _throttle(self, host: str) -> None:
         now = time.monotonic()
@@ -160,13 +180,8 @@ class FetchService:
             doc_repo = FinancialDocumentRepository(self.session)
 
             for url in urls:
-                host = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
                 try:
-                    robots = await self._load_robots(client, host)
-                    if not (robots.can_fetch(USER_AGENT, url) or robots.can_fetch("*", url)):
-                        raise RobotsDisallowed(f"robots.txt disallows: {url}")
-                    await self._throttle(host)
-                    response = await client.get(url)
+                    response = await self._get_respecting_robots(client, url)
                     response.raise_for_status()
                 except RobotsDisallowed as exc:
                     summary.failures.append(str(exc))

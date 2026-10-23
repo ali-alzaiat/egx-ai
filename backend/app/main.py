@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.security import require_api_token
 
 
 def create_app() -> FastAPI:
@@ -12,21 +13,21 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if settings.API_DOCS_ENABLED else None,
+        redoc_url="/redoc" if settings.API_DOCS_ENABLED else None,
+        openapi_url="/openapi.json" if settings.API_DOCS_ENABLED else None,
     )
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     from app.api.ai import router as ai_router
     from app.api.alerts import router as alerts_router
-    from app.api.billing import router as billing_router
     from app.api.companies import router as companies_router
     from app.api.data_quality import router as data_quality_router
     from app.api.data_sources import router as data_sources_router
@@ -49,28 +50,29 @@ def create_app() -> FastAPI:
     from app.api.watchlists import router as watchlists_router
 
     app.include_router(health_router)
-    app.include_router(statements_router)
-    app.include_router(ai_router)
-    app.include_router(billing_router)
-    app.include_router(alerts_router)
-    app.include_router(companies_router)
-    app.include_router(data_quality_router)
-    app.include_router(data_sources_router)
-    app.include_router(disclosures_router)
-    app.include_router(events_router)
-    app.include_router(financial_router)
-    app.include_router(industry_router)
-    app.include_router(ingestion_router)
-    app.include_router(metrics_router)
-    app.include_router(scores_router)
-    app.include_router(screening_router)
-    app.include_router(signals_router)
-    app.include_router(stance_router)
-    app.include_router(technical_router)
-    app.include_router(theses_router)
-    app.include_router(triggers_router)
-    app.include_router(valuation_router)
-    app.include_router(watchlists_router)
+
+    protected = [Depends(require_api_token)]
+    app.include_router(statements_router, dependencies=protected)
+    app.include_router(ai_router, dependencies=protected)
+    app.include_router(alerts_router, dependencies=protected)
+    app.include_router(companies_router, dependencies=protected)
+    app.include_router(data_quality_router, dependencies=protected)
+    app.include_router(data_sources_router, dependencies=protected)
+    app.include_router(disclosures_router, dependencies=protected)
+    app.include_router(events_router, dependencies=protected)
+    app.include_router(financial_router, dependencies=protected)
+    app.include_router(industry_router, dependencies=protected)
+    app.include_router(ingestion_router, dependencies=protected)
+    app.include_router(metrics_router, dependencies=protected)
+    app.include_router(scores_router, dependencies=protected)
+    app.include_router(screening_router, dependencies=protected)
+    app.include_router(signals_router, dependencies=protected)
+    app.include_router(stance_router, dependencies=protected)
+    app.include_router(technical_router, dependencies=protected)
+    app.include_router(theses_router, dependencies=protected)
+    app.include_router(triggers_router, dependencies=protected)
+    app.include_router(valuation_router, dependencies=protected)
+    app.include_router(watchlists_router, dependencies=protected)
 
     return app
 

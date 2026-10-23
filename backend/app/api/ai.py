@@ -5,7 +5,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.analyzer import AIAnalyzer, AnalysisRequest
@@ -17,11 +17,16 @@ from app.repositories.company import CompanyRepository
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
+MAX_QUERY_CHARS = 2000
+
+
 class AnalyzeRequest(BaseModel):
-    """Request body for AI analysis."""
-    analysis_type: str
-    query: str
-    model_used: str | None = None
+    """Request body for AI analysis.
+
+    The model label is provenance, so it is set server-side, never by the caller.
+    """
+    analysis_type: str = Field(max_length=64)
+    query: str = Field(min_length=1, max_length=MAX_QUERY_CHARS)
 
 
 class IndexRequest(BaseModel):
@@ -55,7 +60,6 @@ async def analyze_company(
         company_id=company_id,
         analysis_type=analysis_type,
         query=request.query,
-        model_used=request.model_used,
     ))
 
     await session.commit()

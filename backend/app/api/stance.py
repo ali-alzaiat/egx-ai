@@ -1,10 +1,7 @@
 """API endpoints for the deterministic stance layer (signal-rules-1.0)."""
 
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, NoReturn
-
-if TYPE_CHECKING:
-    from app.billing.service import QuotaExceeded
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,14 +11,6 @@ from app.repositories.company import CompanyRepository
 from app.signals.stance import StanceService
 
 router = APIRouter(prefix="/api/stance", tags=["stance"])
-
-
-def _raise_quota(exc: "QuotaExceeded") -> "NoReturn":
-    """Map the domain quota error to the 429 API error shape. Always raises."""
-    raise HTTPException(
-        status_code=429,
-        detail={"error": "QUOTA_EXCEEDED", "quota": exc.quota, "tier": exc.tier},
-    )
 
 
 def _serialize(result: Any) -> dict[str, Any]:
@@ -56,19 +45,10 @@ async def get_stance(
     ticker: str,
     entry_price: float | None = Query(None),
     stop_pct: float = Query(10.0),
-    user_key: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     if stop_pct <= 0 or stop_pct > 90:
         raise HTTPException(status_code=422, detail="stop_pct must be in (0, 90]")
-    if user_key is not None:
-        from app.billing.service import BillingService, QuotaExceeded
-
-        try:
-            await BillingService(session).assert_quota(user_key, "stance")
-            await session.commit()
-        except QuotaExceeded as exc:
-            _raise_quota(exc)
     try:
         ep = Decimal(str(entry_price)) if entry_price is not None else None
     except (InvalidOperation, ValueError) as exc:
@@ -85,19 +65,9 @@ async def get_stance(
 
 @router.get("/radar")
 async def stance_radar(
-    page_size: int = Query(50, le=50),
-    user_key: str | None = Query(None),
+    page_size: int = Query(50, ge=1, le=50),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    if user_key is not None:
-        from app.billing.service import BillingService, QuotaExceeded
-
-        try:
-            await BillingService(session).assert_quota(user_key, "radar")
-            await session.commit()
-        except QuotaExceeded as exc:
-            _raise_quota(exc)
-
     company_repo = CompanyRepository(session)
     companies, _ = await company_repo.list_companies(page_size=page_size)
     service = StanceService(session)

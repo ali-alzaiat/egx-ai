@@ -12,13 +12,17 @@ the API process at import time.
 
 import importlib
 import io
+import logging
 import os
 import tempfile
 from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 from typing import Any, NamedTuple
 
+from app.core.config import settings
 from app.ingestion.disclosures.constants import PARSE_ENGINES, PARSE_METHODS
+
+logger = logging.getLogger(__name__)
 
 
 class ParsingReport(NamedTuple):
@@ -331,8 +335,9 @@ def parse_filing_bytes(
         try:
             tables, text_chars = extract_with_pdfplumber(data)
         except Exception as exc:
+            logger.warning("pdfplumber parse failed", exc_info=exc)
             return _unknown(
-                f"pdfplumber parse failed: {exc}", engine=engine,
+                f"pdfplumber parse failed: {type(exc).__name__}", engine=engine,
                 engine_version_str=version, method=method,
             )
         if detect_scanned(text_chars=text_chars, table_count=len(tables)):
@@ -352,6 +357,11 @@ def parse_filing_bytes(
             method=method,
             confidence=fill_rate_confidence(tables),
         )
+    if not settings.CAMELOT_ENABLED:
+        return _unknown(
+            "camelot-disabled (set CAMELOT_ENABLED=true for trusted PDFs)",
+            engine=engine, engine_version_str=None, method=method,
+        )
     version = engine_version("camelot")
     if version is None:
         return _unknown(
@@ -365,8 +375,9 @@ def parse_filing_bytes(
             tmp_path = tmp.name
         tables = extract_with_camelot(tmp_path, flavor=method)
     except Exception as exc:
+        logger.warning("camelot parse failed", exc_info=exc)
         return _unknown(
-            f"camelot parse failed: {exc}", engine=engine,
+            f"camelot parse failed: {type(exc).__name__}", engine=engine,
             engine_version_str=version, method=method,
         )
     finally:

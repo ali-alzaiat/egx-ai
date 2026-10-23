@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.disclosures import methodology_version
+from app.core.config import settings
 from app.ingestion.disclosures import parse as parse_mod
 from app.ingestion.disclosures.comparison import (
     compute_ttm,
@@ -112,11 +113,13 @@ class TestIntakePure:
             validate_accounting_basis("US-GAAP")
 
     def test_check_upload_bytes(self) -> None:
-        assert check_upload_bytes(b"%PDF", filename="a.pdf") == b"%PDF"
+        assert check_upload_bytes(b"%PDF-1.4", filename="a.pdf") == b"%PDF-1.4"
         with pytest.raises(ValueError):
             check_upload_bytes(b"", filename="empty.pdf")
         with pytest.raises(ValueError):
             check_upload_bytes(b"x" * (INTAKE_MAX + 1), filename="huge.pdf")
+        with pytest.raises(ValueError):
+            check_upload_bytes(b"<html>", filename="not-a.pdf")
         assert INTAKE_MAX == MAX_PDF_BYTES
 
     def test_period_bounds_quarters(self) -> None:
@@ -328,6 +331,7 @@ class TestParsePure:
         )
         module.read_pdf = lambda _path, **_kwargs: [table]  # type: ignore[attr-defined]
         monkeypatch.setitem(sys.modules, "camelot", module)
+        monkeypatch.setattr(settings, "CAMELOT_ENABLED", True)
         outcome = parse_filing_bytes(b"whatever", engine="camelot", method="lattice")
         assert outcome.status == "OK"
         assert outcome.confidence == {"value": 0.92, "status": "OK"}
@@ -341,9 +345,15 @@ class TestParsePure:
         module.__version__ = "stub"
         module.read_pdf = lambda _path, **_kwargs: []  # type: ignore[attr-defined]
         monkeypatch.setitem(sys.modules, "camelot", module)
+        monkeypatch.setattr(settings, "CAMELOT_ENABLED", True)
         outcome = parse_filing_bytes(b"whatever", engine="camelot")
         assert outcome.status == "UNKNOWN"
         assert "scanned-needs-OCR" in (outcome.reason or "")
+
+    def test_parse_camelot_disabled_by_default(self) -> None:
+        outcome = parse_filing_bytes(b"whatever", engine="camelot")
+        assert outcome.status == "UNKNOWN"
+        assert "camelot-disabled" in (outcome.reason or "")
 
     def test_parse_real_garbage_is_unknown(self) -> None:
         outcome = parse_filing_bytes(b"definitely-not-a-pdf", engine="pdfplumber")
@@ -744,9 +754,20 @@ class TestIntakeService:
                 company_id=test_company.id, filing_url="   ",
                 bulletin_id=None, report_date=REPORT_Q1_2024, filing_type="Q",
             )
+        for bad_url in ("javascript:alert(1)", "file:///etc/passwd", "/relative.pdf"):
+            with pytest.raises(ValueError):
+                await service.register_url(
+                    company_id=test_company.id, filing_url=bad_url,
+                    bulletin_id=None, report_date=REPORT_Q1_2024, filing_type="Q",
+                )
         with pytest.raises(ValueError):
             await service.upload(
                 company_id=test_company.id, filename="e.pdf", data=b"",
+                bulletin_id=None, report_date=REPORT_Q1_2024, filing_type="Q",
+            )
+        with pytest.raises(ValueError):
+            await service.upload(
+                company_id=test_company.id, filename="n.pdf", data=b"<html>not a pdf",
                 bulletin_id=None, report_date=REPORT_Q1_2024, filing_type="Q",
             )
 
@@ -1116,7 +1137,7 @@ class TestDisclosuresApi:
                 "report_date": "2025-03-31",
                 "filing_type": "Q",
             },
-            files={"file": ("g.pdf", b"not-a-pdf", "application/pdf")},
+            files={"file": ("g.pdf", b"%PDF-1.4 garbage-body", "application/pdf")},
         )
         filing_id = uploaded.json()["filing"]["id"]
         parsed = await client.post(

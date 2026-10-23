@@ -63,6 +63,7 @@ from app.ingestion.disclosures.intake import (
     registration_hash_for_url,
     validate_accounting_basis,
     validate_filing_type,
+    validate_filing_url,
 )
 from app.models.disclosure import DisclosureFactDiff, DisclosureFiling
 from app.models.financial import (
@@ -129,8 +130,7 @@ class DisclosureService:
         await self._require_company(company_id)
         validate_filing_type(filing_type)
         validate_accounting_basis(accounting_basis)
-        if not filing_url.strip():
-            raise ValueError("filing_url is required for URL registration")
+        filing_url = validate_filing_url(filing_url)
         key = content_hash or registration_hash_for_url(filing_url)
         existing = await self.filings.get_by_hash(key)
         if existing is not None:
@@ -138,7 +138,7 @@ class DisclosureService:
         filing = DisclosureFiling(
             id=new_filing_id(),
             company_id=company_id,
-            filing_url=filing_url.strip(),
+            filing_url=filing_url,
             bulletin_id=bulletin_id,
             report_date=report_date,
             filing_type=filing_type,

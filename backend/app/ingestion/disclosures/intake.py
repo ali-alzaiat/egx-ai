@@ -10,6 +10,7 @@ out of scope for v1 and stays two rows.
 import hashlib
 import uuid
 from datetime import UTC, date, datetime
+from urllib.parse import urlparse
 
 from app.ingestion.disclosures.constants import (
     ACCOUNTING_BASES,
@@ -44,8 +45,12 @@ def validate_accounting_basis(accounting_basis: str) -> str:
     return accounting_basis
 
 
+PDF_MAGIC = b"%PDF-"
+ALLOWED_URL_SCHEMES = ("http", "https")
+
+
 def check_upload_bytes(data: bytes, *, filename: str) -> bytes:
-    """Trust-boundary checks for an uploaded PDF: non-empty, within size cap."""
+    """Trust-boundary checks for an uploaded PDF: non-empty, within size cap, PDF magic."""
     if not data:
         raise ValueError(f"Empty upload for {filename!r}: nothing to register")
     if len(data) > MAX_PDF_BYTES:
@@ -53,7 +58,20 @@ def check_upload_bytes(data: bytes, *, filename: str) -> bytes:
             f"Upload for {filename!r} is {len(data)} bytes, over the "
             f"{MAX_PDF_BYTES} byte cap"
         )
+    if not data.startswith(PDF_MAGIC):
+        raise ValueError(f"Upload for {filename!r} is not a PDF (missing %PDF- header)")
     return data
+
+
+def validate_filing_url(filing_url: str) -> str:
+    """Return the stripped URL or raise; only absolute http(s) URLs are registered."""
+    url = filing_url.strip()
+    if not url:
+        raise ValueError("filing_url is required for URL registration")
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in ALLOWED_URL_SCHEMES or not parsed.netloc:
+        raise ValueError("filing_url must be an absolute http(s) URL")
+    return url
 
 
 def new_filing_id() -> uuid.UUID:

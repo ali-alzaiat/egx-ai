@@ -3,10 +3,12 @@ from collections.abc import AsyncGenerator
 from datetime import date
 from decimal import Decimal
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import engine, get_session
 from app.main import app
 from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
@@ -56,9 +58,19 @@ async def test_company(db_session: AsyncSession) -> AsyncGenerator[Company, None
     yield company
 
 
+TEST_API_TOKEN = "test-token-" + "x" * 32
+
+
+@pytest.fixture(autouse=True)
+def api_token(monkeypatch: pytest.MonkeyPatch) -> str:
+    """Configure a known API token for every test (the real one is env-only)."""
+    monkeypatch.setattr(settings, "API_TOKEN", TEST_API_TOKEN)
+    return TEST_API_TOKEN
+
+
 @pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Create an async test client with overridden session dependency."""
+async def anon_client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Async test client with the session override and no credentials."""
 
     async def _override_get_session() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
@@ -68,6 +80,13 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def client(anon_client: AsyncClient, api_token: str) -> AsyncClient:
+    """Authenticated async test client (bearer API token)."""
+    anon_client.headers["Authorization"] = f"Bearer {api_token}"
+    return anon_client
 
 
 @pytest_asyncio.fixture

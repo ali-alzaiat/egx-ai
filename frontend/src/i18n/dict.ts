@@ -13,7 +13,6 @@ export const SHORT_COPY = {
   nav_companies: { en: "Companies", ar: "الشركات" },
   nav_rankings: { en: "Market Rankings", ar: "ترتيب السوق" },
   nav_screening: { en: "Screening", ar: "التصفية الشرعية" },
-  nav_pricing: { en: "Pricing", ar: "الأسعار" },
   nav_watchlists: { en: "Watchlists", ar: "قوائم المتابعة" },
   nav_alerts: { en: "Alerts", ar: "التنبيهات" },
   nav_events: { en: "Events", ar: "الأحداث" },
@@ -111,50 +110,6 @@ export const SHORT_COPY = {
   // ---- Radar ----
   signals_radar_title: { en: "Stance radar", ar: "رادار المواقف" },
   signals_radar_count: { en: "companies", ar: "شركة" },
-
-  // ---- Pricing page ----
-  pricing_title: { en: "Pricing", ar: "الأسعار" },
-  pricing_per_month: { en: "per month", ar: "شهريًا" },
-  plan_free_name: { en: "Free", ar: "مجاني" },
-  plan_pro_name: { en: "Pro", ar: "احترافي" },
-  plan_max_name: { en: "Max", ar: "أقصى" },
-  plan_free_desc: {
-    en: "3 stance lookups per day\n1 radar scan per day\nFull company hub",
-    ar: "3 استعلامات موقف يوميًا\nمسحة رادار واحدة يوميًا\nلوحة الشركة الكاملة",
-  },
-  plan_pro_desc: {
-    en: "Unlimited stance lookups\nUnlimited radar scans\nFull company hub\nStatement & ratio library",
-    ar: "استعلامات موقف بلا حدود\nمسحات رادار بلا حدود\nلوحة الشركة الكاملة\nمكتبة القوائم والنسب المالية",
-  },
-  plan_max_desc: {
-    en: "Everything in Pro\nHighest data tier & priority processing\nEarliest document coverage",
-    ar: "كل قدرات الاحترافي\nأعلى مستوى بيانات وأولوية معالجة\nأوسع تغطية للوثائق",
-  },
-  billing_current_plan: { en: "Current plan", ar: "خطتك الحالية" },
-
-  // ---- Checkout surfaces (manual/test provider; button renders only when a
-  // provider URL is returned — see zborsa plan Task 14) ----
-  pricing_checkout: { en: "Choose plan", ar: "اختر الخطة" },
-  pricing_no_provider: {
-    en: "No payment provider is configured yet — nothing was charged.",
-    ar: "لم يتم إعداد مزوّد دفع بعد — لم يُخصم أي مبلغ.",
-  },
-  pricing_checkout_error: {
-    en: "Checkout could not start. Please try again.",
-    ar: "لم يبدأ إتمام الدفع. حاول مرة أخرى.",
-  },
-
-  // ---- Savings calculator (deterministic, illustrative only) ----
-  savings_title: { en: "Savings calculator", ar: "حاسبة التوفير" },
-  savings_monthly_amount: { en: "Monthly amount (EGP)", ar: "المبلغ الشهري (جنيه)" },
-  savings_months: { en: "Months", ar: "عدد الشهور" },
-  savings_annual_rate: { en: "Annual rate (%)", ar: "المعدل السنوي (%)" },
-  savings_table_month: { en: "Month", ar: "الشهر" },
-  savings_table_balance: { en: "Balance (EGP)", ar: "الرصيد (جنيه)" },
-  savings_illustrative: {
-    en: "Illustrative projection with monthly compounding — not a promise of returns.",
-    ar: "توقّع توضيحي بتركيب شهري — وليس وعداً بعوائد.",
-  },
 } as const;
 
 export type CopyKey = keyof typeof SHORT_COPY;

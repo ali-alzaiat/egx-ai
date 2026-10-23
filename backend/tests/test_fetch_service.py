@@ -140,6 +140,30 @@ class TestFetchService:
         assert summary.documents_fetched == 0
         assert summary.failures and "robots" in summary.failures[0].lower()
 
+    async def test_redirect_to_disallowed_host_is_failure(
+        self, db_session: AsyncSession
+    ) -> None:
+        company = await _setup_company(db_session)
+        url = f"https://open.test/{company.ticker}.pdf"
+        fetched: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/robots.txt":
+                blocked = request.url.host == "blocked.test"
+                body = "User-agent: *\nDisallow: /\n" if blocked else ""
+                return httpx.Response(200, text=body)
+            fetched.append(str(request.url))
+            if request.url.host == "open.test":
+                return httpx.Response(302, headers={"location": "https://blocked.test/x.pdf"})
+            return httpx.Response(200, content=PDF_BYTES)
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        svc = FetchService(db_session, http_client=client)
+        summary = await svc.fetch_company(company.ticker, urls=[url])
+        assert summary.documents_fetched == 0
+        assert summary.failures and "robots" in summary.failures[0].lower()
+        assert fetched == [url]
+
     async def test_fact_landed_event_emitted(self, db_session: AsyncSession) -> None:
         company = await _setup_company(db_session)
         url = f"https://feed.test/{company.ticker}.pdf"

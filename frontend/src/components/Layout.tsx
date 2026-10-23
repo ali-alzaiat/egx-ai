@@ -7,7 +7,6 @@ const navItems: { to: string; key: CopyKey }[] = [
   { to: "/companies", key: "nav_companies" },
   { to: "/rankings", key: "nav_rankings" },
   { to: "/screening", key: "nav_screening" },
-  { to: "/pricing", key: "nav_pricing" },
   { to: "/watchlists", key: "nav_watchlists" },
   { to: "/alerts", key: "nav_alerts" },
   { to: "/events", key: "nav_events" },

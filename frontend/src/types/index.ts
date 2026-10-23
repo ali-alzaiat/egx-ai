@@ -860,26 +860,3 @@ export interface StanceRadarResponse {
   items: StanceRadarItem[]
   count: number
 }
-
-export interface BillingPlan {
-  id: string
-  tier: string
-  price_egp: string
-  entitlements: Record<string, unknown>
-  active: boolean
-}
-
-export interface BillingMe {
-  user_key: string
-  tier: string
-  status: string
-  period_start: string
-  period_end: string
-}
-
-/** POST /api/billing/checkout — provider url absent in dev (no real PSP). */
-export interface CheckoutResult {
-  provider: string
-  url: string | null
-  external_id: string | null
-}

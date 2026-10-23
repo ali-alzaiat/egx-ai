@@ -12,7 +12,6 @@ import InvestmentScore from "./pages/InvestmentScore";
 import Peers from "./pages/Peers";
 import Thesis from "./pages/Thesis";
 import Disclosures from "./pages/Disclosures";
-import Pricing from "./pages/Pricing";
 import Signals from "./pages/Signals";
 import Statements from "./pages/Statements";
 import Ratios from "./pages/Ratios";
@@ -60,7 +59,6 @@ function App() {
           <Route path="/companies/:ticker/signals" element={<Signals />} />
           <Route path="/companies/:ticker/statements" element={<Statements />} />
           <Route path="/companies/:ticker/ratios" element={<Ratios />} />
-          <Route path="/pricing" element={<Pricing />} />
           <Route path="/watchlists" element={<Watchlists />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/events" element={<Events />} />
