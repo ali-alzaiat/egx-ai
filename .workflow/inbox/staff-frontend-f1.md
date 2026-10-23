@@ -1,3 +1,5 @@
+# Inbox: staff-frontend-f1
+
 # Staff-frontend Lane F1 — ZBorsa Task 12a: Companies radar mode (2026-10-22)
 
 Read first: docs/superpowers/plans/2026-10-17-zborsa-upgrade.md (Task 12), types `StanceResult`/`TargetLevel` already in `frontend/src/types/index.ts`, hook `useStanceRadar` already in `frontend/src/api/client.ts`. Scope (disjoint, yours only): `frontend/src/pages/Companies.tsx`, new `frontend/src/pages/companies/radarSort.ts`, `frontend/src/pages/companies/radarSort.test.ts`, optional `frontend/src/pages/Companies.css`. Do NOT touch `App.tsx`, `client.ts`, `types/index.ts`, `CompanyTabs.tsx`, `Statements.tsx`, `Ratios.tsx`, `Signals.tsx`, or any backend path.

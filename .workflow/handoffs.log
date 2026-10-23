@@ -127,3 +127,6 @@
 2026-10-23 | researcher -> ux-expert | .workflow/research/ui-ux-direction-2026-10.md | research filed (Plex Sans + Plex Sans Arabic, light-first tokens with WCAG ratios, dense hairline tables, 7-tab company hub, 10 do-not rules); dispatched ux-expert for the redesign spec
 2026-10-23 | qa-ui -> tech-lead | .workflow/research/qa-baseline-2026-10-23.md | baseline audit filed: gates green; 13 findings (4 HIGH: F1 ratios x100, F2 no mobile nav, F3 mobile overflow, F5 Arabic untranslated); F2-F5/F8-F12 folded into the redesign, F7/F13 into R43
 2026-10-23 | router -> - | frontend/src/pages/Ratios.tsx | DONE (fast lane): F1 fixed (use fmtPct, no double x100); verified live: COMI net margin 47.9%, ROE 26.6%, ROA 4.3%, revenue growth 12%
+2026-10-23 | architect -> staff-backend | .workflow/design/r43-computed-company-data.md | R43 contract filed (M1 bridge, M2 recompute, M3 API, migration 023; D-6 analyst ruling, D-8 sourced valuation assumptions, D-9 sector data scheduled separately); dispatched staff-backend
+2026-10-23 | router -> researcher | .workflow/inbox/researcher.md | dispatched: D-9 EGX sector source + D-8 sourced valuation assumptions
+2026-10-23 | router -> - | .workflow/AGENT_RULES.md | DONE: token budget — sonnet for 9 roles, compact agent rules, agents write own deliverables, 150-word handbacks, inbox = current task only, skip-step rules

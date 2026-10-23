@@ -11,8 +11,8 @@ The same eleven-agent team runs under two runtimes; the rules below apply to bot
 ## Files
 - STATUS.md — board: current phase, current task, next actor, open escalations
 - handoffs.log — append-only; line format: `YYYY-MM-DD | from -> to | artifact path or - | result or question`
-- inbox/<agent>.md — messages for that agent; router seeds it before dispatch
-  On dispatch, read your inbox first if it exists.
+- inbox/<agent>.md — the agent's CURRENT task only; the router overwrites it before each dispatch (history lives in handoffs.log and git). On dispatch, read your inbox first.
+- AGENT_RULES.md — the compact rules every agent reads instead of this file plus AGENTS.md.
 - research/, design/, decisions/ — deliverables; decisions/ rulings are numbered continuing the R1–R8 ledger
 
 ## Result contract (end every result with exactly one)
@@ -53,6 +53,16 @@ Pipeline runs end to end for new features. Pure technical fixes may skip researc
 
 **Parallel sessions (added 2026-10-23).** Two sessions or lanes never edit the same checkout: each works on its own branch in its own git worktree, and the router merges. Shared files stay router-owned. (Seen 2026-10-23: a parallel session's page edits overwrote local ones during a rebase.)
 
+## Token budget (added 2026-10-23)
+
+Cost scales with agents × context, so the router keeps both small:
+- **Models:** architect and tech-lead inherit the router's model; every other role runs on `sonnet` (set in `.claude/agents/*.md`).
+- **Skip steps that add nothing:** no researcher when a filed research note already covers the question; no pm when the user's request already states the scope; no architect when no interface, table or API shape changes; tech-lead only for escalations and disputed reviews. Fast lane (below) is the default for fixes.
+- **One QA pass per task:** dispatch only the QA roles the change touches (qa-ui for UI, qa-api for endpoints, analyst for formulas, qa-security for auth/input/secrets changes).
+- **Briefs:** at most ~12 lines, naming the deliverable path and the files to start from. Agents read `.workflow/AGENT_RULES.md`, not this whole file.
+- **Handbacks:** at most 150 words; the router reads a deliverable file only when routing needs it.
+- **Browser QA:** text extraction over screenshots; screenshots only for layout findings, at scale ≤ 0.5.
+
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
 2. Router dispatches tech-lead with the question.
@@ -60,7 +70,7 @@ Pipeline runs end to end for new features. Pure technical fixes may skip researc
 4. Tech-lead cannot resolve -> ASK USER -> router asks the human. No silent defaults.
 
 ## Handoffs
-The router appends every handoffs.log entry and writes every deliverable file under .workflow/ — agents never append the log themselves (staff agents' prompts forbid touching .workflow/ entirely). Edit-less agents return deliverable content inline; the router files it.
+The router appends every handoffs.log entry. Agents write their own deliverable to the path named in their brief (reviewers only under `.workflow/`, implementers only in their code scope) and hand back a summary of at most 150 words — the router never re-types a deliverable.
 
 ## Roadmap integration (SDD roles)
 - Task briefs: tech-lead

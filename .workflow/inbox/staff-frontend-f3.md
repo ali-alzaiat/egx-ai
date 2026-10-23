@@ -1,3 +1,5 @@
+# Inbox: staff-frontend-f3
+
 # Staff-frontend Lane F3 — ZBorsa Task 13: Signals/stance UI + hard invariant (2026-10-22)
 
 Read first: docs/superpowers/plans/2026-10-17-zborsa-upgrade.md (Task 13 + Task 9 StanceResult shape). `StanceResult`/`TargetLevel` types exist in `frontend/src/types/index.ts`; hook `useStance(ticker, params?: { entry_price?: number; stop_pct?: number })` exists in `frontend/src/api/client.ts`. Scope (disjoint, yours only): `frontend/src/pages/Signals.tsx` + new `Signals.css`, new `frontend/src/components/StanceCard.tsx`, new `frontend/src/components/TargetsTable.tsx`, new `frontend/src/components/stanceInvariant.test.ts`. Do NOT touch `App.tsx`, `client.ts`, `types/index.ts`, `CompanyTabs.tsx`, `Companies.tsx`, `Statements.tsx`, `Ratios.tsx`, or any backend path.

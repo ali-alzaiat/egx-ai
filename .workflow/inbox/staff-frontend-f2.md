@@ -1,3 +1,5 @@
+# Inbox: staff-frontend-f2
+
 # Staff-frontend Lane F2 — ZBorsa Task 12b: Statements + Ratios tabs (2026-10-22)
 
 Read first: docs/superpowers/plans/2026-10-17-zborsa-upgrade.md (Task 12 + Task 7 output shapes); backend response shapes: `GET /api/statements/companies/{ticker}/statements` (StatementBundle: periods desc, sections income/balance/cash_flow, each line has `label_en`, `label_ar`, `value|null`, `currency`, `status`, provenance fields `source_label_reported`, `source_page`, `published_date`) and `GET /api/statements/companies/{ticker}/ratios` (code/value/status/reason). Hooks `useStatements`/`useRatios` and the types already exist. Scope (disjoint, yours only): `frontend/src/pages/Statements.tsx` + new `Statements.css`, `frontend/src/pages/Ratios.tsx` + new `Ratios.css`. Do NOT touch `App.tsx`, `client.ts`, `types/index.ts`, `CompanyTabs.tsx`, `Companies.tsx`, `Signals.tsx`, or any backend path.

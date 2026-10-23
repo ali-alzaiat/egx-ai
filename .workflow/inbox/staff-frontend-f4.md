@@ -1,3 +1,5 @@
+# Inbox: staff-frontend-f4
+
 # Staff-frontend Lane F4 — ZBorsa Task 14 verification + completion polish (2026-10-22)
 
 Read first: docs/superpowers/plans/2026-10-17-zborsa-upgrade.md (Task 14). Code largely landed in `9e08e23`: `frontend/src/i18n/dict.ts`, `frontend/src/i18n/useLang.ts`, `frontend/src/i18n/i18n.test.ts`, `frontend/src/utils/savings.ts` + test, `frontend/src/pages/Pricing.tsx`, `frontend/src/components/Layout.tsx`. Scope (disjoint, yours only): those same i18n/Pricing/Layout/savings files (you may amend them; they were shipped unverified). Do NOT touch `App.tsx`, `client.ts`, `types/index.ts`, `CompanyTabs.tsx`, `Companies.tsx`, `Statements.tsx`, `Ratios.tsx`, `Signals.tsx`, or any backend path.
