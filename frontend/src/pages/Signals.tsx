@@ -4,7 +4,7 @@ import { useStance } from "../api/client";
 import { useLang } from "../i18n/useLang";
 import type { CopyKey } from "../i18n";
 import { fmtNum } from "../i18n/format";
-import type { TargetLevel } from "../types";
+import type { ShariahStatus, TargetLevel } from "../types";
 
 const UNSPECIFIED_LEVEL: TargetLevel = {
   value: null,
@@ -43,11 +43,55 @@ function TargetRow({ label, level }: { label: string; level: TargetLevel }) {
   );
 }
 
+const EGX33_KEY: Record<ShariahStatus["egx33"], CopyKey> = {
+  member: "shariah_member",
+  not_member: "shariah_not_member",
+  unknown: "shariah_unknown",
+};
+
+const VERDICT_KEY: Record<ShariahStatus["verdict"], CopyKey> = {
+  COMPLIANT: "shariah_compliant",
+  NON_COMPLIANT: "shariah_non_compliant",
+  INSUFFICIENT_DATA: "insufficient_data",
+  NOT_SCREENED: "shariah_not_screened",
+};
+
+function ShariahBlock({ shariah }: { shariah: ShariahStatus }) {
+  const { t } = useLang();
+  return (
+    <table className="stance-targets">
+      <caption>{t("signals_shariah")}</caption>
+      <tbody>
+        <tr>
+          <td>{t("shariah_our_verdict")}</td>
+          <td>{t(VERDICT_KEY[shariah.verdict])}</td>
+          <td dir="ltr">{shariah.methodology_version ?? ""}</td>
+        </tr>
+        <tr>
+          <td>{t("shariah_egx33")}</td>
+          <td>{t(EGX33_KEY[shariah.egx33])}</td>
+          <td dir="ltr">
+            {shariah.egx33_source ? (
+              <a href={shariah.egx33_source} target="_blank" rel="noreferrer">
+                {shariah.egx33_review_cycle}
+              </a>
+            ) : (
+              shariah.egx33_review_cycle ?? ""
+            )}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
 export default function Signals() {
   const { ticker } = useParams();
   const tk = ticker ?? "";
   const { data, isLoading, error } = useStance(tk);
-  const { t } = useLang();
+  const { t, locale } = useLang();
+  const num = (value: string | null | undefined): string =>
+    value ? fmtNum(locale, value, { maximumFractionDigits: 2 }) : t("no_value");
 
   return (
     <div className="page">
@@ -64,7 +108,55 @@ export default function Signals() {
             </strong>
             {" · "}
             {t("signals_confidence")}: {data.confidence}
+            {" · "}
+            {t("signals_score")}:{" "}
+            <span className="num" dir="ltr">
+              {data.score ?? t("no_value")}
+            </span>
+            {" · "}
+            {t("signals_coverage")}:{" "}
+            <span className="num" dir="ltr">
+              {Math.round(Number.parseFloat(data.coverage) * 100)}%
+            </span>
           </p>
+          {data.liquidity.low && (
+            <p className="alert alert-warning" title={t("low_liquidity_title")}>
+              ⚠ {t("low_liquidity")}
+            </p>
+          )}
+
+          {data.reference_levels && (
+            <table className="stance-targets">
+              <caption>
+                {t("signals_levels")}{" "}
+                <span className="muted" dir="ltr">
+                  ({data.reference_levels.horizon}, ATR {data.reference_levels.atr})
+                </span>
+              </caption>
+              <tbody>
+                <tr>
+                  <td>{t("level_entry")}</td>
+                  <td className="num" dir="ltr">{num(data.reference_levels.entry)}</td>
+                </tr>
+                <tr>
+                  <td>{t("level_upside")}</td>
+                  <td className="num" dir="ltr">{num(data.reference_levels.upside)}</td>
+                </tr>
+                <tr>
+                  <td>{t("level_downside")}</td>
+                  <td className="num" dir="ltr">{num(data.reference_levels.downside)}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+          <p className="stance-liquidity">
+            {t("signals_liquidity")}:{" "}
+            <span className="num" dir="ltr">
+              {num(data.liquidity.avg_value_traded)}
+            </span>
+          </p>
+
+          <ShariahBlock shariah={data.shariah} />
 
           <table className="stance-targets">
             <caption>{t("signals_targets")}</caption>

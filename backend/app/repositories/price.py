@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -96,3 +96,30 @@ class PriceRepository:
         prices = result.scalars().all()
 
         return prices, total
+
+    async def most_traded_company_ids(
+        self,
+        limit: int,
+        lookback_days: int = 30,
+        company_ids: Sequence[uuid.UUID] | None = None,
+    ) -> list[uuid.UUID]:
+        """Companies ranked by average daily value traded (close x volume).
+
+        The window is ``lookback_days`` calendar days back from the newest
+        stored price date, so a stale database still ranks consistently.
+        """
+        latest = (await self.session.execute(select(func.max(DailyPrice.date)))).scalar()
+        if latest is None:
+            return []
+        avg_value = func.avg(DailyPrice.close * DailyPrice.volume)
+        query = (
+            select(DailyPrice.company_id)
+            .where(DailyPrice.date >= latest - timedelta(days=lookback_days))
+            .group_by(DailyPrice.company_id)
+            .order_by(avg_value.desc().nulls_last(), DailyPrice.company_id)
+            .limit(limit)
+        )
+        if company_ids is not None:
+            query = query.where(DailyPrice.company_id.in_(company_ids))
+        result = await self.session.execute(query)
+        return list(result.scalars().all())

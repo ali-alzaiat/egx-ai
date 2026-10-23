@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Companies from "./pages/Companies";
+import Recommendations from "./pages/Recommendations";
 import CompanyDetail from "./pages/CompanyDetail";
 import FinancialData from "./pages/FinancialData";
 import FinancialMetrics from "./pages/FinancialMetrics";
@@ -30,6 +31,7 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/companies" element={<Companies />} />
           <Route path="/rankings" element={<Rankings />} />
           <Route path="/screening" element={<Screening />} />

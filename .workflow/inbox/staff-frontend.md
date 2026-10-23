@@ -1,7 +1,7 @@
 # Inbox: staff-frontend
 
 From: router · 2026-10-09
-Task: Vercel-skill compliance pass over `frontend/**` (standing requirement per user; now encoded in AGENTS.md, your agent definition, and CONTRACT step 7). Read the skill at `/Users/alialzaiat/.claude/skills/vercel-react-best-practices/SKILL.md` plus only the `rules/` files you actually need. Scope: client/rerender/bundle/rendering/js rules; server-*/Next.js-only rules (RSC cache, next/dynamic, streaming, after()) are N/A to this Vite SPA — list skipped rules with one-line reasons, never silently. Fix material violations only; no speculative refactors, no new deps, keep quality.test.ts green. Run `npm test`, `npm run lint`, `npm run build` in frontend/ and paste outputs. End with NEXT: qa-ui | BLOCKED: <question> | DONE + files changed + verification evidence.
+Task: Vercel-skill compliance pass over `frontend/**` (standing requirement per user; now encoded in AGENTS.md, your agent definition, and CONTRACT step 7). Load the `vercel-react-best-practices` skill by name and read its `SKILL.md` plus only the `rules/` files you actually need. Scope: client/rerender/bundle/rendering/js rules; server-*/Next.js-only rules (RSC cache, next/dynamic, streaming, after()) are N/A to this Vite SPA — list skipped rules with one-line reasons, never silently. Fix material violations only; no speculative refactors, no new deps, keep quality.test.ts green. Run `npm test`, `npm run lint`, `npm run build` in frontend/ and paste outputs. End with NEXT: qa-ui | BLOCKED: <question> | DONE + files changed + verification evidence.
 
 ---
 

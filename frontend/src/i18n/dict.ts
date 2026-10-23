@@ -10,6 +10,7 @@ export type Lang = "en" | "ar";
 export const SHORT_COPY = {
   // ---- Layout ----
   nav_dashboard: { en: "Dashboard", ar: "لوحة التحكم" },
+  nav_recommendations: { en: "Recommendations", ar: "الترشيحات" },
   nav_companies: { en: "Companies", ar: "الشركات" },
   nav_rankings: { en: "Market Rankings", ar: "ترتيب السوق" },
   nav_screening: { en: "Screening", ar: "التصفية الشرعية" },
@@ -110,6 +111,56 @@ export const SHORT_COPY = {
   // ---- Radar ----
   signals_radar_title: { en: "Stance radar", ar: "رادار المواقف" },
   signals_radar_count: { en: "companies", ar: "شركة" },
+
+  // ---- Recommendations radar + stance v2 ----
+  reco_title: { en: "Recommendations radar", ar: "رادار الترشيحات" },
+  reco_subtitle: {
+    en: "Most-traded EGX stocks, ranked by value traded.",
+    ar: "أكثر أسهم البورصة المصرية تداولاً، مرتبة حسب قيمة التداول.",
+  },
+  reco_shariah_only: {
+    en: "EGX33 Shariah members only",
+    ar: "أعضاء مؤشر EGX33 الشرعي فقط",
+  },
+  reco_filter_label: { en: "Stance", ar: "الموقف" },
+  reco_filter_all: { en: "All", ar: "الكل" },
+  reco_col_stock: { en: "Stock", ar: "السهم" },
+  reco_col_price: { en: "Last close", ar: "آخر إغلاق" },
+  reco_col_shariah: { en: "Shariah", ar: "الشرعية" },
+  reco_empty: { en: "No stocks match these filters.", ar: "لا توجد أسهم مطابقة لهذه الفلاتر." },
+  reco_levels_note: {
+    en: "Upside / downside are a volatility band (2× / 1.5× ATR) around the last close — not a forecast.",
+    ar: "مرجعا الصعود والهبوط نطاق تذبذب (٢× / ١٫٥× ATR) حول آخر إغلاق — وليسا توقعاً.",
+  },
+  low_liquidity: { en: "Low liquidity", ar: "سيولة منخفضة" },
+  low_liquidity_title: {
+    en: "Average value traded below EGP 500K over 20 sessions",
+    ar: "متوسط قيمة التداول أقل من ٥٠٠ ألف جنيه خلال ٢٠ جلسة",
+  },
+  signals_score: { en: "Composite score", ar: "الدرجة المركبة" },
+  signals_coverage: { en: "Engine coverage", ar: "تغطية المحركات" },
+  signals_levels: { en: "Reference levels", ar: "المستويات المرجعية" },
+  level_entry: { en: "Last close", ar: "آخر إغلاق" },
+  level_upside: { en: "Upside reference", ar: "مرجع الصعود" },
+  level_downside: { en: "Downside reference", ar: "مرجع الهبوط" },
+  signals_liquidity: {
+    en: "Avg value traded (20 sessions, EGP)",
+    ar: "متوسط قيمة التداول (٢٠ جلسة، جنيه)",
+  },
+  signals_shariah: { en: "Shariah", ar: "الشرعية" },
+  shariah_our_verdict: { en: "Our screening", ar: "فحصنا" },
+  shariah_egx33: { en: "EGX33 Shariah index", ar: "مؤشر EGX33 الشرعي" },
+  shariah_member: { en: "Member", ar: "عضو" },
+  shariah_not_member: { en: "Not a member", ar: "ليس عضواً" },
+  shariah_unknown: { en: "Unknown", ar: "غير معروف" },
+  shariah_not_screened: { en: "Not screened yet", ar: "لم يُفحص بعد" },
+  shariah_compliant: { en: "Compliant", ar: "متوافق" },
+  shariah_non_compliant: { en: "Non-compliant", ar: "غير متوافق" },
+  shariah_egx33_badge: { en: "EGX33 Shariah", ar: "EGX33 شرعي" },
+  shariah_egx33_badge_title: {
+    en: "Member of the official EGX33 Shariah index (EGX's list, shown beside our own screening)",
+    ar: "عضو في مؤشر EGX33 الشرعي الرسمي (قائمة البورصة، تُعرض بجانب فحصنا)",
+  },
 } as const;
 
 export type CopyKey = keyof typeof SHORT_COPY;

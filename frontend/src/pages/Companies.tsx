@@ -335,16 +335,18 @@ function MissingDash({ label }: { label: string }) {
 
 /*
  * Note on data sources (kept honest, per the task brief):
- * - Stance value comes from the radar batch; the reason summary in the
- *   tooltip comes from the per-company stance fetch (the radar payload has
- *   no reasons field).
+ * - The radar batch only covers the 50 most-traded names, so the stance falls
+ *   back to the per-company fetch (which also feeds the reasons tooltip) for
+ *   rows outside it.
  * - Gross margin is wired through the existing per-ticker ratios hook.
  * When a fetch fails or the value is missing, the cell renders a dash with
  * an INSUFFICIENT_DATA note — never a zero.
  */
-function StanceCell({ ticker, stance }: { ticker: string; stance: string | null }) {
-  // Reason summary only; the badge itself renders immediately from the radar item.
-  const { data: stanceResult } = useStance(stance ? ticker : undefined)
+function StanceCell({ ticker, stance: radarStance }: { ticker: string; stance: string | null }) {
+  // Radar value renders immediately when present; the per-company fetch fills
+  // in rows outside the radar and supplies the reason summary.
+  const { data: stanceResult } = useStance(ticker)
+  const stance = radarStance ?? stanceResult?.stance ?? null
 
   if (!stance) {
     return <MissingDash label="stance absent or stance fetch failed" />

@@ -116,3 +116,27 @@
   font-size: 0.68rem;
   color: var(--text-muted);
 }
+
+/* Liquidity gate (< EGP 500K/day): shown before any stance is acted on. */
+.radar-liquidity-low {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #dcb262;
+  cursor: default;
+}
+
+/* EGX33 membership and our verdict side by side. */
+.radar-shariah-stack {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.filter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}

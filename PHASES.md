@@ -7,8 +7,46 @@
      Do not act on any recommendation until Phase 13 + Phase 14 are COMPLETE.
 ────────────────────────────────────────────────────────────────────────── -->
 
+## Roadmap — prioritized 2026-10-23 (competitive review vs ZBorsa)
+
+Ordered by user impact and value. ZBorsa (zborsa.app) sells technical-only
+BUY/SELL/HOLD calls with entry/target/stop to small retail investors (99/199 EGP
+per month); it has no Shariah screening, no sourced fundamentals and no published
+track record. We win on trust: Shariah, real filings, an honest backtest. The
+phase sections below remain the detailed specs; this list sets the order.
+
+1. **Recommendations v2 (signal-rules-2.0)** — Status: IN_PROGRESS.
+   v1 scored missing engines as 0, so every stock without fundamentals was
+   `reduce` and BUY was unreachable (R41). v2: weighted average over available
+   engines only, multi-indicator technical composite (trend, RSI, MACD,
+   momentum), ATR reference levels (entry / upside / downside), liquidity flag
+   (< EGP 500K/day, Phase 14 rule), missing data lowers confidence instead of
+   biasing the stance. Shariah leaves the score and becomes its own block.
+2. **Shariah coverage** — Status: IN_PROGRESS.
+   Load official EGX33 Shariah Index membership (egx.com.eg constituents page),
+   show a Shariah badge + filter on the radar and stance views, side by side
+   with our own AAOIFI verdict (never overriding it). Our own verdicts follow
+   once item 3 lands real balance-sheet data.
+3. **Real financial data for the most-traded companies** — Phase 13.
+   Unlocks our own Shariah verdicts, valuation and scores (all synthetic or
+   empty today). Start with the EGX33 Shariah members + EGX30.
+4. **Published track record** — Phase 10.
+   Backtest signal-rules-2.0 on real price history (hit rate, drawdown, vs
+   EGX30) and show it in the UI. Directly answers ZBorsa's undefined "64/100".
+5. **Alert delivery + data gates** — Phases 11 and 14.
+   Web push on stance changes and level crossings; staleness, liquidity and
+   data-quality gates on every recommendation.
+6. **Reach** — Phase 12 + accounts.
+   User accounts, installable PWA, deployment, rate limiting.
+7. **Everyday-investor UX.**
+   Price-band filters (< 5, 5–20 EGP), budget / position sizing on levels,
+   beginner EGX guide, macro strip (CBE rate, USD/EGP, gold, Brent).
+
+Deferred: payments and subscriptions (billing removed 2026-10-23; revisit
+after item 6).
+
 ## Phase 0 — Import Hotfix (BLOCKER)
-Status: NOT_STARTED
+Status: COMPLETE (TYPE_CHECKING import present in `app/models/financial.py`)
 `TYPE_CHECKING` is missing from `backend/app/models/financial.py` line 5.
 This crashes the app at startup and causes all 38 backend test files to fail
 at collection time. Must be fixed before any other work proceeds.

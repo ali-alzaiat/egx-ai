@@ -1000,10 +1000,13 @@ export function useStance(ticker: string | undefined, params?: { entry_price?: n
   });
 }
 
-export function useStanceRadar(pageSize = 50) {
+export function useStanceRadar(pageSize = 50, shariah?: "egx33") {
   return useQuery({
-    queryKey: ["stanceRadar", pageSize],
-    queryFn: () => fetchApi<StanceRadarResponse>(`/stance/radar?page_size=${pageSize}`),
+    queryKey: ["stanceRadar", pageSize, shariah ?? null],
+    queryFn: () =>
+      fetchApi<StanceRadarResponse>(
+        `/stance/radar?page_size=${pageSize}${shariah ? `&shariah=${shariah}` : ""}`,
+      ),
   });
 }
 

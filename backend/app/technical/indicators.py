@@ -23,6 +23,7 @@ class IndicatorType(Enum):
     BOLLINGER = "bollinger"
     OBV = "obv"
     VWAP = "vwap"
+    ATR = "atr"
 
 
 class IndicatorStatus(Enum):
@@ -412,4 +413,73 @@ def calculate_vwap(
         status=IndicatorStatus.AVAILABLE,
         indicator=IndicatorType.VWAP,
         parameters={},
+    )
+
+
+def calculate_atr(
+    highs: list[Decimal],
+    lows: list[Decimal],
+    closes: list[Decimal],
+    period: int = 14,
+) -> IndicatorResult:
+    """Calculate Average True Range (Wilder).
+
+    Formula:
+    TR_t = max(high_t - low_t, |high_t - close_{t-1}|, |low_t - close_{t-1}|)
+    ATR = SMA of the first ``period`` TRs, then Wilder smoothing:
+    ATR_t = (ATR_{t-1} * (period - 1) + TR_t) / period
+
+    Args:
+        highs: List of high prices (oldest first)
+        lows: List of low prices (oldest first)
+        closes: List of close prices (oldest first)
+        period: Number of periods (default 14)
+
+    Returns:
+        IndicatorResult with ATR value in price units
+    """
+    parameters: dict[str, str | None] = {"period": str(period)}
+    if not (len(highs) == len(lows) == len(closes)):
+        return IndicatorResult(
+            value=None,
+            status=IndicatorStatus.INVALID,
+            indicator=IndicatorType.ATR,
+            parameters=parameters,
+            reason="Highs, lows and closes must have same length",
+        )
+    if period < 1 or len(closes) < period + 1:
+        return IndicatorResult(
+            value=None,
+            status=IndicatorStatus.INSUFFICIENT_DATA,
+            indicator=IndicatorType.ATR,
+            parameters=parameters,
+            reason=f"Need {period + 1} bars, got {len(closes)}",
+        )
+    if any(h < lo for h, lo in zip(highs, lows, strict=True)):
+        return IndicatorResult(
+            value=None,
+            status=IndicatorStatus.INVALID,
+            indicator=IndicatorType.ATR,
+            parameters=parameters,
+            reason="A high is below its low",
+        )
+
+    true_ranges = [
+        max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        )
+        for i in range(1, len(closes))
+    ]
+    period_decimal = Decimal(period)
+    atr = sum(true_ranges[:period], Decimal("0")) / period_decimal
+    for tr in true_ranges[period:]:
+        atr = (atr * (period_decimal - Decimal("1")) + tr) / period_decimal
+
+    return IndicatorResult(
+        value=atr.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+        status=IndicatorStatus.AVAILABLE,
+        indicator=IndicatorType.ATR,
+        parameters=parameters,
     )

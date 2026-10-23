@@ -5,6 +5,7 @@ from decimal import Decimal
 from app.technical.indicators import (
     IndicatorStatus,
     IndicatorType,
+    calculate_atr,
     calculate_bollinger_bands,
     calculate_ema,
     calculate_macd,
@@ -144,3 +145,58 @@ class TestIndicatorTypes:
         assert IndicatorType.BOLLINGER.value == "bollinger"
         assert IndicatorType.OBV.value == "obv"
         assert IndicatorType.VWAP.value == "vwap"
+        assert IndicatorType.ATR.value == "atr"
+
+
+class TestATR:
+    def test_constant_range_equals_range(self):
+        # Every bar spans 2.0 with no gaps, so every TR (and the ATR) is 2.0.
+        closes = [Decimal("10")] * 16
+        highs = [Decimal("11")] * 16
+        lows = [Decimal("9")] * 16
+        result = calculate_atr(highs, lows, closes, period=14)
+        assert result.status == IndicatorStatus.AVAILABLE
+        assert result.value == Decimal("2.0000")
+
+    def test_gap_uses_previous_close(self):
+        # Gap up: TR = |high - prev close| = 15 - 10 = 5, not high - low = 1.
+        highs = [Decimal("10"), Decimal("15")]
+        lows = [Decimal("10"), Decimal("14")]
+        closes = [Decimal("10"), Decimal("14.5")]
+        result = calculate_atr(highs, lows, closes, period=1)
+        assert result.value == Decimal("5.0000")
+
+    def test_wilder_smoothing(self):
+        # TRs = 2, 2, 5 with period 2: seed (2+2)/2 = 2, then (2*1 + 5)/2 = 3.5.
+        highs = [Decimal("10"), Decimal("11"), Decimal("11"), Decimal("14")]
+        lows = [Decimal("10"), Decimal("9"), Decimal("9"), Decimal("9")]
+        closes = [Decimal("10"), Decimal("10"), Decimal("10"), Decimal("12")]
+        result = calculate_atr(highs, lows, closes, period=2)
+        assert result.value == Decimal("3.5000")
+
+    def test_insufficient_data(self):
+        bars = [Decimal("10")] * 14
+        result = calculate_atr(bars, bars, bars, period=14)
+        assert result.status == IndicatorStatus.INSUFFICIENT_DATA
+        assert result.value is None
+
+    def test_empty_input(self):
+        result = calculate_atr([], [], [], period=14)
+        assert result.status == IndicatorStatus.INSUFFICIENT_DATA
+
+    def test_mismatched_lengths_invalid(self):
+        result = calculate_atr([Decimal("1")] * 3, [Decimal("1")] * 2, [Decimal("1")] * 3, 1)
+        assert result.status == IndicatorStatus.INVALID
+
+    def test_high_below_low_invalid(self):
+        highs = [Decimal("10"), Decimal("8")]
+        lows = [Decimal("9"), Decimal("9")]
+        closes = [Decimal("10"), Decimal("9")]
+        result = calculate_atr(highs, lows, closes, period=1)
+        assert result.status == IndicatorStatus.INVALID
+
+    def test_zero_range_is_zero_not_missing(self):
+        bars = [Decimal("10")] * 5
+        result = calculate_atr(bars, bars, bars, period=2)
+        assert result.status == IndicatorStatus.AVAILABLE
+        assert result.value == Decimal("0.0000")

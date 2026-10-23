@@ -4,6 +4,7 @@ import type { CopyKey } from "../i18n";
 
 const navItems: { to: string; key: CopyKey }[] = [
   { to: "/", key: "nav_dashboard" },
+  { to: "/recommendations", key: "nav_recommendations" },
   { to: "/companies", key: "nav_companies" },
   { to: "/rankings", key: "nav_rankings" },
   { to: "/screening", key: "nav_screening" },

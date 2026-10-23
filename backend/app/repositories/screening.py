@@ -264,3 +264,41 @@ class ScreeningRepository:
         )
         result = await self.session.execute(query)
         return result.scalars().all()
+
+    async def latest_egx_memberships(
+        self, company_ids: Sequence[uuid.UUID] | None = None
+    ) -> dict[uuid.UUID, ScreeningEgxMembership]:
+        """Each company's newest EGX33 membership record (by review cycle).
+
+        Per company, not per global cycle: a single newer per-company record
+        must never change any other company's status.
+        """
+        query = select(ScreeningEgxMembership).order_by(
+            ScreeningEgxMembership.review_cycle.desc()
+        )
+        if company_ids is not None:
+            if not company_ids:
+                return {}
+            query = query.where(ScreeningEgxMembership.company_id.in_(company_ids))
+        result = await self.session.execute(query)
+        latest: dict[uuid.UUID, ScreeningEgxMembership] = {}
+        for row in result.scalars().all():
+            latest.setdefault(row.company_id, row)
+        return latest
+
+    async def latest_results_by_company(
+        self, company_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ShariahScreeningResult]:
+        """Newest screening verdict per company for the given companies."""
+        if not company_ids:
+            return {}
+        query = (
+            select(ShariahScreeningResult)
+            .where(ShariahScreeningResult.company_id.in_(company_ids))
+            .order_by(ShariahScreeningResult.screened_at.desc())
+        )
+        result = await self.session.execute(query)
+        latest: dict[uuid.UUID, ShariahScreeningResult] = {}
+        for row in result.scalars().all():
+            latest.setdefault(row.company_id, row)
+        return latest

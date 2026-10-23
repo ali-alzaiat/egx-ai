@@ -31,6 +31,7 @@ npm run build      # tsc -b && vite build — the type check
 .venv/Scripts/python -m app.ingestion.sync --universe-only   # refresh EGX company list
 .venv/Scripts/python -m app.ingestion.sync --tickers COMI,SWDY
 .venv/Scripts/python -m app.db.purge --status                # inspect / clean dev DB (see module docstring)
+.venv/Scripts/python -m app.screening.egx33                  # record the official EGX33 Shariah snapshot
 ```
 
 - Set `API_TOKEN` in the repo-root `.env` (read by the backend, docker compose and the Vite dev proxy, which attaches it server-side so it never reaches the browser bundle). `/docs` needs `API_DOCS_ENABLED=true`.
@@ -58,7 +59,7 @@ Data flow, upstream to downstream:
    - `statements/`: fetched filing blob → `extractor.py` (XBRL first, then HTML/text) → `ontology.py`/`aliases.py` label resolution (unknown or ambiguous labels are *dropped*, never guessed) → `validator.py` → candidate lines that need **human approval** via `/api/statements/lines/{id}/approve` before `StatementService` uses them. `fetch_service.py` honours robots.txt and throttles; it is not exposed via the API.
    - `ingestion/disclosures/`: manual URL registration or PDF upload (sha256-deduped) → `parse.py` (pdfplumber, optional Camelot) → facts with page/table/row/col provenance; restatements supersede earlier facts and write to an append-only diff ledger.
    - Legacy `ingestion/fake_*_provider.py` emit `SYNTHETIC`-labelled data; don't mix it with real data in new work.
-3. **Derived engines** consume stored facts and prices: `metrics/`, `statements/ratios.py`, `screening/` (Shariah, methodology in `screening/methodology.py`), `valuation/`, `technical/`, `scores/`, `dataquality/`, `industry/` (peer percentiles), `signals/` (cross-sectional universe ranking + `stance.py` rule engine).
+3. **Derived engines** consume stored facts and prices: `metrics/`, `statements/ratios.py`, `screening/` (Shariah, methodology in `screening/methodology.py`), `valuation/`, `technical/`, `scores/`, `dataquality/`, `industry/` (peer percentiles), `signals/` (cross-sectional universe ranking; the stance engine is pure rules in `rules.py` (signal-rules-2.0: weighted mean over available engines, ATR reference levels, liquidity gate) wrapped by `stance.py`). Shariah is never part of the stance score: `screening/status.py` builds a separate block (our verdict beside official EGX33 membership).
 4. **Continuous monitoring** — `continuous/trigger_service.py` is the single entry point when facts land or prices cross; it evaluates alert rules and thesis invalidations and writes to the events ledger (`/api/events`). Thesis changes are *proposals* gated on human review.
 5. **AI** (`ai/`) — RAG over indexed company data (`document_indexer.py`, pgvector in `rag_pipeline.py`). The analyzer is currently deterministic/template-based; LLMs may only interpret supplied data.
 6. **Auth** (`core/security.py`) — a single shared bearer token (`API_TOKEN`, 32+ chars) protects every router except health; unset fails closed (503). New routers must be mounted in `main.py` with `dependencies=protected`. There are no user accounts: watchlists/alerts use a hard-coded user UUID. Billing was removed (migration 021 drops its tables).

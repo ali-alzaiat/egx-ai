@@ -835,15 +835,46 @@ export interface StanceReason {
   text: string
 }
 
+/** Our verdict and EGX33 membership side by side — never merged. */
+export interface ShariahStatus {
+  verdict: 'COMPLIANT' | 'NON_COMPLIANT' | 'INSUFFICIENT_DATA' | 'NOT_SCREENED'
+  methodology_version: string | null
+  egx33: 'member' | 'not_member' | 'unknown'
+  egx33_review_cycle: string | null
+  egx33_source: string | null
+  note: string | null
+}
+
+/** ATR volatility band around the last close (signal-rules-2.0). */
+export interface ReferenceLevels {
+  entry: string
+  upside: string
+  downside: string
+  atr: string
+  horizon: string
+}
+
+export interface LiquidityInfo {
+  avg_value_traded: string | null
+  window: number
+  low: boolean | null
+}
+
 export interface StanceResult {
   company_id: string
   ticker: string
   stance: 'buy' | 'hold' | 'reduce'
   confidence: number
+  price: string | null
+  score: string | null
+  coverage: string
   reasons: StanceReason[]
   limitations: string[]
   targets: Record<string, TargetLevel>
   stop_level: TargetLevel
+  reference_levels: ReferenceLevels | null
+  liquidity: LiquidityInfo
+  shariah: ShariahStatus
   statement_freshness: string | null
   rules_version: string
   as_of: string
@@ -852,11 +883,18 @@ export interface StanceResult {
 export interface StanceRadarItem {
   ticker: string
   company_id: string
-  stance: string | null
+  name: string
+  stance: 'buy' | 'hold' | 'reduce' | null
   confidence: number | null
+  score: string | null
+  price: string | null
+  reference_levels: ReferenceLevels | null
+  low_liquidity: boolean | null
+  shariah: ShariahStatus | null
 }
 
 export interface StanceRadarResponse {
   items: StanceRadarItem[]
   count: number
+  rules_version: string
 }
