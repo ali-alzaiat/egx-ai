@@ -68,7 +68,14 @@ class BillingService:
 
     async def assert_quota(self, user_key: str, kind: str) -> None:
         sub = await self.subscription_for(user_key)
-        ent = self._entitlements(sub.tier)
+        # canceled subscriptions drop to the FREE tier immediately — the
+        # status, not the stored tier, decides the quota (plan Task 10)
+        effective_tier = (
+            PlanTier.FREE
+            if sub.status == SubscriptionStatus.CANCELED
+            else sub.tier
+        )
+        ent = self._entitlements(effective_tier)
         if kind == "stance":
             quota = ent.daily_stance_quota
         elif kind == "radar":

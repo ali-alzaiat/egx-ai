@@ -50,7 +50,15 @@ class Subscription(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_key: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     tier: Mapped[PlanTier] = mapped_column(
-        Enum(PlanTier, name="plan_tier", create_constraint=True), nullable=False
+        Enum(
+            PlanTier,
+            name="plan_tier",
+            create_constraint=True,
+            # DB enum stores the lowercase VALUES; SQLAlchemy defaults to
+            # member NAMES — bridge it (same pattern as Plan.tier above).
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
     )
     status: Mapped[SubscriptionStatus] = mapped_column(
         Enum(

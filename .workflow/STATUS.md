@@ -1,22 +1,18 @@
 # Status
-- **Current phase:** ZBorsa Upgrade (docs/superpowers/plans/2026-10-17-zborsa-upgrade.md, spec: .workflow/design/zborsa-inspired-upgrade-spec.md) — Tasks 1–8 DONE; Tasks 9–14 code-shipped-incomplete, gate/recovery in progress; Task 15 pending.
-- **Current task:** Recovery pass — commit `9e08e23` bundled Tasks 8–11 + skeletons of 12–14 WITHOUT their required tests and with gate violations. Lanes dispatched to close gaps.
-- **Shipped (zborsa, on main):** Tasks 1–6 (216b46c…0f6b2da + review-gate-1 fix f6a1fd5), Task 7 (d82f76b), Task 8 (9e08e23). Task 11 wiring (types/client/tabs/App) complete. Task 14 code present (i18n dict/useLang/Pricing/savings/Layout RTL).
-- **Known gaps (recovery scope):**
-  - Task 9: `test_stance_service.py` missing (rubric/limitation/scenario-order/stop/quota tests unread); mypy errors `api/stance.py:118,119` (dict-item).
-  - Task 10: `test_billing.py`, `test_entitlements.py` missing (Review Focus #5 webhook tests unverified); migration 020 round-trip on gate DB unverified.
-  - Task 12: Companies radar mode NOT implemented (Companies.tsx unchanged by 9e08e23); `radarSort.ts` + test missing; Statements/Ratios pages are bare skeletons (spec requires grouped tables, EN/AR labels, provenance sub-lines, dash-not-zero).
-  - Task 13: StanceCard.tsx, TargetsTable.tsx, stanceInvariant.test.ts missing; Signals.tsx is a bare list (spec requires badge/meter/reasons/limitations/stop input).
-  - Gates at baseline: mypy 5 errors in 4 files (statements/service.py:149, api/screening.py:331, api/stance.py ×2); ruff 113 repo errors — new-code errors (F401/I001/W292/E501 in new statements/billing/stance files) must go to zero, pre-existing alembic debt excluded.
-- **Next actor:** 1× staff-backend (Task 9+10 tests + code fixes) ∥ 4× staff-frontend lanes F1/F2/F3/F4 → router merge + gates.
-- **Open escalations:** none.
-- **Carry-forward:**
+- **Current phase:** ZBorsa Upgrade — Tasks 1–14 SHIPPED (+ Task 9/10 test recovery pass); Task 15 workflow records filed (R41). Next: QA cycle + rubric ruling (see Open ruling below).
+- **Current task:** Idle — awaiting next directive (QA per contract, or new phase plan).
+- **Shipped (zborsa, main):** Task 1–6 (`216b46c`…`0f6b2da` + `f6a1fd5`), Task 7 (`d82f76b`), Task 8–11 (`9e08e23` + parallel-session cleanups `f667297`/`95e3e77`/`399fc7a`), Tasks 12–14 (lanes F1–F4 `47123c3` integrated with remote terminal-restyle, `3b7578d`). Task 15: R41 filed + records pushed.
+- **Recovery pass (2026-10-23):** Task 9/10 tests written (49 tests, 49 green on gate DB `egx_ai_gate`); full backend suite 770 passed / 5 environmental fails (see R41); mypy 0/181; ruff clean app+tests. Three real bugs found by the new tests and FIXED: `Subscription.tier` enum binding (model), canceled-sub quota tier ignored (service), unknown checkout tier 500→404 (api).
+- **Next actor:** tech-lead → BLOCKED ruling requested in R41 "Rubric finding": BUY stance unreachable (rubric max 55 < 60 floor) — raise BUY floor or add a positive-points source; deliberate no-code-change, tests pin HOLD.
+- **Open escalations:** none beyond the rubric ruling request.
+- **Carry-forward (address on next relevant touch):**
+  - Make environment-dependent tests portable (universe snapshot/data-source seeds): 5 failing tests on this machine (test_universe ×1, test_signals_api ×2, test_ingestion_jobs ×1, test_screening_phase6 ×1 — all trace to gitignored `data/` absent locally)
   - Drop unused `useHealthCheck` on next `client.ts` touch
   - 004→005 migration enum bug (pre-existing)
-  - Repo-wide alembic ruff debt (33 pre-existing errors — NOT in recovery scope)
-  - W2 — watchlist numeric-metric rename/delete endpoints absent (see .workflow/design/watchlist-alerts-events-ux.md)
-  - R21 census test — fixed 2026-10-11
-- **Decisions ledger:** R9–R40 filed. Next ruling: R41 (zborsa close: top-10 list record, real-PSP blocker, deferrals: real-PDF fixtures, income-share-from-industry-rule, PendingFinancialData resolution). NOTE: R41 was also referenced inside plan Tasks 3/4/15 — one R41 filing covers all.
+  - Repo-wide alembic ruff debt (pre-existing)
+  - W2 — watchlist numeric-metric rename/delete endpoints absent
+  - Unreachable `raise` in `api/billing.py` webhook handler (cosmetic dead line)
+- **Decisions ledger:** R9–R41 filed. Next ruling: R42 (rubric BUY-floor).
 - **Standing pre-phase data gate (2026-10-11):** 0 real financial facts in DB (`DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`).
 - **Subagent models (2026-10-17):** all eleven agents on parent model `opencode/glm-5.3-flash-free`.
-- **Testing note (2026-10-22):** full pytest run exceeded 10 min wall clock — investigate suite-level hang (suspect: network-touching ingest/universe tests) during recovery pass; backend lanes must run gates themselves and report any hang.
+- **Env notes (2026-10-22/23):** Docker/WSL2 repaired on this machine (WSL update + clean restart); compose postgres up (old dev volume intact) at :5432; fresh gate DB `egx_ai_gate` at head 020 for gates. Dev servers must be stopped before backend gates (contract).

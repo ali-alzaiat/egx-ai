@@ -41,7 +41,13 @@ async def checkout(
     sub = await service.subscription_for(user_key)
     # manual provider: no real checkout URL
     provider = ManualPaymentProvider()
-    plan = await session.execute(select(Plan).where(Plan.tier == PlanTier(tier)))
+    try:
+        tier_enum = PlanTier(tier)
+    except ValueError as exc:
+        # unknown tier is a client error, not a server error (pricing page
+        # sends user-selected tiers; a 404 keeps the honest no-provider path)
+        raise HTTPException(status_code=404, detail="plan not found") from exc
+    plan = await session.execute(select(Plan).where(Plan.tier == tier_enum))
     plan_row = plan.scalar_one_or_none()
     if plan_row is None:
         raise HTTPException(status_code=404, detail="plan not found")
