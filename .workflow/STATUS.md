@@ -1,20 +1,22 @@
 # Status
-- **Current phase:** Phase 8 — Continuous Intelligence (kickoff per continuous run)
-- **Current task:** Batches B–D SHIPPED per R40 (thesis, disclosures, watchlists, alerts, events; all gates zero-errors-zero-warnings). Frontend covers all 20 backend routers — never-behind rule in effect going forward.
-- **Shipped:** Phase 1 (data quality), Phase 2 (industry intelligence), Phase 3 (valuation), Phase 4 (investment score), Phase 5 (investment thesis), Phase 6 (Shariah v2), Phase 7 (document intelligence backend per R36, findings verdict R37 — ship, no fix-list), Phase 8 backend (B1–B6 per R38/R39, 650/650) + full frontend catch-up (Batch A company upgrades; Batches B–D per R40). All on `feature/phase8-continuous-intelligence`, committed as `f64c39d`.
-- **Next actor:** router → merge/commit decision (phase branch holds backend + frontend; Phase-13 stashes still parked)
+- **Current phase:** ZBorsa Upgrade (docs/superpowers/plans/2026-10-17-zborsa-upgrade.md, spec: .workflow/design/zborsa-inspired-upgrade-spec.md) — Tasks 1–8 DONE; Tasks 9–14 code-shipped-incomplete, gate/recovery in progress; Task 15 pending.
+- **Current task:** Recovery pass — commit `9e08e23` bundled Tasks 8–11 + skeletons of 12–14 WITHOUT their required tests and with gate violations. Lanes dispatched to close gaps.
+- **Shipped (zborsa, on main):** Tasks 1–6 (216b46c…0f6b2da + review-gate-1 fix f6a1fd5), Task 7 (d82f76b), Task 8 (9e08e23). Task 11 wiring (types/client/tabs/App) complete. Task 14 code present (i18n dict/useLang/Pricing/savings/Layout RTL).
+- **Known gaps (recovery scope):**
+  - Task 9: `test_stance_service.py` missing (rubric/limitation/scenario-order/stop/quota tests unread); mypy errors `api/stance.py:118,119` (dict-item).
+  - Task 10: `test_billing.py`, `test_entitlements.py` missing (Review Focus #5 webhook tests unverified); migration 020 round-trip on gate DB unverified.
+  - Task 12: Companies radar mode NOT implemented (Companies.tsx unchanged by 9e08e23); `radarSort.ts` + test missing; Statements/Ratios pages are bare skeletons (spec requires grouped tables, EN/AR labels, provenance sub-lines, dash-not-zero).
+  - Task 13: StanceCard.tsx, TargetsTable.tsx, stanceInvariant.test.ts missing; Signals.tsx is a bare list (spec requires badge/meter/reasons/limitations/stop input).
+  - Gates at baseline: mypy 5 errors in 4 files (statements/service.py:149, api/screening.py:331, api/stance.py ×2); ruff 113 repo errors — new-code errors (F401/I001/W292/E501 in new statements/billing/stance files) must go to zero, pre-existing alembic debt excluded.
+- **Next actor:** 1× staff-backend (Task 9+10 tests + code fixes) ∥ 4× staff-frontend lanes F1/F2/F3/F4 → router merge + gates.
 - **Open escalations:** none.
-- **Carry-forward (address on next relevant touch):**
+- **Carry-forward:**
   - Drop unused `useHealthCheck` on next `client.ts` touch
   - 004→005 migration enum bug (pre-existing)
-  - ~~R21 fragile census test~~ — **FIXED 2026-10-11:** resilient assertion (`>= stub_companies * 3`), jobs suite 11/11 green
-  - Repo-wide alembic ruff debt (33 pre-existing errors; F1 fixed in Phase 6)
-  - Frontend pipeline stalled after Phase 1 — Phases 2–7 backend-only; schedule frontend catch-up
-  - Phase 0 import hotfix (`TYPE_CHECKING` in `models/financial.py`) — verified in working tree, clean pytest collection
-- **Decisions ledger:** R9–R40 filed. Next ruling: R41.
+  - Repo-wide alembic ruff debt (33 pre-existing errors — NOT in recovery scope)
+  - W2 — watchlist numeric-metric rename/delete endpoints absent (see .workflow/design/watchlist-alerts-events-ux.md)
+  - R21 census test — fixed 2026-10-11
+- **Decisions ledger:** R9–R40 filed. Next ruling: R41 (zborsa close: top-10 list record, real-PSP blocker, deferrals: real-PDF fixtures, income-share-from-industry-rule, PendingFinancialData resolution). NOTE: R41 was also referenced inside plan Tasks 3/4/15 — one R41 filing covers all.
 - **Standing pre-phase data gate (2026-10-11):** 0 real financial facts in DB (`DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`).
-- **Subagent models (2026-10-16, per user directive):** all eleven agents on parent model `opencode/muse-spark-1.3-contributor-free`; no tier split.
-
-- **Update 2026-10-17:** Phase 8 alert scope-matching fixed in backend (unscoped/list-scoped rules fire; 3 tests, 653/653, ruff/mypy clean, uncommitted); Alerts/Watchlists ticker-dropdown UX shipped; Watchlist/Alerts/Events UX overhaul implemented per `.workflow/design/watchlist-alerts-events-ux.md` (W1/W3, A1–A4, E1–E3; gates green tsc 0/eslint 0/build 0 warn/vitest 10/10). **Backend scope fix + UX overhaul still UNCOMMITTED on `feature/phase8-continuous-intelligence`.**
-- **Subagent models (2026-10-17, per user directive):** all eleven agents switched to parent model `opencode/glm-5.3-flash-free` (effective after opencode restart).
-- **Carry-forward added:** W2 — watchlist numeric-metric model rename/delete endpoints (PATCH/DELETE on `/api/watchlists/{id}`) are absent in `backend/app/api/watchlists.py`; no UI built. See `.workflow/design/watchlist-alerts-events-ux.md`.
+- **Subagent models (2026-10-17):** all eleven agents on parent model `opencode/glm-5.3-flash-free`.
+- **Testing note (2026-10-22):** full pytest run exceeded 10 min wall clock — investigate suite-level hang (suspect: network-touching ingest/universe tests) during recovery pass; backend lanes must run gates themselves and report any hang.
