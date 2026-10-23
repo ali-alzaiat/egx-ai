@@ -3,7 +3,7 @@ import CompanyTabs from "../components/CompanyTabs";
 import { useRatios } from "../api/client";
 import { useLang } from "../i18n/useLang";
 import type { CopyKey } from "../i18n";
-import { fmtNum } from "../i18n/format";
+import { fmtNum, fmtPct } from "../i18n/format";
 import type { RatioResult } from "../types";
 
 const PERCENT_RATIOS = new Set([
@@ -49,10 +49,7 @@ export default function Ratios() {
                   {r.value === null
                     ? t("no_value")
                     : isPct
-                      ? fmtNum(locale, Number(r.value) * 100, {
-                          style: "percent",
-                          maximumFractionDigits: 1,
-                        })
+                      ? fmtPct(locale, r.value)
                       : fmtNum(locale, r.value, { maximumFractionDigits: 4 })}
                 </td>
                 <td>

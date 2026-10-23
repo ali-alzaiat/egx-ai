@@ -19,3 +19,14 @@ describe("i18n", () => {
     expect(fmtNum("en", 10_000)).toBe("10,000");
   });
 });
+
+describe("ratio percent formatting (QA F1 regression)", () => {
+  it("formats API decimals once, never x100 twice", async () => {
+    const { fmtPct } = await import("./format");
+    // COMI net margin from /ratios (0.479...) and AMOC gross margin (6.63%).
+    expect(fmtPct("en", "0.47948")).toBe("47.9%");
+    expect(fmtPct("en", "0.0663")).toBe("6.6%");
+    expect(fmtPct("ar-EG-u-nu-latn", "0.0663")).not.toContain("663");
+    expect(fmtPct("en", null)).toBe("—");
+  });
+});

@@ -1,5 +1,10 @@
 # Inbox: ux-expert
 
+From: router (UI revamp, Claude Code runtime) · 2026-10-23
+Task: Produce the redesign spec the frontend will implement (CONTRACT step 5). Inputs: `.workflow/research/ui-ux-direction-2026-10.md` (read in full — tokens, type scale, table/chart/component rules, do-not list, proposed IA) and `.workflow/decisions/R43-show-data-not-forms.md` (company tabs become read-only; data-entry tools move to `/admin`; AI Insights route removed). Walk the current app in the built-in browser first (preview_start name `frontend`, backend already on :8000) in English and Arabic so findings are grounded. Deliver: (1) final IA — grouped sidebar, mobile top bar + menu, company hub header + the 7-tab structure and which current pages/components land in each tab, `/admin` contents; (2) final token sheet (light + dark CSS custom properties, type scale, spacing, radii) — you may tune the research hex values but must keep the stated contrast ratios; (3) per-screen layout spec for: Dashboard, Recommendations, Companies, Company hub (each tab), Rankings, Shariah screening list, Watchlists, Alerts, Events, Admin — what is shown, in what order, empty/loading/error copy; (4) stance and Shariah copy (EN + AR) honouring AGENTS.md principle 10 (no certainty words); (5) explicit RTL rules list for the implementer. Be concrete enough that staff-frontend needs no follow-up questions. Read-only: return the spec inline (router files it as `.workflow/design/ui-redesign-2026-10.md`). End NEXT: staff-frontend | BLOCKED: <question> | DONE.
+
+---
+
 From: router (UX overhaul: Watchlists / Alerts / Events) · 2026-10-16
 Task: Live UX review of three pages + concrete, implementable fix list. Dev servers are already up (backend :8000, frontend :5173 — verify with a quick probe; if down, say so and stop, do NOT start infrastructure yourself).
 

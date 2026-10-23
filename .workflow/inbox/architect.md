@@ -1,5 +1,10 @@
 # Inbox: architect
 
+From: router (Claude Code runtime) · 2026-10-23
+Task: Design the backend contract for R43 (`.workflow/decisions/R43-show-data-not-forms.md` — read it in full, especially Build order M1–M2, triggers, AC-2..AC-7, and the two open notes). Deliver: (1) M1 bridge — how metrics, investment score, fair value and Shariah consume approved statement lines (`StatementLineRepository.latest_approved`, filing outranks vendor) instead of / alongside FinancialFact: an ontology-code → engine-input mapping table, provenance shape (tier, period end, source), INSUFFICIENT_DATA reasons; which Shariah engine becomes canonical (statement-lines path `app/screening/statement_input.py`). (2) M2 recompute service — one module (e.g. `app/services/recompute.py`) with `recompute_company(company_id, reason)` and the three hooks (statement import, price sync job, first-view GET with staleness rule); idempotency per company + methodology_version; inline vs queued choice with justification (single-user tool, ~230 companies). (3) API contract changes — which GET endpoints compute-on-read, which POSTs become admin-only or unused, response shape additions (`calculated_at`, `source_tier`, `provisional`), and the `/admin` page's API needs. (4) Frontend contract for M3/M4 (removed client functions per AC-1, admin route). Read the actual code before ruling: `backend/app/{metrics,scores,valuation,screening,thesis,technical,signals,statements,ingestion}/`, `backend/app/api/*.py`, and the cross-phase contracts in `docs/superpowers/plans/2026-10-08-competitive-enhancement-roadmap.md`. Write the design to `.workflow/design/r43-computed-company-data.md` (your only write) and return a summary inline. End NEXT: staff-backend | BLOCKED: <question> | DONE.
+
+---
+
 From: router (user directive: frontend far behind backend) · 2026-10-11
 Task: Frontend catch-up contract — map EVERY backend surface with no UI to frontend routes/components/hooks, organized in implementable batches.
 
