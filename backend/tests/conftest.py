@@ -1,18 +1,75 @@
+"""Shared fixtures. Tests run against their own database, never the dev one.
+
+The test database URL is ``TEST_DATABASE_URL`` when set, else the configured
+``DATABASE_URL`` with ``_test`` appended to the database name. It is pointed
+at *before* anything imports the engine, then created (if missing) and
+migrated to head once per session.
+"""
+
+import asyncio
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from sqlalchemy.engine import make_url
+
+from app.core.config import settings
+
+
+def _test_database_url() -> str:
+    dev = make_url(settings.DATABASE_URL)
+    explicit = os.environ.get("TEST_DATABASE_URL")
+    url = make_url(explicit) if explicit else dev.set(database=f"{dev.database}_test")
+    if url.database == dev.database:
+        raise RuntimeError("refusing to run tests against the dev database")
+    return url.render_as_string(hide_password=False)
+
+
+TEST_DATABASE_URL = _test_database_url()
+# Both the app engine (via settings) and alembic's env.py (via the env var) read this.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+settings.DATABASE_URL = TEST_DATABASE_URL
+# Each async test runs on its own event loop; pooled connections are loop-bound.
+settings.DATABASE_NULLPOOL = True
+
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.db.session import engine, get_session
 from app.main import app
 from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
 from app.models.market import Company, CompanyStatus, DataSource
+
+
+async def _create_database_if_missing(url: str) -> None:
+    import asyncpg
+
+    target = make_url(url)
+    admin = target.set(drivername="postgresql", database="postgres")
+    conn = await asyncpg.connect(admin.render_as_string(hide_password=False))
+    try:
+        exists = await conn.fetchval(
+            "SELECT 1 FROM pg_database WHERE datname = $1", target.database
+        )
+        if not exists:
+            await conn.execute(f'CREATE DATABASE "{target.database}"')
+    finally:
+        await conn.close()
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Create the test database if needed and migrate it to head."""
+    import alembic.command
+    import alembic.config
+
+    asyncio.run(_create_database_if_missing(TEST_DATABASE_URL))
+    cfg = alembic.config.Config(str(Path(__file__).parent.parent / "alembic.ini"))
+    alembic.command.upgrade(cfg, "head")
 
 
 @pytest_asyncio.fixture
@@ -59,6 +116,14 @@ async def test_company(db_session: AsyncSession) -> AsyncGenerator[Company, None
 
 
 TEST_API_TOKEN = "test-token-" + "x" * 32
+
+
+@pytest.fixture(autouse=True)
+def _clear_stance_cache() -> None:
+    """Cached stances must never leak between tests (they roll back their rows)."""
+    from app.signals import stance_cache
+
+    stance_cache.clear()
 
 
 @pytest.fixture(autouse=True)

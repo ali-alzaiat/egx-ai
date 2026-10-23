@@ -5,8 +5,8 @@ Revises: 017
 Create Date: 2026-10-11
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "018"

@@ -1,7 +1,61 @@
 """Tests for the signals API /ranking endpoints."""
 
+import uuid
+from datetime import date, timedelta
+from decimal import Decimal
+
 import pytest
+import pytest_asyncio
 from httpx import AsyncClient
+
+from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
+
+PRICED_SESSIONS = 300
+
+
+@pytest_asyncio.fixture
+async def priced_companies(db_session) -> list[Company]:
+    """Three active companies with a year of prices: the engine needs real history
+    and the test database starts empty."""
+    source = DataSource(
+        id=uuid.uuid4(),
+        name=f"TEST_SRC_{uuid.uuid4().hex[:6]}",
+        source_type=DataSourceType.SYNTHETIC,
+    )
+    db_session.add(source)
+    companies = []
+    for drift in (Decimal("0.002"), Decimal("0"), Decimal("-0.002")):
+        company = Company(
+            id=uuid.uuid4(),
+            ticker=f"SIG{uuid.uuid4().hex[:6].upper()}",
+            name="Signals probe",
+            currency="EGP",
+            status=CompanyStatus.ACTIVE,
+        )
+        db_session.add(company)
+        companies.append((company, drift))
+    await db_session.flush()
+    start = date.today() - timedelta(days=PRICED_SESSIONS)
+    for company, drift in companies:
+        close = Decimal("10")
+        for i in range(PRICED_SESSIONS):
+            close = (close * (Decimal("1") + drift + Decimal(i % 3 - 1) / 200)).quantize(
+                Decimal("0.0001")
+            )
+            db_session.add(
+                DailyPrice(
+                    company_id=company.id,
+                    date=start + timedelta(days=i),
+                    open=close,
+                    high=close * Decimal("1.01"),
+                    low=close * Decimal("0.99"),
+                    close=close,
+                    volume=500_000,
+                    source_id=source.id,
+                )
+            )
+    await db_session.flush()
+    return [c for c, _ in companies]
 
 
 @pytest.mark.asyncio
@@ -20,7 +74,9 @@ async def test_signals_list_with_filter(client: AsyncClient, test_company) -> No
 
 
 @pytest.mark.asyncio
-async def test_signals_list_coverage(client: AsyncClient, db_session) -> None:
+async def test_signals_list_coverage(
+    client: AsyncClient, db_session, priced_companies
+) -> None:
     from app.signals.engine import SignalEngine
     async with db_session as s:
         await SignalEngine(s).run(persist=True)
@@ -67,7 +123,7 @@ async def test_signals_coverage(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_signals_run_now(client: AsyncClient) -> None:
+async def test_signals_run_now(client: AsyncClient, priced_companies) -> None:
     response = await client.post("/api/signals/run")
     assert response.status_code == 200
     data = response.json()

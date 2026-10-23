@@ -25,11 +25,14 @@ The main session is the router. Subagents never dispatch each other.
 6. **Parallel implementation.** Backend implements the real endpoints; frontend builds against **mocks** of the frozen contract. They do not block each other. Frontend swaps mocks for the real backend once it lands (integration step).
    **Briefing is the router's job, not a pipeline stop.** The router writes each task brief directly from the architect contract (or from the previous artifact) and dispatches. Do NOT route routine briefs or scope checks through tech-lead — that hop is reserved for escalation/arbitration, a disputed review, and the final per-task/per-phase verdict.
 7. **Every finished task goes straight to QA.** No task is called done until QA has run: `qa-api` (contract/conformance), `qa-ui` (build/lint/test/UX), `qa-security` (secrets/injection/authz), and `analyst` for financial logic. QA findings are blockers. Frontend tasks are additionally checked against the vercel-react-best-practices skill (applicable client/rerender/bundle/rendering/js rules; Next.js/RSC-only rules N/A) — violations are blockers.
+   **Real-data check (added 2026-10-23).** Conformance is not correctness: every task that changes a scoring, stance, screening or valuation output also runs that output on the real dev database and reports its distribution. For stances: `cd backend && python -m app.signals.sanity`. If one outcome covers more than 80% of names, the QA handoff must explain why (e.g. market breadth) or the task is NOT done. A test that pins an output nobody would accept on real data (e.g. "max bullish case is hold") is a defect, not a golden.
 8. **Code review on every code change.** A reviewer (`general`, medium tier) reviews each implementer's diff before it merges. No code merges unreviewed.
 9. **UX reviews the built design.** After frontend ships, `ux-expert` reviews the implementation against the design and flags gaps.
 10. **Tech-lead final verdict** per task and phase.
 
 Pipeline runs end to end for new features. Pure technical fixes may skip researcher/pm with a ledger note, but **never skip architect-contract, QA, code review, or UX where UI is touched**.
+
+**Fast lane (added 2026-10-23).** A change qualifies when it adds no endpoint, no table/migration and no new page, and touches at most ~5 source files (bug fixes, copy, refactors, config, docs). Fast lane = implementer → code review → gates green (CI) → real-data check if it changes an output → router logs DONE. It skips researcher, pm, architect, UX design and the tech-lead verdict. Anything that turns out bigger mid-task goes back to the full pipeline.
 
 **Parallel rule:** at any stage, dispatch agents whose scopes are disjoint in parallel — backend, frontend (mocked), ux-expert, qa-ui, qa-api, qa-security, and code reviewers. Tech-lead verifies disjointness. Overlapping or dependent scopes run sequentially.
 
@@ -37,10 +40,12 @@ Pipeline runs end to end for new features. Pure technical fixes may skip researc
 - Each phase brief must name the UI surface (new page/tab/section or upgrade of an existing one) alongside the endpoints; phases with no user-visible surface must say so explicitly with a reason.
 - At phase kickoff the router lists uncovered backend endpoints in STATUS; at phase close the router verifies each new/changed endpoint is reachable from the UI (or under an explicit logged deferral) before the DONE handoff.
 - A task with any error or warning in its gates (pytest, ruff, mypy, tsc, eslint, build, vitest) is NOT done — warnings are blockers, not advisories. Zero-errors-zero-warnings is the only green.
-- Backend gates run with dev servers stopped (`uvicorn`, `vite dev` share the dev database and can cause transient lock/contention failures — seen 2026-10-16).
+- Backend tests run against their own database (`<dev db>_test`, or `TEST_DATABASE_URL`), created and migrated by `tests/conftest.py` — never the dev database. Tests seed every row they need; a test that only passes on one machine's data is a defect. CI (`.github/workflows/ci.yml`) runs every gate on push/PR and must be green before a task is DONE.
 - Logged deferrals go to `decisions/` with a reason + owner phase, and stay on the STATUS carry-forward list until shipped.
 
 **Frontend parallel lanes (Batch A, added 2026-10-16):** one staff-frontend agent per lane, each with its own inbox (`inbox/staff-frontend-a1.md` … `a4.md`) and disjoint file ownership (A1: InvestmentScore page; A2: ShariahScreening page; A3: Valuation page; A4: new PeersTab component). Shared files (`api/client.ts`, `types/index.ts`, `App.tsx`, `CompanyTabs.tsx`) are router-owned — lanes return wiring instructions instead of editing them. No lane runs `npm run build`/`npm test` (shared tree); router runs gates after merge.
+
+**Parallel sessions (added 2026-10-23).** Two sessions or lanes never edit the same checkout: each works on its own branch in its own git worktree, and the router merges. Shared files stay router-owned. (Seen 2026-10-23: a parallel session's page edits overwrote local ones during a rebase.)
 
 ## Escalation ladder
 1. Unsure -> BLOCKED, never guess.
@@ -73,27 +78,15 @@ Single tier per user directive — all agents run on the parent model.
 
 To change a tier: edit the `model:` line in the agent's `.opencode/agents/<name>.md` frontmatter. Requires an opencode restart to take effect.
 
-## Standing pre-phase gate (added 2026-10-11)
+## Data-first gate (replaces the 2026-10-11 warning-only gate, 2026-10-23)
 
-**Before dispatching researcher for any new competitive phase (Phases 2–10),** the router must run:
+A phase or task that **consumes fundamentals** (metrics, ratios, valuation, scores, thesis, Shariah verdicts, anything reading financial facts or statement lines) may not start until real data exists:
 
 ```bash
-cd backend && .venv/bin/python -c "
-import asyncio, asyncpg, os
-async def check():
-    conn = await asyncpg.connect(os.environ['DATABASE_URL'])
-    count = await conn.fetchval(
-        \"SELECT COUNT(*) FROM financial_facts WHERE source_type != 'SYNTHETIC'\"
-    )
-    print(f'Real financial facts: {count}')
-    if count == 0:
-        print('WARN: all data is synthetic — Phase 13 must ship before outputs are acted on')
-    await conn.close()
-asyncio.run(check())
-"
+cd backend && python -m app.dataquality.real_data --min-companies 5
 ```
 
-If `count == 0`, the phase may still be implemented (competitive features can be built in parallel), but the handoffs.log entry for that phase must include: `DATA WARNING: outputs computed on synthetic data — not for real-money use until Phase 13 ships`.
+Exit 1 = BLOCKED: the only fundamentals work allowed is getting real data in (Phase 13). The old rule let phases ship on synthetic data with a warning; 14 phases were marked COMPLETE while the database held 0 real financial facts. Price-only work (technical, liquidity, stance on prices) is not blocked.
 
 ## PM fast-path (added 2026-10-11)
 

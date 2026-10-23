@@ -60,6 +60,12 @@ ignore = [
     "B008",  # Do not perform function call in argument defaults (FastAPI Depends/Query)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# conftest must point the app at the test database before importing the engine.
+"tests/conftest.py" = ["E402"]
+# Applied migrations are history: keep their DDL lines as written.
+"alembic/versions/*.py" = ["E501"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 

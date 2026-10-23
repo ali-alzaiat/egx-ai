@@ -1,4 +1,4 @@
-.PHONY: dev test lint format migrate seed docker-up docker-down clean
+.PHONY: dev test lint format migrate docker-up docker-down clean
 
 # Development
 dev:

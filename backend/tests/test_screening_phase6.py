@@ -431,10 +431,22 @@ class TestPurificationApi:
     ) -> None:
         from sqlalchemy import select
 
-        # ADIB is seeded in the universe; reuse the row (test writes roll back).
+        # Reuse ADIB when the database has it, else create it (writes roll back).
         company = (
             await db_session.execute(select(Company).where(Company.ticker == "ADIB"))
-        ).scalar_one()
+        ).scalar_one_or_none()
+        if company is None:
+            company = Company(
+                id=uuid.uuid4(),
+                ticker="ADIB",
+                name="Abu Dhabi Islamic Bank - Egypt",
+                sector="Financials",
+                industry="Banks",
+                currency="EGP",
+                status=CompanyStatus.ACTIVE,
+            )
+            db_session.add(company)
+            await db_session.flush()
         await client.post(f"/api/screening/companies/{company.id}/screen")
         response = await client.post(
             f"/api/screening/companies/{company.id}/purification",

@@ -15,7 +15,9 @@ htmlcov/
 .agents/
 .venv/
 opencode.json
-data/
+data/*
+# The dated universe snapshot is the auditable offline fallback (see universe.py).
+!data/egx_universe.csv
 skills-lock.json
 frontend/tsconfig.tsbuildinfo
 

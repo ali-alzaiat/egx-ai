@@ -276,9 +276,22 @@ async def test_get_data_quality_stays_read_only(client, refresh_env, db_session,
     assert after == before
 
 
-async def test_data_sources_exposes_last_synced_at(client):
+async def test_data_sources_exposes_last_synced_at(client, db_session):
+    import uuid
+
+    from app.models.market import DataSource, DataSourceType
+
+    # Seed our own row: the test database starts empty (no reliance on dev data).
+    db_session.add(
+        DataSource(
+            id=uuid.uuid4(),
+            name=f"TEST_SRC_{uuid.uuid4().hex[:6]}",
+            source_type=DataSourceType.SYNTHETIC,
+        )
+    )
+    await db_session.flush()
     response = await client.get("/api/data-sources")
     assert response.status_code == 200
     items = response.json()
-    assert items  # the dev/test database always has at least one source
+    assert items
     assert all("last_synced_at" in item for item in items)

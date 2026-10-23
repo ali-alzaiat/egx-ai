@@ -32,12 +32,13 @@ npm run build      # tsc -b && vite build — the type check
 .venv/Scripts/python -m app.ingestion.sync --tickers COMI,SWDY
 .venv/Scripts/python -m app.db.purge --status                # inspect / clean dev DB (see module docstring)
 .venv/Scripts/python -m app.screening.egx33                  # record the official EGX33 Shariah snapshot
+.venv/Scripts/python -m app.dataquality.real_data            # data-first gate: companies with real fundamentals
+.venv/Scripts/python -m app.signals.sanity                   # real-data check: stance distribution vs market breadth
 ```
 
 - Set `API_TOKEN` in the repo-root `.env` (read by the backend, docker compose and the Vite dev proxy, which attaches it server-side so it never reaches the browser bundle). `/docs` needs `API_DOCS_ENABLED=true`.
-- Backend tests hit the real `DATABASE_URL` database. Use the `client` fixture (authenticated) or `anon_client` (no token). `tests/conftest.py` wraps each test in an outer transaction that is rolled back, so services may call `session.commit()` freely. Stop `uvicorn`/`vite dev` before running gates — they share the dev DB and cause lock contention.
+- Backend tests never touch the dev database: `tests/conftest.py` points them at `<dev db>_test` (or `TEST_DATABASE_URL`), creating and migrating it on first run. Tests seed every row they need. Use the `client` fixture (authenticated) or `anon_client` (no token). CI (`.github/workflows/ci.yml`) runs every gate on push/PR. Each test runs in an outer transaction that is rolled back, so services may call `session.commit()` freely.
 - A task is only "green" with zero errors **and zero warnings** across pytest, ruff, mypy, tsc, eslint, build and vitest.
-- The README's `python -m app.seed.seed` and `make seed` are stale — `app/seed/` is empty.
 
 ## Architecture
 
@@ -72,5 +73,6 @@ React 19 + Vite SPA with react-router (`App.tsx`). Company-scoped pages live und
 
 ## Project workflow
 
+- Process rules in `.workflow/CONTRACT.md` that most affect day-to-day work: the **data-first gate** (no work that consumes fundamentals while `python -m app.dataquality.real_data` exits 1), the **real-data check** (changed outputs are run on real data; >80% in one outcome must be explained), and the **fast lane** for small changes.
 - `PHASES.md` tracks phase status (with reliability warnings about synthetic data); per-phase specs are in `docs/phases/`.
 - Multi-agent process: agent definitions in `.opencode/agents/`, coordination files in `.workflow/` (`CONTRACT.md` defines the pipeline and the NEXT/BLOCKED/ASK USER/DONE result contract, `STATUS.md` is the board, `handoffs.log` is append-only). The architect's API contract in `.workflow/design/` is the source of truth both backend and frontend build against, and every backend change must ship with its UI surface in the same phase.

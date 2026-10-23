@@ -53,8 +53,9 @@ pip install -e ".[dev]"
 # Run migrations
 alembic upgrade head
 
-# Seed development data (synthetic)
-python -m app.seed.seed
+# Load real market data: EGX company list + prices, then official EGX33 Shariah membership
+python -m app.ingestion.sync
+python -m app.screening.egx33
 
 # Start dev server
 uvicorn app.main:app --reload --port 8000
@@ -80,7 +81,6 @@ make test         # Run all tests
 make lint         # Lint all code
 make format       # Format all code
 make migrate      # Run database migrations
-make seed         # Seed development data
 ```
 
 ## Phase 2 — Companies + Market Prices
@@ -111,7 +111,7 @@ To add a real EGX provider, implement `MarketDataProvider` and register it in th
 
 ### Development Data
 
-Run `python -m app.seed.seed` to populate the database with 10 synthetic EGX companies and historical price data. All synthetic data is labeled with `source_type = SYNTHETIC`.
+Run `python -m app.ingestion.sync` to discover the EGX universe and load real daily prices. Synthetic data is only created by tests and is always labeled `source_type = SYNTHETIC`.
 
 ## Phase 3 — Financial Statements & Normalized Financial Data
 
@@ -157,12 +157,7 @@ The `FinancialDataProvider` protocol is separate from `MarketDataProvider`:
 
 ### Development Data
 
-Run `python -m app.seed.seed` to populate:
-- 10 synthetic EGX companies
-- 4,530+ price records
-- 50 financial periods
-- 50 financial documents
-- 850 financial facts
+Real financial statements arrive through the disclosure pipeline (Phase 13). Check coverage with `python -m app.dataquality.real_data`; phases that consume fundamentals are blocked until it reports at least 5 companies.
 
 ### Phase 4: Financial Metrics
 
@@ -214,7 +209,6 @@ egx-ai/
 │   │   ├── models/   # SQLAlchemy models
 │   │   ├── repositories/ # Data access
 │   │   ├── schemas/  # Pydantic schemas
-│   │   └── seed/     # Development seeding
 │   ├── tests/        # pytest tests
 │   └── alembic/      # Database migrations
 ├── frontend/         # React frontend

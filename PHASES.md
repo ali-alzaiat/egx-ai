@@ -30,6 +30,8 @@ phase sections below remain the detailed specs; this list sets the order.
 3. **Real financial data for the most-traded companies** — Phase 13.
    Unlocks our own Shariah verdicts, valuation and scores (all synthetic or
    empty today). Start with the EGX33 Shariah members + EGX30.
+   Data-first gate (CONTRACT.md): no other work that consumes fundamentals
+   starts until `python -m app.dataquality.real_data --min-companies 5` passes.
 4. **Published track record** — Phase 10.
    Backtest signal-rules-2.0 on real price history (hit rate, drawdown, vs
    EGX30) and show it in the UI. Directly answers ZBorsa's undefined "64/100".
