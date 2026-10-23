@@ -34,6 +34,7 @@ npm run build      # tsc -b && vite build — the type check
 .venv/Scripts/python -m app.screening.egx33                  # record the official EGX33 Shariah snapshot
 .venv/Scripts/python -m app.dataquality.real_data            # data-first gate: companies with real fundamentals
 .venv/Scripts/python -m app.signals.sanity                   # real-data check: stance distribution vs market breadth
+.venv/Scripts/python -m app.statements.vendor_import         # import saved data/vendor/stockanalysis/*.json (offline, provisional)
 ```
 
 - Set `API_TOKEN` in the repo-root `.env` (read by the backend, docker compose and the Vite dev proxy, which attaches it server-side so it never reaches the browser bundle). `/docs` needs `API_DOCS_ENABLED=true`.
@@ -59,6 +60,8 @@ Data flow, upstream to downstream:
 2. **Fundamentals** — two real-data paths, both provenance-tracked:
    - `statements/`: fetched filing blob → `extractor.py` (XBRL first, then HTML/text) → `ontology.py`/`aliases.py` label resolution (unknown or ambiguous labels are *dropped*, never guessed) → `validator.py` → candidate lines that need **human approval** via `/api/statements/lines/{id}/approve` before `StatementService` uses them. `fetch_service.py` honours robots.txt and throttles; it is not exposed via the API.
    - `ingestion/disclosures/`: manual URL registration or PDF upload (sha256-deduped) → `parse.py` (pdfplumber, optional Camelot) → facts with page/table/row/col provenance; restatements supersede earlier facts and write to an append-only diff ledger.
+   - `statements/vendor_import.py`: offline import of saved vendor files (S&P Global via stockanalysis.com) as `vendor_aggregator` lines — provisional, validated, and always outranked by filing-backed lines in `latest_approved`. The app never fetches vendor pages itself.
+   - `statements/intake.py` + `/intake` page: priority checklist (EGX33 Shariah + 30 most traded) and assisted manual entry of official filings (every value needs the filing URL and page).
    - Legacy `ingestion/fake_*_provider.py` emit `SYNTHETIC`-labelled data; don't mix it with real data in new work.
 3. **Derived engines** consume stored facts and prices: `metrics/`, `statements/ratios.py`, `screening/` (Shariah, methodology in `screening/methodology.py`), `valuation/`, `technical/`, `scores/`, `dataquality/`, `industry/` (peer percentiles), `signals/` (cross-sectional universe ranking; the stance engine is pure rules in `rules.py` (signal-rules-2.0: weighted mean over available engines, ATR reference levels, liquidity gate) wrapped by `stance.py`). Shariah is never part of the stance score: `screening/status.py` builds a separate block (our verdict beside official EGX33 membership).
 4. **Continuous monitoring** — `continuous/trigger_service.py` is the single entry point when facts land or prices cross; it evaluates alert rules and thesis invalidations and writes to the events ledger (`/api/events`). Thesis changes are *proposals* gated on human review.

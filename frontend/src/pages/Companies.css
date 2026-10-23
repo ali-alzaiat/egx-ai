@@ -140,3 +140,38 @@
   gap: 0.35rem;
   cursor: pointer;
 }
+
+/* Statement provenance + filings intake. */
+.source-provisional {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #dcb262;
+  background: rgba(217, 164, 65, 0.13);
+  border: 1px solid rgba(217, 164, 65, 0.3);
+  cursor: help;
+}
+
+.intake-form {
+  margin-bottom: 1.5rem;
+}
+
+.intake-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.intake-url {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.intake-reject {
+  color: #e28b81;
+  font-size: 0.75rem;
+}

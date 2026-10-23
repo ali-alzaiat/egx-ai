@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.financial import FinancialDocument, FinancialPeriod, ReportingPeriodType
+from app.models.statements import ExtractionMethod
 from app.repositories.statements import StatementLineRepository
 from app.statements.ontology import STATEMENT_LINES, LineSection
 from app.statements.ratios import RATIO_VERSION, RatioService
@@ -46,6 +47,9 @@ class StatementLineRead(BaseModel):
     source_page: str | None
     published_date: date | None
     document_url: str | None
+    # "filing" (official document) or "vendor" (provisional aggregator data).
+    source_tier: str | None = None
+    provisional: bool = False
 
 
 class PeriodStatements(BaseModel):
@@ -81,6 +85,13 @@ class RatioBundle(BaseModel):
     fiscal_year: int | None
     ratios_version: str
     ratios: list[RatioRead]
+
+
+def _source_tier(row: "FinancialStatementLine | None") -> str | None:
+    """Provenance tier of a statement line shown to users (None when missing)."""
+    if row is None or row.value is None:
+        return None
+    return "vendor" if row.extraction_method == ExtractionMethod.vendor_aggregator else "filing"
 
 
 class StatementService:
@@ -154,6 +165,8 @@ class StatementService:
                         source_label_reported=line_row.source_label_reported if line_row else None,
                         source_page=line_row.source_page if line_row else None,
                         published_date=line_row.published_date if line_row else None,
+                        source_tier=_source_tier(line_row),
+                        provisional=_source_tier(line_row) == "vendor",
                         document_url=(
                             documents[line_row.source_document_id].document_url
                             if (

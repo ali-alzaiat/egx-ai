@@ -5,11 +5,12 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Protocol
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.financial import FinancialDocument
 from app.models.statements import (
+    ExtractionMethod,
     ExtStatus,
     FinancialDocumentBlob,
     FinancialStatementLine,
@@ -106,12 +107,14 @@ class StatementLineRepository:
         return created
 
     async def latest_approved(self, company_id: uuid.UUID) -> list[FinancialStatementLine]:
-        """Approved/auto_validated lines only, latest publication wins per key.
+        """Approved/auto_validated lines only, one winner per key.
 
-        Per ``(period_id, ontology_code)`` the row with the max ``published_date``
-        wins; ties (same date) fall back to the newest ``created_at`` — and the
-        result is deterministic in Postgres on that ordering. ``extraction_candidate``
-        and ``rejected`` rows are always excluded (candidate-leakage invariant).
+        Per ``(period_id, ontology_code)``: filing-backed rows always beat
+        ``vendor_aggregator`` rows (provisional data never overrides a filing),
+        then the max ``published_date`` wins; ties fall back to the newest
+        ``created_at`` — deterministic in Postgres on that ordering.
+        ``extraction_candidate`` and ``rejected`` rows are always excluded
+        (candidate-leakage invariant).
         """
         query = (
             select(FinancialStatementLine)
@@ -122,6 +125,14 @@ class StatementLineRepository:
             .order_by(
                 FinancialStatementLine.period_id,
                 FinancialStatementLine.ontology_code,
+                case(
+                    (
+                        FinancialStatementLine.extraction_method
+                        == ExtractionMethod.vendor_aggregator,
+                        1,
+                    ),
+                    else_=0,
+                ),
                 FinancialStatementLine.published_date.desc().nulls_last(),
                 FinancialStatementLine.created_at.desc(),
             )

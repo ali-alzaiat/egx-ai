@@ -42,6 +42,9 @@ import type {
   StanceResult,
   StanceRadarResponse,
   CompaniesOverviewResponse,
+  IntakeResponse,
+  ManualFilingRequest,
+  ManualFilingResponse,
   Watchlist,
   WatchlistEntry,
 } from "../types";
@@ -999,6 +1002,31 @@ export function useStance(ticker: string | undefined, params?: { entry_price?: n
     queryFn: () => fetchApi<StanceResult>(`/stance/companies/${ticker}${qs ? `?${qs}` : ""}`),
     enabled: !!ticker,
   });
+}
+
+export function useFilingsIntake() {
+  return useQuery({
+    queryKey: ["filingsIntake"],
+    queryFn: () => fetchApi<IntakeResponse>(`/statements/intake`),
+  });
+}
+
+// POST /api/statements/manual-filings — plain async; 422 carries the reason.
+export async function recordManualFiling(
+  body: ManualFilingRequest,
+): Promise<ManualFilingResponse> {
+  const res = await fetch(`${API_BASE}/statements/manual-filings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    const message =
+      detail && typeof detail.detail === "string" ? detail.detail : `API error: ${res.status}`;
+    throw new Error(message);
+  }
+  return res.json();
 }
 
 export function useCompaniesOverview(tickers: string[]) {

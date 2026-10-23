@@ -13,6 +13,7 @@ from collections.abc import AsyncGenerator
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -116,6 +117,72 @@ async def test_company(db_session: AsyncSession) -> AsyncGenerator[Company, None
 
 
 TEST_API_TOKEN = "test-token-" + "x" * 32
+
+
+def _vendor_payload(ticker: str, currency: str = "EGP") -> dict[str, Any]:
+    """A saved vendor file in the stockanalysis layout with SYNTHETIC test numbers."""
+    dates = ["TTM", "2025-06-30", "2024-06-30"]
+    years = ["TTM", "2025", "2024"]
+
+    def stmt(fields: dict[str, list[Any]], titles: dict[str, str]) -> dict[str, Any]:
+        return {
+            "url": f"https://stockanalysis.com/quote/egx/{ticker}/financials/",
+            "available": True,
+            "trust": {"sources": [{"name": "TEST SOURCE"}], "lastUpdated": "2026-08-19"},
+            "map": [{"id": k, "title": v} for k, v in titles.items()],
+            "financialData": {"datekey": dates, "fiscalYear": years, **fields},
+        }
+
+    return {
+        "ticker": ticker,
+        "fetched_at": "2026-10-23T12:00:00+00:00",
+        "currency_financial": currency,
+        "statements": {
+            "income": stmt(
+                {
+                    "revenue": [999, 1000, 800],
+                    "cor": [1, 600, 500],
+                    "gp": [1, 400, 300],
+                    "interestExpense": [-1, -20, -10],
+                    "taxexp": [1, 50, 40],
+                    "netinccmn": [1, 200, None],
+                    "epsBasic": [1, 1.5, 1.2],
+                },
+                {
+                    "revenue": "Revenue",
+                    "cor": "Cost of Revenue",
+                    "gp": "Gross Profit",
+                    "interestExpense": "Interest Expense",
+                    "taxexp": "Income Tax Expense",
+                    "netinccmn": "Net Income to Common",
+                    "epsBasic": "EPS (Basic)",
+                },
+            ),
+            "balance": stmt(
+                {
+                    "assets": [1, 1000, 900],
+                    "liabilities": [1, 400, 400],
+                    "totalCommonEquity": [1, 580, 480],
+                    "minorityInterestBS": [1, 20, 20],
+                    "equity": [1, 600, 500],
+                },
+                {
+                    "assets": "Total Assets",
+                    "liabilities": "Total Liabilities",
+                    "totalCommonEquity": "Total Common Equity",
+                    "minorityInterestBS": "Minority Interest",
+                    "equity": "Shareholders' Equity",
+                },
+            ),
+            "cash_flow": stmt({"capex": [1, -30, -25]}, {"capex": "Capital Expenditures"}),
+        },
+    }
+
+
+@pytest.fixture
+def vendor_payload() -> Any:
+    """Factory for synthetic vendor files: ``vendor_payload(ticker, currency="EGP")``."""
+    return _vendor_payload
 
 
 @pytest.fixture(autouse=True)

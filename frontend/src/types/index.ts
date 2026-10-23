@@ -794,6 +794,9 @@ export interface StatementLineRead {
   source_page: string | null
   published_date: string | null
   document_url: string | null
+  /** "filing" = official document, "vendor" = provisional aggregator data. */
+  source_tier: 'filing' | 'vendor' | null
+  provisional: boolean
 }
 
 export interface PeriodStatements {
@@ -891,6 +894,47 @@ export interface StanceRadarItem {
   reference_levels: ReferenceLevels | null
   low_liquidity: boolean | null
   shariah: ShariahStatus | null
+}
+
+/** GET /api/statements/intake — priority companies and their filing coverage. */
+export interface IntakeItem {
+  company_id: string
+  ticker: string
+  name: string
+  reasons: Array<'egx33' | 'most_traded'>
+  filing_years: number[]
+  vendor_years: number[]
+  target_year: number
+  status: 'missing' | 'vendor_only' | 'filed'
+  disclosure_url: string | null
+}
+
+export interface IntakeLineDef {
+  code: string
+  label_en: string
+  label_ar: string
+  section: 'income' | 'balance' | 'cash_flow'
+}
+
+export interface IntakeResponse {
+  items: IntakeItem[]
+  lines: IntakeLineDef[]
+}
+
+export interface ManualFilingRequest {
+  ticker: string
+  fiscal_year: number
+  period_end: string
+  document_url: string
+  publication_date: string | null
+  currency: string
+  lines: Array<{ code: string; value: string; page: string }>
+}
+
+export interface ManualFilingResponse {
+  document_id: string
+  period_id: string
+  lines: Array<{ code: string; status: string; reason: string | null }>
 }
 
 /** GET /api/companies/overview — one Companies-table page in one request. */

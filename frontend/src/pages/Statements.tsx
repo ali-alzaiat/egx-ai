@@ -21,6 +21,7 @@ function SectionTable({ title, lines }: { title: string; lines: StatementLineRea
         <tr>
           <th scope="col">{t("col_line")}</th>
           <th scope="col">{t("col_value")}</th>
+          <th scope="col">{t("col_source")}</th>
         </tr>
       </thead>
       <tbody>
@@ -35,17 +36,43 @@ function SectionTable({ title, lines }: { title: string; lines: StatementLineRea
                   ? t("no_value")
                   : fmtNum(locale, l.value, { maximumFractionDigits: 4 })}
               </td>
+              <td>
+                <SourceCell line={l} />
+              </td>
             </tr>
           );
         })}
         {lines.length === 0 && (
           <tr>
-            <td colSpan={2}>{t("insufficient_data")}</td>
+            <td colSpan={3}>{t("insufficient_data")}</td>
           </tr>
         )}
       </tbody>
     </table>
   );
+}
+
+/** Where a value came from: an official filing (with page) or provisional vendor data. */
+function SourceCell({ line }: { line: StatementLineRead }) {
+  const { t } = useLang();
+  if (line.source_tier === "vendor") {
+    return (
+      <span className="source-provisional" title={t("source_provisional_title")}>
+        {t("source_provisional")}
+      </span>
+    );
+  }
+  if (line.source_tier === "filing") {
+    const label = `${t("source_filing")}${line.source_page ? ` · ${t("source_page")} ${line.source_page}` : ""}`;
+    return line.document_url ? (
+      <a href={line.document_url} target="_blank" rel="noreferrer">
+        {label}
+      </a>
+    ) : (
+      <span>{label}</span>
+    );
+  }
+  return null;
 }
 
 function PeriodBlock({ p }: { p: PeriodStatements }) {

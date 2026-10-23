@@ -36,6 +36,8 @@ class ExtractionMethod(enum.StrEnum):
     downloaded_document_text = "downloaded_document_text"
     xbrl = "xbrl"
     manual_seed = "manual_seed"
+    # Third-party aggregator data: provisional, always outranked by filing-backed rows.
+    vendor_aggregator = "vendor_aggregator"
 
 
 class ExtStatus(enum.StrEnum):

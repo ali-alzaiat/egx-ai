@@ -1,10 +1,13 @@
 """Ops review queue endpoints: approve extraction candidates, reject with reason."""
 
 import uuid
+from datetime import date
+from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
@@ -16,6 +19,8 @@ from app.schemas.statements import (
     ReviewDecisionRequest,
     ReviewQueueItemRead,
 )
+from app.statements.intake import ManualLine, intake_checklist, record_manual_filing
+from app.statements.ontology import STATEMENT_LINES
 from app.statements.service import StatementService
 
 router = APIRouter(prefix="/api/statements", tags=["statements"])
@@ -128,3 +133,75 @@ async def company_ratios(
         return JSONResponse(status_code=404, content={"detail": "company not found"})
     bundle = await StatementService(session).company_ratios(company_obj.id)
     return JSONResponse(status_code=200, content=bundle.model_dump(mode="json"))
+
+
+class ManualLineBody(BaseModel):
+    code: str = Field(max_length=64)
+    value: Decimal
+    page: str = Field(min_length=1, max_length=32)
+
+
+class ManualFilingBody(BaseModel):
+    """Numbers copied from an official filing; every value carries its page."""
+
+    ticker: str = Field(max_length=20)
+    fiscal_year: int = Field(ge=1990, le=2100)
+    period_end: date
+    document_url: str = Field(max_length=500)
+    publication_date: date | None = None
+    currency: str = Field("EGP", min_length=3, max_length=3)
+    lines: list[ManualLineBody] = Field(min_length=1, max_length=len(STATEMENT_LINES))
+
+
+@router.get("/intake")
+async def filings_intake(session: AsyncSession = Depends(get_session)) -> dict[str, Any]:
+    """Priority checklist: EGX33 Shariah members + 30 most traded, missing work first."""
+    rows = await intake_checklist(session)
+    return {
+        "items": [
+            {
+                "company_id": str(r.company_id),
+                "ticker": r.ticker,
+                "name": r.name,
+                "reasons": r.reasons,
+                "filing_years": r.filing_years,
+                "vendor_years": r.vendor_years,
+                "target_year": r.target_year,
+                "status": r.status,
+                "disclosure_url": r.disclosure_url,
+            }
+            for r in rows
+        ],
+        "lines": [
+            {"code": code, "label_en": sl.label_en, "label_ar": sl.label_ar, "section": sl.section}
+            for code, sl in STATEMENT_LINES.items()
+        ],
+    }
+
+
+@router.post("/manual-filings")
+async def record_filing(
+    body: ManualFilingBody, session: AsyncSession = Depends(get_session)
+) -> dict[str, Any]:
+    """Record an official filing entered by hand; lines run through the validator."""
+    try:
+        result = await record_manual_filing(
+            session,
+            ticker=body.ticker,
+            fiscal_year=body.fiscal_year,
+            period_end=body.period_end,
+            document_url=body.document_url,
+            publication_date=body.publication_date,
+            currency=body.currency,
+            lines=[ManualLine(code=x.code, value=x.value, page=x.page) for x in body.lines],
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await session.commit()
+    return {
+        "document_id": str(result.document_id),
+        "period_id": str(result.period_id),
+        "lines": result.lines,
+    }
