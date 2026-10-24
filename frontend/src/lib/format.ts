@@ -62,7 +62,9 @@ export function fmtChange(locale: string, abs: Numeric, pct: Numeric): string | 
 /** Decimal input, 1 dp fixed: 0.42 -> "42.0%". */
 export function fmtPct(locale: string, value: Numeric): string | null {
   const n = toNumber(value);
-  return n === null ? null : `${fixed(locale, n * 100, 1)}%`;
+  if (n === null) return null;
+  // Negatives use U+2212 like the other helpers (Intl gives an ASCII hyphen).
+  return n < 0 ? withSign(n, `${fixed(locale, -n * 100, 1)}%`) : `${fixed(locale, n * 100, 1)}%`;
 }
 
 /** Decimal input, sign always: 0.631 -> "+63.1%", -0.143 -> "−14.3%". */

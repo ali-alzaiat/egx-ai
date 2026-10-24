@@ -1,1 +1,8 @@
-/* Rankings specific styles */
+/* Rankings layout only: the list of companies without price history. */
+.excluded-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+.excluded-list li { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }

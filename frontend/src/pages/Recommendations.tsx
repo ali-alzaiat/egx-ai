@@ -1,235 +1,270 @@
-import "./Companies.css";
-
 /*
- * Recommendations radar (signal-rules-2.0): the most-traded EGX stocks with
- * stance, confidence, ATR reference levels, liquidity and Shariah side by
- * side. One batch request (useStanceRadar); the Shariah-only toggle narrows
- * the server query to official EGX33 members, the stance filter is local.
- * Missing values render as a dash with an INSUFFICIENT_DATA note — never zero.
+ * Recommendations (signal-rules-2.0): model stances for the most-traded EGX
+ * stocks with confidence, composite, ATR reference levels, liquidity and
+ * Shariah side by side. One batch request (useStanceRadar); the Shariah-only
+ * toggle narrows the server query to official EGX33 members, the stance and
+ * text filters are local. Filter state lives in the URL. Missing values render
+ * as <Missing> with the reason, never zero.
  */
 
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { useStanceRadar } from "../api/client";
+import { useMemo, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useSignals, useStanceRadar } from "../api/client";
+import { StanceBadge, Tag, ShariahPair, type StanceCode } from "../components/ui/Badges";
+import DataTable, { type Column } from "../components/ui/DataTable";
+import { Missing } from "../components/ui/Missing";
+import { PageHeader } from "../components/ui/PageHeader";
+import { PageTitle } from "../components/ui/PageTitle";
+import { Segmented } from "../components/ui/Segmented";
+import { EmptyState, ErrorState, NoMatch } from "../components/ui/States";
 import { useLang } from "../i18n/useLang";
-import type { CopyKey } from "../i18n";
-import { fmtNum } from "../lib/format";
-import type { ShariahStatus, StanceRadarItem } from "../types";
-import { sortRadarRows, type RadarSortDir } from "./companies/radarSort";
+import { fmtDate, fmtInt, fmtPrice, fmtScore, toNumber } from "../lib/format";
+import { useMediaQuery } from "../lib/useMediaQuery";
+import type { StanceRadarItem } from "../types";
+import { Stock, assessedStance, countText, stockFirst } from "./companies/shared";
 
-type StanceValue = "buy" | "hold" | "reduce";
-type StanceFilter = "all" | StanceValue;
+type StanceFilter = "all" | StanceCode;
+const STANCE_FILTERS: readonly StanceFilter[] = ["all", "buy", "hold", "reduce"];
+const STANCE_ORDER: Record<StanceCode, number> = { buy: 0, hold: 1, reduce: 2 };
 
-const STANCE_FILTERS: StanceFilter[] = ["all", "buy", "hold", "reduce"];
-
-const STANCE_KEY: Record<StanceValue, CopyKey> = {
-  buy: "stance_buy",
-  hold: "stance_hold",
-  reduce: "stance_reduce",
-};
-
-const STANCE_SHAPES: Record<StanceValue, string> = { buy: "▲", hold: "●", reduce: "▼" };
-
-interface RecoRow extends StanceRadarItem {
-  scoreValue: number | null;
+interface RecoRow {
+  item: StanceRadarItem;
+  /** Position in the server's most-traded order. */
+  rank: number;
+  /** Null means "Not assessed" (no stance, or the zero-confidence default). */
+  stance: StanceCode | null;
 }
 
-type RecoSortKey = "ticker" | "stance" | "scoreValue" | "confidence";
+function isStanceFilter(value: string | null): value is StanceFilter {
+  return value !== null && (STANCE_FILTERS as readonly string[]).includes(value);
+}
 
 export default function Recommendations() {
   const { t, locale } = useLang();
-  const [shariahOnly, setShariahOnly] = useState(false);
-  const [stanceFilter, setStanceFilter] = useState<StanceFilter>("all");
-  const [sortKey, setSortKey] = useState<RecoSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<RadarSortDir>("desc");
+  const narrow = useMediaQuery("(max-width: 767px)");
+  const [params, setParams] = useSearchParams();
+
+  const stanceParam = params.get("stance");
+  const stanceFilter: StanceFilter = isStanceFilter(stanceParam) ? stanceParam : "all";
+  const shariahOnly = params.get("egx33") === "1";
+  const text = params.get("q") ?? "";
+
+  const update = (patch: Record<string, string | null>): void => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value === null || value === "") next.delete(key);
+          else next.set(key, value);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const clearFilters = (): void => update({ stance: null, egx33: null, q: null });
 
   const { data, isLoading, error, refetch } = useStanceRadar(50, shariahOnly ? "egx33" : undefined);
+  // Latest scored close date, the same date the stances are computed on.
+  const { data: market } = useSignals({ limit: 1 });
 
-  const rows = useMemo<RecoRow[]>(() => {
-    const items = (data?.items ?? []).map((item) => ({
-      ...item,
-      scoreValue: item.score !== null ? Number.parseFloat(item.score) : null,
-    }));
-    const filtered =
-      stanceFilter === "all" ? items : items.filter((item) => item.stance === stanceFilter);
-    // Server order is "most traded first"; only re-sort when a column is chosen.
-    return sortKey ? sortRadarRows(filtered, sortKey, sortDir) : filtered;
-  }, [data, stanceFilter, sortKey, sortDir]);
+  const allRows = useMemo<RecoRow[]>(
+    () =>
+      (data?.items ?? []).map((item, index) => ({
+        item,
+        rank: index + 1,
+        stance: assessedStance(item.stance, item.confidence),
+      })),
+    [data],
+  );
 
-  const toggleSort = (key: RecoSortKey): void => {
-    if (key === sortKey) {
-      setSortDir((dir) => (dir === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "ticker" || key === "stance" ? "asc" : "desc");
-    }
-  };
+  // Text filter first, so the stance counts reflect what the reader typed.
+  const textRows = useMemo(() => {
+    const q = text.trim().toLowerCase();
+    if (!q) return allRows;
+    return allRows.filter(
+      ({ item }) => item.ticker.toLowerCase().includes(q) || item.name.toLowerCase().includes(q),
+    );
+  }, [allRows, text]);
 
-  const num = (value: string | null | undefined): string =>
-    value ? fmtNum(locale, value, { maximumFractionDigits: 2 }) : t("no_value");
+  const counts = useMemo(() => {
+    const c: Record<StanceCode, number> = { buy: 0, hold: 0, reduce: 0 };
+    for (const row of textRows) if (row.stance) c[row.stance] += 1;
+    return c;
+  }, [textRows]);
 
-  const sortHeader = (key: RecoSortKey, label: string) => (
-    <th
-      aria-sort={sortKey === key ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button type="button" className="radar-sort-btn" onClick={() => toggleSort(key)}>
-        {label}
-        {sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
-      </button>
-    </th>
+  const rows = useMemo(
+    () => (stanceFilter === "all" ? textRows : textRows.filter((row) => row.stance === stanceFilter)),
+    [textRows, stanceFilter],
+  );
+
+  const rules = data?.rules_version ?? null;
+  const filtersActive = stanceFilter !== "all" || shariahOnly || text !== "";
+
+  const columns = useMemo<Column<RecoRow>[]>(() => {
+    const dash = <Missing localized={t("no_engine_input")} />;
+    const level = (v: string | undefined): ReactNode => {
+      const formatted = v === undefined ? null : fmtPrice(locale, v);
+      return formatted ?? <Missing localized={t("reco_no_atr")} />;
+    };
+    return stockFirst<RecoRow>(
+      [
+        {
+          id: "rank",
+          header: t("col_rank"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => r.rank,
+          cell: (r) => r.rank,
+        },
+        {
+          id: "stock",
+          header: t("reco_col_stock"),
+          sortable: true,
+          sticky: true,
+          sortValue: (r) => r.item.ticker,
+          cell: (r) => (
+            <span className="shariah-pair">
+              <Stock ticker={r.item.ticker} name={r.item.name} href={`/companies/${r.item.ticker}/price`} cardLinked />
+              {r.item.low_liquidity && <Tag title={t("low_liquidity_title")}>{t("low_liquidity")}</Tag>}
+            </span>
+          ),
+        },
+        {
+          id: "stance",
+          header: t("signals_stance"),
+          sortable: true,
+          sortValue: (r) => (r.stance ? STANCE_ORDER[r.stance] : null),
+          cell: (r) => <StanceBadge stance={r.stance} confidence={r.item.confidence} rules={rules} />,
+        },
+        {
+          id: "confidence",
+          header: t("reco_col_confidence"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => (r.stance ? r.item.confidence : null),
+          cell: (r) => (r.stance ? fmtInt(locale, r.item.confidence) : dash),
+        },
+        {
+          id: "composite",
+          header: t("reco_col_composite"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => (r.stance ? toNumber(r.item.score) : null),
+          cell: (r) => (r.stance ? (fmtScore(locale, r.item.score) ?? dash) : dash),
+        },
+        {
+          id: "price",
+          header: t("reco_col_price"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => toNumber(r.item.price),
+          cell: (r) => fmtPrice(locale, r.item.price) ?? <Missing localized={t("no_stored_price")} />,
+        },
+        {
+          id: "upside",
+          header: t("reco_col_upside"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => toNumber(r.item.reference_levels?.upside),
+          cell: (r) => level(r.item.reference_levels?.upside),
+        },
+        {
+          id: "downside",
+          header: t("reco_col_downside"),
+          type: "num",
+          sortable: true,
+          sortValue: (r) => toNumber(r.item.reference_levels?.downside),
+          cell: (r) => level(r.item.reference_levels?.downside),
+        },
+        {
+          id: "shariah",
+          header: t("reco_col_shariah"),
+          sortable: true,
+          sortValue: (r) => r.item.shariah?.verdict ?? null,
+          cell: (r) => <ShariahPair shariah={r.item.shariah} />,
+        },
+      ],
+      narrow,
+    );
+  }, [t, locale, rules, narrow]);
+
+  const stanceOptions = STANCE_FILTERS.map((value) => ({
+    value,
+    label:
+      value === "all"
+        ? t("reco_filter_all")
+        : `${t(value === "buy" ? "stance_buy" : value === "hold" ? "stance_hold" : "stance_reduce")} ${fmtInt(locale, counts[value])}`,
+  }));
+
+  const asOf = fmtDate(locale, market?.as_of);
+  const meta = [
+    countText(t, locale, rows.length, "stocks_count"),
+    asOf ? t("prices_as_of_short", { date: asOf }) : null,
+    rules ? t("rules_label", { rules }) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(" · ");
+
+  const empty = filtersActive ? (
+    <NoMatch things={t("reco_things")} onClear={clearFilters} />
+  ) : (
+    <EmptyState>{t("reco_empty")}</EmptyState>
   );
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>{t("reco_title")}</h1>
-        <p>{t("reco_subtitle")}</p>
-      </div>
+    <div className="page">
+      <PageTitle parts={[t("reco_title")]} />
+      <PageHeader title={t("reco_title")} subtitle={t("reco_subtitle")} />
 
       <div className="filters">
-        <label className="filter-checkbox">
+        <Segmented
+          label={t("reco_filter_label")}
+          options={stanceOptions}
+          value={stanceFilter}
+          onChange={(value) => update({ stance: value === "all" ? null : value })}
+        />
+        <label>
           <input
             type="checkbox"
             checked={shariahOnly}
-            onChange={(e) => setShariahOnly(e.target.checked)}
-          />{" "}
+            onChange={(e) => update({ egx33: e.target.checked ? "1" : null })}
+          />
           {t("reco_shariah_only")}
         </label>
-        <select
-          className="filter-select"
-          aria-label={t("reco_filter_label")}
-          value={stanceFilter}
-          onChange={(e) => setStanceFilter(e.target.value as StanceFilter)}
-        >
-          {STANCE_FILTERS.map((value) => (
-            <option key={value} value={value}>
-              {value === "all" ? t("reco_filter_all") : t(STANCE_KEY[value])}
-            </option>
-          ))}
-        </select>
+        <input
+          type="search"
+          className="filter-input"
+          aria-label={t("reco_filter_text")}
+          placeholder={t("reco_filter_text")}
+          value={text}
+          onChange={(e) => update({ q: e.target.value })}
+        />
       </div>
 
-      {isLoading && <div className="loading">{t("loading")}</div>}
-      {error && (
-        <div className="alert alert-error">
-          {t("load_error")}{" "}
-          <button className="link-btn" onClick={() => refetch()}>
-            ↻
-          </button>
-        </div>
-      )}
-
-      {data && rows.length === 0 && <div className="empty">{t("reco_empty")}</div>}
-
-      {data && rows.length > 0 && (
-        <div className="table-container">
-          <table className="radar-table">
-            <thead>
-              <tr>
-                {sortHeader("ticker", t("reco_col_stock"))}
-                {sortHeader("stance", t("signals_stance"))}
-                {sortHeader("scoreValue", t("signals_score"))}
-                {sortHeader("confidence", t("signals_confidence"))}
-                <th>{t("reco_col_price")}</th>
-                <th>{t("level_upside")}</th>
-                <th>{t("level_downside")}</th>
-                <th>{t("reco_col_shariah")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.company_id}>
-                  <td>
-                    <Link to={`/companies/${row.ticker}/price`} className="ticker-link">
-                      {row.ticker}
-                    </Link>
-                    <div className="radar-name">{row.name}</div>
-                    {row.low_liquidity && (
-                      <span className="radar-liquidity-low" title={t("low_liquidity_title")}>
-                        ⚠ {t("low_liquidity")}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {row.stance ? (
-                      <span className={`radar-stance radar-stance-${row.stance}`}>
-                        {STANCE_SHAPES[row.stance]} {t(STANCE_KEY[row.stance])}
-                      </span>
-                    ) : (
-                      <Missing label="stance unavailable" />
-                    )}
-                  </td>
-                  <td className="num" dir="ltr">
-                    {row.score ?? <Missing label="no engine produced an input" />}
-                  </td>
-                  <td className="num" dir="ltr">
-                    {row.confidence ?? <Missing label="no confidence" />}
-                  </td>
-                  <td className="num" dir="ltr">
-                    {num(row.price)}
-                  </td>
-                  <td className="num" dir="ltr">
-                    {row.reference_levels ? num(row.reference_levels.upside) : <Missing label="no ATR" />}
-                  </td>
-                  <td className="num" dir="ltr">
-                    {row.reference_levels ? num(row.reference_levels.downside) : <Missing label="no ATR" />}
-                  </td>
-                  <td>
-                    <ShariahCell shariah={row.shariah} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {data && (
-        <>
-          <p className="muted">{t("reco_levels_note")}</p>
-          <p className="muted" dir="ltr">
-            {data.rules_version} · {t("not_investment_advice")}
-          </p>
-        </>
+      {error ? (
+        <ErrorState thing={t("reco_thing_loading")} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.item.company_id}
+          caption={t("reco_title")}
+          loading={isLoading}
+          loadingThing={t("reco_thing_loading")}
+          meta={meta}
+          empty={empty}
+          defaultSort={{ id: "rank", dir: "asc" }}
+          cardFields={["stance", "confidence", "price", "shariah"]}
+          rowHref={(r) => `/companies/${r.item.ticker}/price`}
+          footnote={
+            <>
+              {t("reco_levels_note")} {t("reco_confidence_note")} {t("reco_composite_note")}{" "}
+              {t("not_investment_advice")}
+            </>
+          }
+        />
       )}
     </div>
-  );
-}
-
-function Missing({ label }: { label: string }) {
-  return (
-    <span className="radar-missing" title={`INSUFFICIENT_DATA — ${label}`}>
-      —
-    </span>
-  );
-}
-
-/** EGX33 membership and our own verdict, shown side by side and never merged. */
-export function ShariahCell({ shariah }: { shariah: ShariahStatus | null }) {
-  const { t } = useLang();
-  if (!shariah) return <Missing label="shariah status unavailable" />;
-  const ours =
-    shariah.verdict === "COMPLIANT" ? (
-      <span className="radar-shariah radar-shariah-ok">✓ {t("shariah_compliant")}</span>
-    ) : shariah.verdict === "NON_COMPLIANT" ? (
-      <span className="radar-shariah radar-shariah-non">✕ {t("shariah_non_compliant")}</span>
-    ) : null;
-  const egx33 =
-    shariah.egx33 === "member" ? (
-      <span
-        className="radar-shariah radar-shariah-ok"
-        title={`${t("shariah_egx33_badge_title")} · ${shariah.egx33_review_cycle ?? ""}`}
-      >
-        ☪ {t("shariah_egx33_badge")}
-      </span>
-    ) : null;
-  if (!ours && !egx33) {
-    return <Missing label={shariah.note ?? t("shariah_not_screened")} />;
-  }
-  return (
-    <span className="radar-shariah-stack">
-      {egx33}
-      {ours}
-    </span>
   );
 }

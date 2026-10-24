@@ -7,7 +7,7 @@ export interface SegmentedOption<V extends string> {
   lang?: string;
 }
 
-/** Radio-group segmented control, 32px tall (spec 3.10). */
+/** Radio-group segmented control, control-h tall (spec 3.10). */
 export function Segmented<V extends string>({
   options,
   value,

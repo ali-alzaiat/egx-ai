@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { Notice } from "../../components/ui/Notice";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { PageTitle } from "../../components/ui/PageTitle";
@@ -13,9 +13,14 @@ const SECTIONS: readonly { path: string; key: CopyKey }[] = [
   { path: "thesis", key: "admin_thesis" },
 ];
 
+// Per-company sections keep the picked company when switching between them.
+const COMPANY_SECTIONS: ReadonlySet<string> = new Set(["disclosures", "peers", "thesis"]);
+
 /** `/admin` shell (spec 1.5): header, write-warning notice, route-based sub-navigation. */
 export default function AdminLayout() {
   const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const ticker = params.get("ticker");
   const { t } = useLang();
   const segment = pathname.replace(/\/+$/, "").split("/")[2] ?? "";
   const section = SECTIONS.find((s) => s.path === segment);
@@ -31,7 +36,7 @@ export default function AdminLayout() {
         {SECTIONS.map((s) => (
           <Link
             key={s.path}
-            to={`/admin/${s.path}`}
+            to={`/admin/${s.path}${ticker && COMPANY_SECTIONS.has(s.path) ? `?ticker=${encodeURIComponent(ticker)}` : ""}`}
             className="tab-link"
             aria-current={s.path === segment ? "page" : undefined}
           >

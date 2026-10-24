@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** h1 at --fs-h2, optional one-sentence subtitle, optional actions at inline-end (spec 3.2). */
+/** h1 at --fs-h1 (--fs-h2 on phone), optional one-sentence subtitle, optional actions at inline-end (spec 3.2). */
 export function PageHeader({
   title,
   subtitle,

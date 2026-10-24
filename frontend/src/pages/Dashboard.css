@@ -1,1 +1,10 @@
-/* Dashboard specific styles */
+/* Dashboard layout only: the two tables stack, then sit side by side from 1280px. */
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+.dash-grid > section { min-width: 0; }
+@media (min-width: 1280px) {
+  .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

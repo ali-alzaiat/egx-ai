@@ -12,7 +12,7 @@ export interface StatItem {
   numeric?: boolean;
 }
 
-/** Items separated by inline dividers; 2-column grid on small screens (spec 3.5). No cards, no icons. */
+/** Stat tiles (label over value); 2-column grid on small screens (spec 3.5, friendly look). No hover lift, no icons. */
 export function StatStrip({ items, label }: { items: readonly StatItem[]; label?: string }) {
   return (
     <ul className="stat-strip" aria-label={label}>
