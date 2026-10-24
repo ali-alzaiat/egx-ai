@@ -1,0 +1,77 @@
+import type { CopyEntry } from "./types";
+
+/** Admin area: filings intake. */
+export const ADMIN_COPY = {
+  intake_title: { en: "Official filings intake", ar: "إدخال القوائم المالية الرسمية" },
+  intake_subtitle: {
+    en: "EGX33 Shariah members and the 30 most-traded companies. Copy each value from the official filing with its page number; filings replace provisional vendor data.",
+    ar: "أعضاء مؤشر EGX33 الشرعي وأكثر 30 شركة تداولاً. انسخ كل قيمة من القوائم الرسمية مع رقم الصفحة؛ القوائم الرسمية تحل محل بيانات المزوّد المؤقتة.",
+  },
+  intake_status_missing: { en: "Missing", ar: "غير متوفر" },
+  intake_status_vendor_only: { en: "Provisional only", ar: "مؤقت فقط" },
+  intake_status_filed: { en: "Filed", ar: "مُدخل من القوائم" },
+  intake_reason_egx33: { en: "EGX33 Shariah", ar: "EGX33 شرعي" },
+  intake_reason_most_traded: { en: "Most traded", ar: "الأكثر تداولاً" },
+  intake_col_company: { en: "Company", ar: "الشركة" },
+  intake_col_status: { en: "Status", ar: "الحالة" },
+  intake_col_target: { en: "Target year", ar: "السنة المستهدفة" },
+  intake_col_filed: { en: "Filed years", ar: "سنوات مُدخلة" },
+  intake_col_vendor: { en: "Provisional years", ar: "سنوات مؤقتة" },
+  intake_disclosures: { en: "EGX disclosures", ar: "إفصاحات البورصة" },
+  intake_enter: { en: "Enter filing", ar: "إدخال القوائم" },
+  intake_form_title: { en: "Enter an official filing", ar: "إدخال قوائم مالية رسمية" },
+  intake_fiscal_year: { en: "Fiscal year", ar: "السنة المالية" },
+  intake_period_end: { en: "Period end", ar: "نهاية الفترة" },
+  intake_document_url: { en: "Filing URL", ar: "رابط القوائم" },
+  intake_publication_date: { en: "Publication date", ar: "تاريخ النشر" },
+  intake_currency: { en: "Currency", ar: "العملة" },
+  intake_value: { en: "Value (full units)", ar: "القيمة (بالوحدات الكاملة)" },
+  intake_page: { en: "Page", ar: "الصفحة" },
+  intake_submit: { en: "Save filing", ar: "حفظ القوائم" },
+  intake_saving: { en: "Saving…", ar: "جارٍ الحفظ…" },
+  intake_need_page: {
+    en: "Every value needs the page it was copied from.",
+    ar: "كل قيمة تحتاج رقم الصفحة المنسوخة منها.",
+  },
+  intake_result: { en: "Validation result", ar: "نتيجة التحقق" },
+  // ---- Admin shell ----
+  admin_title: { en: "Admin", ar: "الإدارة" },
+  admin_notice: {
+    en: "Maintenance and data-entry tools. Actions here write to the database.",
+    ar: "أدوات الصيانة وإدخال البيانات. الإجراءات هنا تكتب في قاعدة البيانات.",
+  },
+  admin_sections_aria: { en: "Admin sections", ar: "أقسام الإدارة" },
+  admin_market: { en: "Market data", ar: "بيانات السوق" },
+  admin_disclosures: { en: "Disclosures", ar: "الإفصاحات" },
+  admin_peers: { en: "Peer lists", ar: "قوائم الشركات المماثلة" },
+  admin_thesis: { en: "Thesis updates", ar: "تحديثات الفرضية" },
+  admin_pick_company: {
+    en: "Pick a company to open this section.",
+    ar: "اختر شركة لفتح هذا القسم.",
+  },
+  admin_section_pending: {
+    en: "The tools for this section move here from the company page in a later step. Until then they remain on the company page.",
+    ar: "ستنتقل أدوات هذا القسم إلى هنا من صفحة الشركة في خطوة لاحقة. حتى ذلك الحين تبقى في صفحة الشركة.",
+  },
+  admin_open_company: { en: "Open company page", ar: "فتح صفحة الشركة" },
+  admin_market_intro: {
+    en: "Refreshes the company list, end-of-day prices and data-quality scores from the configured source.",
+    ar: "يحدّث قائمة الشركات وأسعار نهاية اليوم ودرجات جودة البيانات من المصدر المُعدّ.",
+  },
+  admin_refresh: { en: "Refresh market data", ar: "تحديث بيانات السوق" },
+  admin_refreshing: { en: "Refreshing…", ar: "جارٍ التحديث…" },
+  admin_refresh_universe: { en: "Refreshing company list…", ar: "جارٍ تحديث قائمة الشركات…" },
+  admin_refresh_prices: { en: "Fetching prices {done}/{total}…", ar: "جارٍ جلب الأسعار {done}/{total}…" },
+  admin_refresh_prices_plain: { en: "Fetching prices…", ar: "جارٍ جلب الأسعار…" },
+  admin_refresh_assessment: { en: "Scoring data quality…", ar: "جارٍ تقييم جودة البيانات…" },
+  admin_refresh_done: {
+    en: "Refresh complete: {records} price records, {scores} quality scores.",
+    ar: "اكتمل التحديث: {records} سجل سعر و{scores} درجة جودة.",
+  },
+  admin_refresh_partial: {
+    en: "Some tickers failed ({count}). Details are in the browser console.",
+    ar: "فشل جلب بعض الرموز ({count}). التفاصيل في وحدة تحكم المتصفح.",
+  },
+  admin_refresh_failed: { en: "Refresh failed: {error}", ar: "فشل التحديث: {error}" },
+  admin_refresh_unknown_error: { en: "unknown error", ar: "خطأ غير معروف" },
+} as const satisfies Record<string, CopyEntry>;

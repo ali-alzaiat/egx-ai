@@ -48,7 +48,7 @@ export default function FilingsIntake() {
   return (
     <div>
       <div className="page-header">
-        <h1>{t("intake_title")}</h1>
+        <h2>{t("intake_title")}</h2>
         <p>{t("intake_subtitle")}</p>
       </div>
       {isLoading && <div className="loading">{t("loading")}</div>}
@@ -80,7 +80,7 @@ export default function FilingsIntake() {
               {data.items.map((item) => (
                 <tr key={item.company_id}>
                   <td>
-                    <Link to={`/companies/${item.ticker}/statements`} className="ticker-link">
+                    <Link to={`/companies/${item.ticker}/financials`} className="ticker-link">
                       {item.ticker}
                     </Link>
                     <div className="radar-name">{item.name}</div>

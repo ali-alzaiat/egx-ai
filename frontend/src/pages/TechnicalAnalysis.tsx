@@ -5,7 +5,6 @@ import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCompanyByTicker, useCompanyPrices, useTechnicalIndicators, calculateIndicators } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 
 // Indicators are calculated from the stored price history the app already
 // holds — the user never pastes prices by hand (F4).
@@ -79,7 +78,7 @@ export default function TechnicalAnalysis() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Technical Analysis — {company.ticker}</h1>
+          <h2>Technical Analysis — {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
         <button
@@ -91,7 +90,6 @@ export default function TechnicalAnalysis() {
         </button>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       {pricesLoading && <div className="loading">Loading price history...</div>}
       {!pricesLoading && series.closes.length === 0 && (

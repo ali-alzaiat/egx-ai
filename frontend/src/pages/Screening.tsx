@@ -75,7 +75,7 @@ export default function Screening() {
                       <td>
                         {company ? (
                           <Link
-                            to={`/companies/${company.ticker}/screening`}
+                            to={`/companies/${company.ticker}/shariah`}
                             className="ticker-link"
                           >
                             {company.ticker}

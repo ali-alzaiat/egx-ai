@@ -5,7 +5,6 @@ import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateValuations, useCompanyByTicker, useFairValue, useValuations } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 import FairValueCard from '../components/FairValueCard'
 import SensitivityTable from '../components/SensitivityTable'
 import type { CompanyValuation } from '../types'
@@ -120,7 +119,7 @@ export default function Valuation() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Valuation - {company.ticker}</h1>
+          <h2>Valuation - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
         <button className="btn btn-primary" onClick={handleCalculate} disabled={running}>
@@ -128,7 +127,6 @@ export default function Valuation() {
         </button>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       <div className="valuation-info">
         <p>

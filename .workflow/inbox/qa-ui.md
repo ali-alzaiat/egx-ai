@@ -1,4 +1,18 @@
 # Inbox: qa-ui
 
-From: router (baseline before redesign, Claude Code runtime) · 2026-10-23
-Task: Baseline functional audit of EVERY screen, in English and in Arabic (RTL), before the UI revamp. Start the UI with `mcp__Claude_Browser__preview_start` name `frontend` (it proxies /api to the running backend on :8000 with the API token). Routes (from `frontend/src/App.tsx`): /, /recommendations, /intake, /companies, /rankings, /screening, /watchlists, /alerts, /events, and for a company with real data (use COMI and AMOC) every tab: /companies/:ticker, /financials, /metrics, /screening, /valuation, /technical, /ai, /score, /peers, /thesis, /disclosures, /signals, /statements, /ratios. For each screen record: HTTP errors (read_network_requests), console errors (read_console_messages, errors only), broken/empty states that should have data, untranslated English left in Arabic mode, RTL layout breaks (mirroring, numbers, tables), overflow at mobile width (resize_window preset mobile, then reset to desktop). Switch language with the sidebar language button. Do NOT submit any form that writes to the database. Also run the gates: `cd frontend && npx tsc -b && npm run lint && npx vitest run && npm run build`. Report a findings table (screen, lang, severity, evidence) — evidence only, no opinions. End NEXT: tech-lead | BLOCKED: <question> | DONE.
+From: router · 2026-10-24
+Task: QA the FE-1 foundation only (shell, tokens, shared ui/ components, hub routing, /admin shell). Page bodies are NOT migrated yet (lanes A/B/C come next), so English inside unmigrated page bodies and backend 500s from `/api/stance/*` (R43 backend WIP) are out of scope; note them in one line, don't itemize.
+
+Spec: `.workflow/design/ui-redesign-2026-10.md` §1 (IA, routes, sidebar, narrow screens, hub, admin), §2 (tokens, themes, Arabic), §3.1–3.9, §6 (RTL), §9 checks 1, 2, 7 (focus rings), 8, 9.
+
+Check, in EN and AR, at 1280 and 375 px (reset to desktop after):
+- Every top-level route and the 7 hub tabs for COMI: renders, no console errors from frontend code, no horizontal overflow (`scrollWidth === innerWidth`).
+- Old tab paths and `/intake` redirect per §1.1; `/companies/COMI/ai` shows Not found; unknown ticker shows Not found.
+- Mobile: menu drawer opens/closes (Esc, backdrop), search overlay works, language and theme toggles reachable.
+- RTL: sidebar on the right, icons/chevrons mirrored, numbers Western digits, `dir`/`lang` on `<html>` switch.
+- Dark theme: toggle works, no unreadable text in the shell.
+- Keyboard: Tab through shell and search, focus visible; `/` or the spec's shortcut opens search if specified.
+
+Start the UI with `preview_start` name `frontend` (proxies to the backend on :8000). Do not submit forms. Gates: `cd frontend && npx tsc -b; npm run lint; npx vitest run; npm run build` (last 3 lines each).
+
+Deliverable: `.workflow/research/qa-fe1-2026-10-24.md` — findings table (route, lang, width, severity, evidence, file:line if known). Evidence only. End with NEXT: staff-frontend (if findings) | DONE.

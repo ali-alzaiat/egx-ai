@@ -7,13 +7,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { t, type CopyKey, type Lang } from "./dict";
+import { t, type CopyKey, type CopyParams, type Lang } from "./dict";
 
 type LangContextValue = {
   lang: Lang;
   setLang: (l: Lang) => void;
   /** Translate a copy key into the current language. */
-  t: (key: CopyKey) => string;
+  t: (key: CopyKey, params?: CopyParams) => string;
   /** HTML locale string for Intl formatting ("ar-EG" or "en"), always Latin digits. */
   locale: string;
 };
@@ -48,7 +48,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
     () => ({
       lang,
       setLang,
-      t: (key: CopyKey) => t(key, lang),
+      t: (key: CopyKey, params?: CopyParams) => t(key, lang, params),
       // Latin digits in Arabic: EGX figures are conventionally Western digits,
       // and mixing Arabic-Indic digits with API "1234.56" strings would be chaos.
       locale: lang === "ar" ? "ar-EG-u-nu-latn" : "en",

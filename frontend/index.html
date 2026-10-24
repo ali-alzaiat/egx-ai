@@ -4,7 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EGX AI - Stock Analysis & Shariah Screening</title>
+    <title>EGX AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" />
+    <script>
+      // Apply stored theme and language before React mounts so the page never flashes.
+      try {
+        var d = document.documentElement;
+        var th = localStorage.getItem("egx-theme");
+        if (th === "light" || th === "dark") d.setAttribute("data-theme", th);
+        if (localStorage.getItem("egx-lang") === "ar") { d.lang = "ar"; d.dir = "rtl"; }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

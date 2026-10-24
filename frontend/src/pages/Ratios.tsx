@@ -1,9 +1,8 @@
 import { useParams } from "react-router-dom";
-import CompanyTabs from "../components/CompanyTabs";
 import { useRatios } from "../api/client";
 import { useLang } from "../i18n/useLang";
 import type { CopyKey } from "../i18n";
-import { fmtNum, fmtPct } from "../i18n/format";
+import { fmtNum, fmtPct } from "../lib/format";
 import type { RatioResult } from "../types";
 
 const PERCENT_RATIOS = new Set([
@@ -24,8 +23,7 @@ export default function Ratios() {
 
   return (
     <div className="page">
-      <CompanyTabs ticker={tk} />
-      <h1>{t("ratios_title")}</h1>
+      <h2>{t("ratios_title")}</h2>
       {isLoading && <p>{t("loading")}</p>}
       {error && <p>{t("load_error")}</p>}
       {data && data.ratios.length === 0 && <p>{t("ratios_empty")}</p>}
@@ -49,7 +47,7 @@ export default function Ratios() {
                   {r.value === null
                     ? t("no_value")
                     : isPct
-                      ? fmtPct(locale, r.value)
+                      ? (fmtPct(locale, r.value) ?? t("no_value"))
                       : fmtNum(locale, r.value, { maximumFractionDigits: 4 })}
                 </td>
                 <td>

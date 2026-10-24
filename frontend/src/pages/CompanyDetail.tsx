@@ -1,49 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  startMarketRefresh,
-  useCompanyByTicker,
-  useCompanyPrices,
-  useLatestPrice,
-  useSyncStatus,
-} from '../api/client'
+import { useCompanyByTicker, useCompanyPrices, useLatestPrice } from '../api/client'
 import { formatAsOf, formatPrice, formatVolume } from '../lib/format'
-import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
-import DataQualityCard from '../components/DataQualityCard'
-import type { SyncJobStatus } from '../types'
 
-const REFRESH_KEYS = [
-  ['dataQuality'],
-  ['signals'],
-  ['prices'],
-  ['latestPrice'],
-  ['dataSources'],
-] as const
-
-function liveStatusLine(job: SyncJobStatus | undefined): string {
-  if (!job || job.status === 'idle') return 'Refreshing…'
-  if (job.status === 'accepted') return 'Refreshing…'
-  switch (job.phase) {
-    case 'universe':
-      return 'Refreshing company list…'
-    case 'prices':
-      return job.progress
-        ? `Fetching prices ${job.progress.completed}/${job.progress.total}…`
-        : 'Fetching prices…'
-    case 'assessment':
-      return 'Scoring data quality…'
-    default:
-      return 'Refreshing…'
-  }
-}
-
+/**
+ * Hub Overview (interim). The hub layout route owns the header, tabs, company
+ * validation and the data-quality card (now under Financials); "Refresh market
+ * data" moved to Admin. The Overview rebuild comes with the hub-tabs lane.
+ */
 export default function CompanyDetail() {
   const { ticker } = useParams<{ ticker: string }>()
-  const queryClient = useQueryClient()
-  const { data: company, isLoading: loadingCompany, error: errorCompany } = useCompanyByTicker(ticker)
-
+  const { data: company } = useCompanyByTicker(ticker)
   const { data: latestPrice, isLoading: loadingLatest } = useLatestPrice(company?.id)
 
   const oneYearAgo = new Date()
@@ -61,52 +28,7 @@ export default function CompanyDetail() {
     page: pricePage,
   })
 
-  // ─── Market refresh (R16, runSignals pattern) ───
-  const [refreshing, setRefreshing] = useState(false)
-  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
-  const [refreshErr, setRefreshErr] = useState<string | null>(null)
-  const syncQuery = useSyncStatus()
-  const syncJob = syncQuery.data
-
-  useEffect(() => {
-    if (!refreshing) return
-    const status = syncJob?.status
-    if (status !== 'done' && status !== 'partial' && status !== 'failed') return
-    for (const key of REFRESH_KEYS) {
-      void queryClient.invalidateQueries({ queryKey: [...key] })
-    }
-    if (status === 'failed') {
-      setRefreshErr(`Refresh failed: ${syncJob?.error ?? 'unknown error'}`)
-    } else {
-      const records = syncJob?.prices?.records_written ?? 0
-      const scores = syncJob?.assessment?.scores_written ?? 0
-      let msg = `Refresh complete — ${records} price records, ${scores} quality scores.`
-      if (status === 'partial') {
-        msg += ` Some tickers failed (${syncJob?.prices?.failed_count ?? 0}) — details in the browser console.`
-        console.warn('Market refresh partial failure:', syncJob?.prices?.failed_tickers)
-      }
-      setRefreshMsg(msg)
-      window.setTimeout(() => setRefreshMsg(null), 4000)
-    }
-    setRefreshing(false)
-  }, [refreshing, syncJob, queryClient])
-
-  const handleRefresh = async (): Promise<void> => {
-    setRefreshing(true)
-    setRefreshErr(null)
-    setRefreshMsg(null)
-    try {
-      // 409 adopts the live job instead of throwing — poll it either way.
-      await startMarketRefresh()
-      await syncQuery.refetch()
-    } catch (err) {
-      setRefreshing(false)
-      setRefreshErr(`Refresh failed: ${err instanceof Error ? err.message : 'unknown error'}`)
-    }
-  }
-
-  if (loadingCompany) return <div className="loading">Loading company...</div>
-  if (errorCompany || !company) return <CompanyNotFound ticker={ticker} />
+  if (!company) return null
 
   const prices = pricesData?.items ?? []
   const visiblePrices = prices.filter(
@@ -116,29 +38,6 @@ export default function CompanyDetail() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>{company.ticker} — {company.name}</h1>
-          {company.name_ar && <p className="subtitle">{company.name_ar}</p>}
-        </div>
-        <div>
-          <button className="btn btn-secondary" onClick={handleRefresh} disabled={refreshing}>
-            {refreshing ? 'Refreshing…' : 'Refresh market data'}
-          </button>
-          {refreshing && (
-            <p role="status" className="muted">{liveStatusLine(syncJob)}</p>
-          )}
-          {refreshMsg && (
-            <p role="status" className="muted">{refreshMsg}</p>
-          )}
-        </div>
-      </div>
-      {refreshErr && <div className="alert alert-error">{refreshErr}</div>}
-
-      <CompanyTabs ticker={company.ticker} />
-
-      <DataQualityCard companyId={company.id} />
-
       <div className="card-grid">
         <div className="card">
           <div className="card-label">Latest Close</div>
@@ -179,22 +78,22 @@ export default function CompanyDetail() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Open</th>
-                  <th>High</th>
-                  <th>Low</th>
-                  <th>Close</th>
-                  <th>Volume</th>
+                  <th className="num">Open</th>
+                  <th className="num">High</th>
+                  <th className="num">Low</th>
+                  <th className="num">Close</th>
+                  <th className="num">Volume</th>
                 </tr>
               </thead>
               <tbody>
                 {visiblePrices.map((price) => (
                   <tr key={price.id}>
                     <td>{price.date}</td>
-                    <td>{formatPrice(price.open)}</td>
-                    <td>{formatPrice(price.high)}</td>
-                    <td>{formatPrice(price.low)}</td>
-                    <td>{formatPrice(price.close)}</td>
-                    <td>{formatVolume(price.volume)}</td>
+                    <td className="num" dir="ltr">{formatPrice(price.open)}</td>
+                    <td className="num" dir="ltr">{formatPrice(price.high)}</td>
+                    <td className="num" dir="ltr">{formatPrice(price.low)}</td>
+                    <td className="num" dir="ltr">{formatPrice(price.close)}</td>
+                    <td className="num" dir="ltr">{formatVolume(price.volume)}</td>
                   </tr>
                 ))}
               </tbody>

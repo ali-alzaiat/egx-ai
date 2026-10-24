@@ -5,7 +5,6 @@ import { useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { calculateMetrics, useCompanyByTicker, useCompanyMetrics } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 import type { FinancialMetric } from '../types'
 
 function MetricValue({ metric }: { metric: FinancialMetric }) {
@@ -113,11 +112,10 @@ export default function FinancialMetrics() {
       <div className="page">
         <div className="page-header">
           <div>
-            <h1>Financial Metrics - {company.ticker}</h1>
+            <h2>Financial Metrics - {company.ticker}</h2>
             <p className="subtitle">{company.name}</p>
           </div>
         </div>
-        <CompanyTabs ticker={company.ticker} />
         <div className="alert alert-error">
           Couldn't load metrics.{' '}
           <button className="link-btn" onClick={() => refetch()}>
@@ -143,7 +141,7 @@ export default function FinancialMetrics() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Financial Metrics - {company.ticker}</h1>
+          <h2>Financial Metrics - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
         <button className="btn btn-primary" onClick={handleCalculate} disabled={running}>
@@ -151,7 +149,6 @@ export default function FinancialMetrics() {
         </button>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       {toast && (
         <p role="status" className="muted">{toast}</p>

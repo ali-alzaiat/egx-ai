@@ -360,7 +360,7 @@ export default function Disclosures() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Disclosures - {company.ticker}</h1>
+          <h2>Disclosures - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
           <p className="muted">
             Analyst surface: registry mirrors analyst-supplied sources — nothing is crawled.
