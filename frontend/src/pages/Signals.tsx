@@ -1,9 +1,8 @@
 import { useParams } from "react-router-dom";
-import CompanyTabs from "../components/CompanyTabs";
 import { useStance } from "../api/client";
 import { useLang } from "../i18n/useLang";
 import type { CopyKey } from "../i18n";
-import { fmtNum } from "../i18n/format";
+import { fmtNum } from "../lib/format";
 import type { ShariahStatus, TargetLevel } from "../types";
 
 const UNSPECIFIED_LEVEL: TargetLevel = {
@@ -95,8 +94,7 @@ export default function Signals() {
 
   return (
     <div className="page">
-      <CompanyTabs ticker={tk} />
-      <h1>{t("signals_title")}</h1>
+      <h2>{t("signals_title")}</h2>
       {isLoading && <p>{t("loading")}</p>}
       {error && <p>{t("load_error")}</p>}
       {data && (

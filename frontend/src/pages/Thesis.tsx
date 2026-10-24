@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { assessThesis, updateThesis, useCompanyByTicker, useThesis } from '../api/client'
 import { formatAsOf } from '../lib/format'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 import type {
   ThesisAssessment,
   ThesisCatalyst,
@@ -640,12 +639,11 @@ export default function Thesis() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Investment Thesis - {company.ticker}</h1>
+          <h2>Investment Thesis - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       {thesisError ? (
         <div className="alert alert-error">

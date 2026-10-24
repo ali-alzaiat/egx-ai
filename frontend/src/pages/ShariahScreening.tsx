@@ -14,7 +14,6 @@ import {
 } from '../api/client'
 import { formatAsOf } from '../lib/format'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 
 // ─── Local shapes (shared types/index.ts is router-owned; do not extend it) ───
 // Backend GET …/companies/{id} also returns report_date/report_date_reason/
@@ -200,7 +199,7 @@ export default function ShariahScreening() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Shariah Screening - {company.ticker}</h1>
+          <h2>Shariah Screening - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
         <button className="btn btn-primary" onClick={handleScreen} disabled={running}>
@@ -208,7 +207,6 @@ export default function ShariahScreening() {
         </button>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       <div className="screening-info">
         <p>

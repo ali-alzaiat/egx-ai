@@ -1,0 +1,116 @@
+/*
+ * Design tokens (ui-redesign-2026-10 section 2). Fonts load from index.html
+ * (<link>), never from a CSS @import.
+ */
+
+/* ─── Light theme (default) plus shared tokens ──────────────────────── */
+:root {
+  color-scheme: light;
+  /* surfaces */
+  --bg: #f6f6f3; --surface: #ffffff; --surface-2: #efefeb;
+  --border: #dcdcd5; --border-strong: #878a83;
+  /* text */
+  --text: #16181b; --text-2: #474b52; --text-3: #62666e;
+  /* brand + state */
+  --accent: #2a4a7f; --accent-bg: #e9eef6; --accent-ink: #ffffff;
+  --gain: #0a7a3e; --gain-bg: #e8f3ec;
+  --loss: #c1272d; --loss-bg: #fbeaea;
+  --warn: #8a5300; --warn-bg: #fbf1e1;
+  --neutral: #5b6068;
+  --focus: var(--accent);
+  --scrim: rgba(22, 24, 27, 0.4);
+  --shadow-pop: 0 4px 16px rgba(22, 24, 27, 0.12);
+  /* chart series (Okabe-Ito, darkened for 3:1 on white) */
+  --series-1: #0072b2; --series-2: #9a5b00; --series-3: #8e4a75; --series-4: #6b6f76;
+  --chart-grid: var(--border); --chart-axis: var(--text-3); --chart-ref: var(--text-3);
+
+  /* type */
+  --font-ui: "IBM Plex Sans", "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+  --font-code: "IBM Plex Mono", ui-monospace, monospace; /* methodology versions/IDs only */
+  --fs-micro: 11px; --lh-micro: 14px;
+  --fs-meta: 12px; --lh-meta: 16px;
+  --fs-table: 13px; --lh-table: 18px;
+  --fs-ui: 14px; --lh-ui: 20px;
+  --fs-read: 16px; --lh-read: 24px;
+  --fs-h3: 16px; --lh-h3: 22px;
+  --fs-h2: 20px; --lh-h2: 28px;
+  --fs-h1: 24px; --lh-h1: 32px;
+  --fs-figure: 28px; --lh-figure: 32px;
+  --tracking-heading: -0.01em;
+
+  /* space (4px grid) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+  --gutter: 24px;
+
+  /* shape + size */
+  --radius-sm: 4px; /* controls, badges, inputs */
+  --radius-md: 6px; /* panels, table frame, popovers, drawer */
+  --control-h: 32px; --row-h: 32px; --row-h-compact: 28px;
+  --sidebar-w: 224px; --topbar-h: 48px; --content-max: 1440px;
+
+  /* motion + layers */
+  --dur: 120ms; --ease: ease-out;
+  --z-sticky: 10; --z-drawer: 40; --z-popover: 50; --z-toast: 60;
+
+  /*
+   * Legacy aliases for the page stylesheets that migrate page by page
+   * (spec section 10 step 3). Remove each alias when its last user is migrated.
+   */
+  --bg-primary: var(--bg); --bg-secondary: var(--surface-2); --bg-tertiary: var(--surface-2);
+  --bg-card: var(--surface); --bg-card-hover: var(--surface-2); --bg-soft: var(--surface-2);
+  --card-bg: var(--surface); --surface-3: var(--surface-2); --chip-bg: var(--surface-2);
+  --code-bg: var(--surface-2); --track: var(--surface-2);
+  --border-subtle: var(--border);
+  --text-primary: var(--text); --text-secondary: var(--text-2); --text-muted: var(--text-3);
+  --accent-hover: var(--accent);
+  --green: var(--gain); --green-bg: var(--gain-bg); --green-dark: var(--gain);
+  --red: var(--loss); --red-bg: var(--loss-bg); --color-negative: var(--loss);
+  --yellow: var(--warn); --yellow-bg: var(--warn-bg);
+  --amber-soft: var(--warn-bg); --amber-dark: var(--warn); --warning: var(--warn);
+  --blue: var(--accent); --blue-bg: var(--accent-bg); --blue-dark: var(--accent);
+  --font-mono: var(--font-code); --font-sans: var(--font-ui);
+}
+@media (max-width: 767px) {
+  :root { --gutter: 16px; --control-h: 40px; }
+}
+
+/* ─── Dark theme (follows the OS; manual override wins) ─────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1012; --surface: #16171a; --surface-2: #1e2024;
+    --border: #2b2d32; --border-strong: #666a73;
+    --text: #e7e8ea; --text-2: #b3b6bc; --text-3: #8e929a;
+    --accent: #9db7e6; --accent-bg: #1c2433; --accent-ink: #0f1012;
+    --gain: #45c07a; --gain-bg: #14261c;
+    --loss: #f07a72; --loss-bg: #2a1716;
+    --warn: #e3a64a; --warn-bg: #2a2112;
+    --neutral: #a3a7ae;
+    --scrim: rgba(0, 0, 0, 0.6);
+    --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --series-1: #56b4e9; --series-2: #e69f00; --series-3: #cc79a7; --series-4: #9aa0a8;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1012; --surface: #16171a; --surface-2: #1e2024;
+  --border: #2b2d32; --border-strong: #666a73;
+  --text: #e7e8ea; --text-2: #b3b6bc; --text-3: #8e929a;
+  --accent: #9db7e6; --accent-bg: #1c2433; --accent-ink: #0f1012;
+  --gain: #45c07a; --gain-bg: #14261c;
+  --loss: #f07a72; --loss-bg: #2a1716;
+  --warn: #e3a64a; --warn-bg: #2a2112;
+  --neutral: #a3a7ae;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --series-1: #56b4e9; --series-2: #e69f00; --series-3: #cc79a7; --series-4: #9aa0a8;
+}
+
+/* ─── Arabic overrides ──────────────────────────────────────────────── */
+html[lang="ar"] {
+  --font-ui: "IBM Plex Sans Arabic", "IBM Plex Sans", "Noto Sans Arabic", system-ui, sans-serif;
+  --lh-micro: 16px; --lh-meta: 18px; --lh-table: 20px; --lh-ui: 22px; --lh-read: 26px;
+  --lh-h3: 26px; --lh-h2: 32px; --lh-h1: 36px; --lh-figure: 32px;
+  --tracking-heading: 0;
+}

@@ -3,7 +3,6 @@ import "./FinancialData.css";
 import { Link, useParams } from 'react-router-dom'
 import { useCompanyByTicker, useFinancialPeriods, useFinancialFacts } from '../api/client'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 
 export default function FinancialData() {
   const { ticker } = useParams<{ ticker: string }>()
@@ -32,11 +31,10 @@ export default function FinancialData() {
       <div className="page">
         <div className="page-header">
           <div>
-            <h1>Financial Data - {company.ticker}</h1>
+            <h2>Financial Data - {company.ticker}</h2>
             <p className="subtitle">{company.name}</p>
           </div>
         </div>
-        <CompanyTabs ticker={company.ticker} />
         <div className="alert alert-error">
           Couldn't load financial data.{' '}
           <button className="link-btn" onClick={() => refetchPeriods()}>
@@ -57,15 +55,14 @@ export default function FinancialData() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Financial Data - {company.ticker}</h1>
+          <h2>Financial Data - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
-        <Link className="btn btn-secondary" to={`/companies/${company.ticker}/disclosures`}>
+        <Link className="btn btn-secondary" to={`/companies/${company.ticker}/thesis#filings`}>
           Disclosures
         </Link>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       {allEmpty && (
         <div className="empty">

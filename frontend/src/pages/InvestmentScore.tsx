@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { assessScore, useCompanyByTicker, useScore } from '../api/client'
 import { formatAsOf } from '../lib/format'
 import CompanyNotFound from '../components/CompanyNotFound'
-import CompanyTabs from '../components/CompanyTabs'
 import type { ScoreAssessment, ScoreCheck } from '../types'
 
 const COMPONENT_ORDER = ['value', 'past', 'health', 'dividend', 'growth'] as const
@@ -236,7 +235,7 @@ export default function InvestmentScore() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Investment Score - {company.ticker}</h1>
+          <h2>Investment Score - {company.ticker}</h2>
           <p className="subtitle">{company.name}</p>
         </div>
         <button className="btn btn-primary" onClick={handleAssess} disabled={running}>
@@ -244,7 +243,6 @@ export default function InvestmentScore() {
         </button>
       </div>
 
-      <CompanyTabs ticker={company.ticker} />
 
       {runError && (
         <div className="alert alert-error">

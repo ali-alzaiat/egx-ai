@@ -13,7 +13,7 @@ import { Link } from "react-router-dom";
 import { useStanceRadar } from "../api/client";
 import { useLang } from "../i18n/useLang";
 import type { CopyKey } from "../i18n";
-import { fmtNum } from "../i18n/format";
+import { fmtNum } from "../lib/format";
 import type { ShariahStatus, StanceRadarItem } from "../types";
 import { sortRadarRows, type RadarSortDir } from "./companies/radarSort";
 
@@ -140,7 +140,7 @@ export default function Recommendations() {
               {rows.map((row) => (
                 <tr key={row.company_id}>
                   <td>
-                    <Link to={`/companies/${row.ticker}/signals`} className="ticker-link">
+                    <Link to={`/companies/${row.ticker}/price`} className="ticker-link">
                       {row.ticker}
                     </Link>
                     <div className="radar-name">{row.name}</div>
