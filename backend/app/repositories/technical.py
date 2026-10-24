@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,4 +66,23 @@ class TechnicalRepository:
             query = query.where(TechnicalIndicator.indicator_type == indicator_type)
         query = query.order_by(TechnicalIndicator.calculated_at.desc())
         result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def latest_set(self, company_id: uuid.UUID) -> Sequence[TechnicalIndicator]:
+        """Only the most recent computed set (R43: one snapshot per company)."""
+        latest = (
+            await self.session.execute(
+                select(func.max(TechnicalIndicator.calculated_at)).where(
+                    TechnicalIndicator.company_id == company_id
+                )
+            )
+        ).scalar_one_or_none()
+        if latest is None:
+            return []
+        result = await self.session.execute(
+            select(TechnicalIndicator)
+            .where(TechnicalIndicator.company_id == company_id)
+            .where(TechnicalIndicator.calculated_at == latest)
+            .order_by(TechnicalIndicator.indicator_type)
+        )
         return result.scalars().all()

@@ -50,6 +50,9 @@ class StatementLineRead(BaseModel):
     # "filing" (official document) or "vendor" (provisional aggregator data).
     source_tier: str | None = None
     provisional: bool = False
+    # Ontology unit (1.1): "currency", "shares" or "currency_per_share". Readers
+    # format by unit, never by ``currency`` (which is the filing's currency).
+    unit: str = "currency"
 
 
 class PeriodStatements(BaseModel):
@@ -157,6 +160,7 @@ class StatementService:
                 table.append(
                     StatementLineRead(
                         ontology_code=line.code,
+                        unit=line.unit,
                         label_en=line.label_en,
                         label_ar=line.label_ar,
                         value=value,

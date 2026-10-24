@@ -14,6 +14,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, NamedTuple
 
+from app.valuation.constants import EXPLICIT_STAGE_YEARS
+
 
 class ValuationModel(Enum):
     """Supported valuation models."""
@@ -67,6 +69,7 @@ def _two_stage_present_value(
     years_stable: int,
     discount_rate: Decimal,
     terminal_growth_rate: Decimal,
+    terminal_discount_rate: Decimal | None = None,
 ) -> tuple[Decimal, Decimal, Decimal, Decimal] | None:
     """Present value of a 2-stage cash-flow stream plus Gordon terminal value.
 
@@ -74,39 +77,81 @@ def _two_stage_present_value(
     ``growth_stable`` for ``years_stable`` years; the terminal value is a
     Gordon perpetuity on the final projected flow.
 
+    Faded discount rate (valuation 1.2, owner rulings M5 + fade horizon): the
+    first ``years_high`` years are discounted at ``discount_rate``; every later
+    year (the stable stage) and the Gordon capitalisation of the terminal value
+    use ``terminal_discount_rate`` (the long-run cost of equity, on the same
+    inflation horizon as ``terminal_growth_rate``). Discount factors compound
+    across the switch, so year t > years_high carries
+    (1 + discount_rate)^years_high * (1 + terminal_discount_rate)^(t - years_high).
+    ``None`` keeps one rate throughout.
+
     Returns (pv_flows, terminal_value, pv_terminal, enterprise_value),
     or None when the discounting math fails.
     """
+    terminal_rate = terminal_discount_rate if terminal_discount_rate is not None else discount_rate
     pv_flows = Decimal("0")
     projected = base_cash_flow
-    year = 0
+    factor = Decimal("1")
     for _ in range(years_high):
-        year += 1
         projected = projected * (1 + growth_high)
-        pv = _safe_divide(projected, (1 + discount_rate) ** year, precision=8)
+        factor = factor * (1 + discount_rate)
+        pv = _safe_divide(projected, factor, precision=8)
         if pv is None:
             return None
         pv_flows += pv
     for _ in range(years_stable):
-        year += 1
         projected = projected * (1 + growth_stable)
-        pv = _safe_divide(projected, (1 + discount_rate) ** year, precision=8)
+        factor = factor * (1 + terminal_rate)
+        pv = _safe_divide(projected, factor, precision=8)
         if pv is None:
             return None
         pv_flows += pv
 
     terminal_fcf = projected * (1 + terminal_growth_rate)
     terminal_value = _safe_divide(
-        terminal_fcf, discount_rate - terminal_growth_rate, precision=8
+        terminal_fcf, terminal_rate - terminal_growth_rate, precision=8
     )
     if terminal_value is None:
         return None
-    pv_terminal = _safe_divide(
-        terminal_value, (1 + discount_rate) ** year, precision=8
-    )
+    pv_terminal = _safe_divide(terminal_value, factor, precision=8)
     if pv_terminal is None:
         return None
     return (pv_flows, terminal_value, pv_terminal, pv_flows + pv_terminal)
+
+
+def _faded_growing_stream(
+    first_flow: Decimal,
+    terminal_first_flow: Decimal,
+    growth: Decimal,
+    rate: Decimal,
+    terminal_rate: Decimal,
+    years: int,
+) -> Decimal | None:
+    """PV of a growing stream whose terminal value is capitalised at a faded rate.
+
+    Flows ``first_flow * (1 + growth) ** (t - 1)`` for ``t = 1..years`` are
+    discounted at ``rate``. The year ``years + 1`` flow is ``terminal_first_flow``;
+    its Gordon value at ``terminal_rate`` is brought back to today at ``rate`` over
+    the explicit years (same fade as ``_two_stage_present_value``, owner ruling M5).
+    With ``terminal_rate == rate`` and a consistent terminal flow this equals the
+    closed-form perpetuity.
+    """
+    pv = Decimal("0")
+    flow = first_flow
+    for year in range(1, years + 1):
+        term = _safe_divide(flow, (1 + rate) ** year, precision=8)
+        if term is None:
+            return None
+        pv += term
+        flow = flow * (1 + growth)
+    terminal_value = _safe_divide(terminal_first_flow, terminal_rate - growth, precision=8)
+    if terminal_value is None:
+        return None
+    pv_terminal = _safe_divide(terminal_value, (1 + rate) ** years, precision=8)
+    if pv_terminal is None:
+        return None
+    return pv + pv_terminal
 
 
 def calculate_pe_valuation(
@@ -477,15 +522,18 @@ def calculate_fcfe_2stage(
     growth_stable: Decimal | None,
     discount_rate: Decimal | None,
     terminal_growth_rate: Decimal | None,
-    years_high: int = 5,
+    years_high: int = EXPLICIT_STAGE_YEARS,
     years_stable: int = 5,
     shares_outstanding: Decimal | None = None,
+    terminal_discount_rate: Decimal | None = None,
 ) -> ValuationResult:
     """Calculate implied share price with a 2-stage FCFE model (general companies).
 
     Stage 1 compounds FCF at ``growth_high`` for ``years_high`` years, stage 2
-    at ``growth_stable`` for ``years_stable`` years; terminal value is a Gordon
-    perpetuity discounted at ``discount_rate`` (cost of equity).
+    at ``growth_stable`` for ``years_stable`` years; the explicit flows are
+    discounted at ``discount_rate`` (cost of equity) and the Gordon terminal
+    value is capitalised at ``terminal_discount_rate`` (long-run cost of equity;
+    ``None`` = the same rate throughout).
 
     Args:
         free_cash_flow: Current levered free cash flow (never fabricated)
@@ -496,6 +544,7 @@ def calculate_fcfe_2stage(
         years_high: Stage-1 years (default 5)
         years_stable: Stage-2 years (default 5)
         shares_outstanding: Shares outstanding for per-share value
+        terminal_discount_rate: Long-run cost of equity for the terminal value
 
     Returns:
         ValuationResult with implied price and assumptions
@@ -554,6 +603,18 @@ def calculate_fcfe_2stage(
             reason="Discount rate must be greater than terminal growth rate",
         )
 
+    if terminal_discount_rate is not None and terminal_discount_rate <= terminal_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={
+                "terminal_discount_rate": str(terminal_discount_rate),
+                "terminal_growth_rate": str(terminal_growth_rate),
+            },
+            reason="Long-run cost of equity must be greater than terminal growth rate",
+        )
+
     if years_high <= 0 or years_stable <= 0:
         return ValuationResult(
             value=None,
@@ -574,6 +635,7 @@ def calculate_fcfe_2stage(
         years_stable,
         discount_rate,
         terminal_growth_rate,
+        terminal_discount_rate,
     )
     if stages is None:
         return ValuationResult(
@@ -610,6 +672,9 @@ def calculate_fcfe_2stage(
             "growth_stable": str(growth_stable),
             "years_stable": str(years_stable),
             "discount_rate": str(discount_rate),
+            "terminal_discount_rate": (
+                str(terminal_discount_rate) if terminal_discount_rate is not None else None
+            ),
             "terminal_growth_rate": str(terminal_growth_rate),
             "pv_flows": str(pv_flows),
             "terminal_value": str(terminal_value),
@@ -625,16 +690,24 @@ def calculate_ddm(
     expected_dps: Decimal | None,
     discount_rate: Decimal | None,
     perpetual_growth_rate: Decimal | None,
+    terminal_discount_rate: Decimal | None = None,
+    explicit_years: int = EXPLICIT_STAGE_YEARS,
 ) -> ValuationResult:
     """Calculate implied share price with the Gordon Dividend Discount Model.
 
     Formula: Value = Expected DPS / (discount rate - perpetual growth).
     Used for consistent dividend payers and as the fallback intrinsic model.
 
+    With ``terminal_discount_rate`` (owner ruling M5) the first ``explicit_years``
+    dividends are discounted at ``discount_rate`` and the Gordon terminal value is
+    capitalised at the long-run cost of equity, then brought back at ``discount_rate``.
+
     Args:
         expected_dps: Expected dividend per share next period
         discount_rate: Cost of equity
         perpetual_growth_rate: Perpetual dividend growth rate
+        terminal_discount_rate: Long-run cost of equity for the terminal value
+        explicit_years: Explicit-stage years when the fade is used
 
     Returns:
         ValuationResult with implied price and assumptions
@@ -682,9 +755,31 @@ def calculate_ddm(
             reason="Discount rate must be greater than perpetual growth rate",
         )
 
-    value = _safe_divide(
-        expected_dps, discount_rate - perpetual_growth_rate, precision=4
-    )
+    if terminal_discount_rate is not None:
+        if terminal_discount_rate <= perpetual_growth_rate:
+            return ValuationResult(
+                value=None,
+                status=ValuationStatus.INVALID,
+                model=ValuationModel.DDM,
+                assumptions={
+                    "terminal_discount_rate": str(terminal_discount_rate),
+                    "perpetual_growth_rate": str(perpetual_growth_rate),
+                },
+                reason="Long-run cost of equity must be greater than perpetual growth rate",
+            )
+        faded = _faded_growing_stream(
+            expected_dps,
+            expected_dps * (1 + perpetual_growth_rate) ** explicit_years,
+            perpetual_growth_rate,
+            discount_rate,
+            terminal_discount_rate,
+            explicit_years,
+        )
+        value = faded.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP) if faded else None
+    else:
+        value = _safe_divide(
+            expected_dps, discount_rate - perpetual_growth_rate, precision=4
+        )
     if value is None or value <= 0:
         return ValuationResult(
             value=None,
@@ -705,6 +800,9 @@ def calculate_ddm(
             "expected_dps": str(expected_dps),
             "discount_rate": str(discount_rate),
             "perpetual_growth_rate": str(perpetual_growth_rate),
+            "terminal_discount_rate": (
+                str(terminal_discount_rate) if terminal_discount_rate is not None else None
+            ),
             "formula": "Value = Expected DPS / (discount rate - perpetual growth)",
         },
     )
@@ -715,6 +813,8 @@ def calculate_excess_returns(
     stable_roe: Decimal | None,
     cost_of_equity: Decimal | None,
     perpetual_growth_rate: Decimal | None,
+    terminal_discount_rate: Decimal | None = None,
+    explicit_years: int = EXPLICIT_STAGE_YEARS,
 ) -> ValuationResult:
     """Calculate implied share price with the Excess Returns model (banks/insurers).
 
@@ -723,11 +823,19 @@ def calculate_excess_returns(
     Terminal excess is already a present value (perpetuity from today), so no
     further discounting is applied.
 
+    With ``terminal_discount_rate`` (owner ruling M5) the first ``explicit_years``
+    excess returns ``(ROE - CoE) x BV x (1+g)^(t-1)`` are discounted at ``CoE`` and the
+    terminal excess ``(ROE - long-run CoE) x BV x (1+g)^years`` is capitalised at the
+    long-run cost of equity, then brought back to today at ``CoE``. Equal rates give
+    the closed form above.
+
     Args:
         stable_book_value_per_share: Stable book value per share
         stable_roe: Stable return on equity (fraction, e.g. 0.12)
         cost_of_equity: Cost of equity (fraction)
         perpetual_growth_rate: Perpetual growth rate of excess returns
+        terminal_discount_rate: Long-run cost of equity for the terminal excess
+        explicit_years: Explicit-stage years when the fade is used
 
     Returns:
         ValuationResult with implied price and assumptions
@@ -785,9 +893,32 @@ def calculate_excess_returns(
         )
 
     excess = (stable_roe - cost_of_equity) * stable_book_value_per_share
-    terminal_excess = _safe_divide(
-        excess, cost_of_equity - perpetual_growth_rate, precision=8
-    )
+    if terminal_discount_rate is not None:
+        if terminal_discount_rate <= perpetual_growth_rate:
+            return ValuationResult(
+                value=None,
+                status=ValuationStatus.INVALID,
+                model=ValuationModel.EXCESS_RETURNS,
+                assumptions={
+                    "terminal_discount_rate": str(terminal_discount_rate),
+                    "perpetual_growth_rate": str(perpetual_growth_rate),
+                },
+                reason="Long-run cost of equity must be greater than perpetual growth rate",
+            )
+        terminal_excess = _faded_growing_stream(
+            excess,
+            (stable_roe - terminal_discount_rate)
+            * stable_book_value_per_share
+            * (1 + perpetual_growth_rate) ** explicit_years,
+            perpetual_growth_rate,
+            cost_of_equity,
+            terminal_discount_rate,
+            explicit_years,
+        )
+    else:
+        terminal_excess = _safe_divide(
+            excess, cost_of_equity - perpetual_growth_rate, precision=8
+        )
     if terminal_excess is None:
         return ValuationResult(
             value=None,
@@ -823,6 +954,9 @@ def calculate_excess_returns(
             "perpetual_growth_rate": str(perpetual_growth_rate),
             "excess": str(excess),
             "terminal_excess": str(terminal_excess),
+            "terminal_discount_rate": (
+                str(terminal_discount_rate) if terminal_discount_rate is not None else None
+            ),
             "formula": "FV = Stable BV + (Stable ROE - CoE) × Stable BV / (CoE - g)",
         },
     )
@@ -834,10 +968,11 @@ def calculate_affo_2stage(
     growth_stable: Decimal | None,
     discount_rate: Decimal | None,
     terminal_growth_rate: Decimal | None,
-    years_high: int = 5,
+    years_high: int = EXPLICIT_STAGE_YEARS,
     years_stable: int = 5,
     shares_outstanding: Decimal | None = None,
     cash_flow_source: str = "affo",
+    terminal_discount_rate: Decimal | None = None,
 ) -> ValuationResult:
     """Calculate implied share price with a 2-stage AFFO model (REITs/developers).
 
@@ -855,6 +990,8 @@ def calculate_affo_2stage(
         years_stable: Stage-2 years (default 5)
         shares_outstanding: Shares outstanding for per-share value
         cash_flow_source: One of "affo", "ffo", "fcf"
+        terminal_discount_rate: Long-run cost of equity for the terminal value
+            (``None`` = the same rate throughout)
 
     Returns:
         ValuationResult with implied price and assumptions
@@ -922,6 +1059,18 @@ def calculate_affo_2stage(
             reason="Discount rate must be greater than terminal growth rate",
         )
 
+    if terminal_discount_rate is not None and terminal_discount_rate <= terminal_growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.AFFO_2STAGE,
+            assumptions={
+                "terminal_discount_rate": str(terminal_discount_rate),
+                "terminal_growth_rate": str(terminal_growth_rate),
+            },
+            reason="Long-run cost of equity must be greater than terminal growth rate",
+        )
+
     if years_high <= 0 or years_stable <= 0:
         return ValuationResult(
             value=None,
@@ -942,6 +1091,7 @@ def calculate_affo_2stage(
         years_stable,
         discount_rate,
         terminal_growth_rate,
+        terminal_discount_rate,
     )
     if stages is None:
         return ValuationResult(
@@ -979,6 +1129,9 @@ def calculate_affo_2stage(
             "growth_stable": str(growth_stable),
             "years_stable": str(years_stable),
             "discount_rate": str(discount_rate),
+            "terminal_discount_rate": (
+                str(terminal_discount_rate) if terminal_discount_rate is not None else None
+            ),
             "terminal_growth_rate": str(terminal_growth_rate),
             "pv_flows": str(pv_flows),
             "terminal_value": str(terminal_value),

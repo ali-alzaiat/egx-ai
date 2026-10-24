@@ -2,36 +2,22 @@
 
 import re
 import uuid
-from datetime import UTC, date, datetime
-from decimal import Decimal
+from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.financial import FinancialDocument
 from app.repositories.screening import ScreeningRepository
 from app.screening.methodology import DEFAULT_METHODOLOGY
-from app.screening.purification import (
-    NOT_ZAKAT_COPY,
-    PURIFICATION_DOCTRINE,
-    PurificationEstimate,
-    estimate_dividend_purification,
-)
+from app.screening.purification import NOT_ZAKAT_COPY, PURIFICATION_DOCTRINE
 from app.screening.rules import ScreeningVerdict
-from app.screening.service import RuleProvenance, ScreeningInput, ShariahScreeningService
+from app.services.recompute import Engine, RecomputeService, compute_meta
+from app.statements.bridge import DPS_DERIVATION, DPS_LABEL
 
 router = APIRouter(prefix="/api/screening", tags=["screening"])
-
-# Fact labels backing each ratio rule (mirrors POST /screen lookup).
-RULE_FACT_LABELS: dict[str, tuple[str, ...]] = {
-    "debt_ratio": ("total_debt", "total_assets"),
-    "interest_income_ratio": ("interest_income", "revenue"),
-    "cash_securities_ratio": ("cash_and_equivalents", "total_assets"),
-}
 
 # EGX33 runs semi-annual reviews effective February + August (research §3).
 REVIEW_CYCLE_RE = re.compile(r"^\d{4}-(02|08)$")
@@ -47,23 +33,6 @@ EGX33_DISCREPANCY_NOTE = (
 )
 
 
-class PurificationBody(BaseModel):
-    """Dividend-method purification inputs; every field optional.
-
-    The ratio comes only from cited filing inputs — never proxied from other
-    facts. Missing ratio degrades to INSUFFICIENT_DATA (R32 B4).
-    """
-
-    dividend_egp: float | None = None
-    dps: float | None = None
-    shares_held: float | None = None
-    non_permissible_revenue: float | None = None
-    total_revenue: float | None = None
-    ratio_provenance: str | None = None
-    dps_source: str | None = None
-    dps_date: date | None = None
-
-
 class EgxMembershipBody(BaseModel):
     """One dated EGX33 membership catalyst record (Feb/Aug review cycle)."""
 
@@ -72,25 +41,6 @@ class EgxMembershipBody(BaseModel):
     effective_date: date | None = None
     source: str = Field(min_length=1)
     note: str | None = None
-
-
-def _doc_descriptor(doc: FinancialDocument) -> str:
-    """Cite the filing behind a fact (deterministic, human-readable)."""
-    if doc.filing_date is not None:
-        return f"{doc.document_type} filing {doc.filing_date.isoformat()}"
-    return f"{doc.document_type} (filing date unknown)"
-
-
-def _rule_provenance(
-    labels: tuple[str, ...],
-    docs: dict[str, FinancialDocument],
-) -> RuleProvenance | None:
-    """Provenance for one rule: latest filing among its present inputs."""
-    present = [docs[label] for label in labels if label in docs]
-    if not present:
-        return None
-    best = max(present, key=lambda doc: doc.filing_date or date.min)
-    return RuleProvenance(source=_doc_descriptor(best), source_date=best.filing_date)
 
 
 def _rule_payload(rule: Any) -> dict[str, Any]:
@@ -112,73 +62,69 @@ def _rule_payload(rule: Any) -> dict[str, Any]:
     }
 
 
-def _purification_payload(estimate: PurificationEstimate) -> dict[str, Any]:
-    """Serialize an estimate; the amount stays null until a ratio exists."""
-    return {
-        "status": estimate.status.value,
-        "branch": estimate.branch.value,
-        "doctrine": estimate.doctrine,
-        "amount_egp": str(estimate.amount_egp) if estimate.amount_egp is not None else None,
-        "dividend_egp": (
-            str(estimate.dividend_egp) if estimate.dividend_egp is not None else None
-        ),
-        "ratio": str(estimate.ratio) if estimate.ratio is not None else None,
-        "ratio_provenance": estimate.ratio_provenance,
-        "dps": str(estimate.dps) if estimate.dps is not None else None,
-        "dps_source": estimate.dps_source,
-        "dps_date": estimate.dps_date.isoformat() if estimate.dps_date is not None else None,
-        "reason": estimate.reason,
-        "missing_input": estimate.missing_input,
-        "note": estimate.note,
-    }
-
-
-def _to_decimal(value: float | None) -> Decimal | None:
-    """Convert request floats without binary-float artifacts."""
-    return Decimal(str(value)) if value is not None else None
-
-
 @router.get("/companies/{company_id}")
 async def get_screening_result(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    """Get the screening result for a company."""
+    """Shariah verdict from approved statement lines, computed on first view.
+
+    Never 404 for a known company: missing inputs make each rule
+    INSUFFICIENT_DATA naming the statement line (``is_compliant: null``).
+    """
     from app.repositories.company import CompanyRepository
 
-    company_repo = CompanyRepository(session)
-    company = await company_repo.get_by_id(company_id)
+    company = await CompanyRepository(session).get_by_id(company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    screening_repo = ScreeningRepository(session)
-    result = await screening_repo.get_screening_result(company_id)
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Screening result not found")
+    recompute = RecomputeService(session)
+    state = await recompute.ensure_fresh(company_id, Engine.SHARIAH)
+    await recompute.ensure_fresh(company_id, Engine.DQ_FS)  # the embedded DQ block
+    meta = compute_meta(state)
+    result = await ScreeningRepository(session).get_screening_result(
+        company_id, DEFAULT_METHODOLOGY.version.value
+    )
 
     from app.dataquality.service import DataQualityService
 
-    dq_result = await DataQualityService(session).latest(
-        company_id, "financial_statements"
-    )
+    dq_result = await DataQualityService(session).latest(company_id, "financial_statements")
     data_quality = dq_result.as_dict() if dq_result is not None else None
 
-    return {
-        "id": str(result.id),
-        "company_id": str(result.company_id),
-        "is_compliant": result.is_compliant,
-        "status": result.status.value,
-        "methodology_version": result.methodology_version,
-        "methodology_name": result.methodology_name,
-        "overall_reason": result.overall_reason,
-        "screened_at": result.screened_at.isoformat(),
-        "report_date": result.report_date.isoformat() if result.report_date else None,
-        "report_date_reason": result.report_date_reason,
-        "created_at": result.created_at.isoformat(),
-        "rule_results": [_rule_payload(r) for r in result.rule_results],
-        "data_quality": data_quality,
-    }
+    if result is None:
+        reason = f"computation failed: {meta.get('compute_error') or 'no snapshot'}"
+        payload: dict[str, Any] = {
+            "id": None,
+            "company_id": str(company_id),
+            "is_compliant": None,
+            "status": "INSUFFICIENT_DATA",
+            "methodology_name": DEFAULT_METHODOLOGY.name,
+            "overall_reason": reason,
+            "screened_at": None,
+            "report_date": None,
+            "report_date_reason": None,
+            "created_at": None,
+            "rule_results": [],
+        }
+    else:
+        payload = {
+            "id": str(result.id),
+            "company_id": str(result.company_id),
+            "is_compliant": result.is_compliant,
+            "status": result.status.value,
+            "methodology_name": result.methodology_name,
+            "overall_reason": result.overall_reason,
+            "screened_at": result.screened_at.isoformat(),
+            "report_date": result.report_date.isoformat() if result.report_date else None,
+            "report_date_reason": result.report_date_reason,
+            "created_at": result.created_at.isoformat(),
+            "rule_results": [_rule_payload(r) for r in result.rule_results],
+        }
+    payload.update(meta)
+    payload["methodology_version"] = DEFAULT_METHODOLOGY.version.value
+    payload["engine"] = "statement_lines"
+    payload["data_quality"] = data_quality
+    return payload
 
 
 @router.get("/companies")
@@ -208,269 +154,70 @@ async def list_screened_companies(
     ]
 
 
-@router.post("/companies/{company_id}/screen")
-async def screen_company(
-    company_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    """Screen a company for Shariah compliance."""
-    from app.repositories.company import CompanyRepository
-
-    company_repo = CompanyRepository(session)
-    company = await company_repo.get_by_id(company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-
-    # Get financial data with source documents for per-rule provenance.
-    from app.repositories.financial import FinancialFactRepository
-
-    fact_repo = FinancialFactRepository(session)
-    rows = await fact_repo.list_facts_with_documents(company_id=company_id)
-
-    # Build facts dictionary (last row wins per label, as before).
-    facts_dict: dict[str, Decimal | None] = {}
-    docs_dict: dict[str, FinancialDocument] = {}
-    for fact, doc in rows:
-        label = fact.normalized_label or fact.reported_label
-        value = fact.reported_value if fact.normalized_value is None else fact.normalized_value
-        facts_dict[label] = value
-        docs_dict[label] = doc
-
-    provenance: dict[str, RuleProvenance] = {
-        "industry_screen": RuleProvenance(source="company record", source_date=None)
-    }
-    for rule_name, labels in RULE_FACT_LABELS.items():
-        prov = _rule_provenance(labels, docs_dict)
-        if prov is not None:
-            provenance[rule_name] = prov
-
-    # Create screening input
-    screening_input = ScreeningInput(
-        company_id=str(company_id),
-        ticker=company.ticker,
-        industry=company.industry,
-        total_debt=facts_dict.get("total_debt"),
-        total_assets=facts_dict.get("total_assets"),
-        interest_income=facts_dict.get("interest_income"),
-        total_revenue=facts_dict.get("revenue"),
-        cash_and_securities=facts_dict.get("cash_and_equivalents"),
-        provenance=provenance,
-    )
-
-    # Run screening
-    service = ShariahScreeningService(session)
-    output = await service.screen_company(screening_input)
-
-    # Persist results
-    screening_repo = ScreeningRepository(session)
-    result = await screening_repo.upsert_screening_result(
-        company_id=company_id,
-        is_compliant=output.is_compliant,
-        methodology_version=output.methodology_version,
-        methodology_name=DEFAULT_METHODOLOGY.name,
-        overall_reason=output.overall_reason,
-        screened_at=output.screened_at,
-        report_date=output.report_date,
-        report_date_reason=output.report_date_reason,
-    )
-
-    # Add rule results
-    for rule_result in output.rule_results:
-        await screening_repo.add_rule_result(
-            screening_result_id=result.id,
-            rule_name=rule_result.rule_name,
-            verdict=rule_result.verdict.value,
-            value=float(rule_result.value) if rule_result.value is not None else None,
-            threshold=float(rule_result.threshold) if rule_result.threshold is not None else None,
-            reason=rule_result.reason,
-            missing_input=rule_result.missing_input,
-            source=rule_result.source,
-            source_date=rule_result.source_date,
-        )
-
-    await session.commit()
-
-    return {
-        "company_id": str(company_id),
-        "ticker": output.ticker,
-        "is_compliant": output.is_compliant,
-        "methodology_version": output.methodology_version,
-        "overall_reason": output.overall_reason,
-        "rule_results": [_rule_payload(r) for r in output.rule_results],
-        "screened_at": output.screened_at.isoformat(),
-        "report_date": output.report_date.isoformat() if output.report_date else None,
-        "report_date_reason": output.report_date_reason,
-    }
-
-
-@router.post("/companies/{company_id}/screen-statements", response_model=None)
-async def screen_company_from_statements(
-    company_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any] | JSONResponse:
-    """Screen a company using approved statement lines as inputs."""
-    from app.repositories.company import CompanyRepository
-    from app.repositories.statements import StatementLineRepository
-    from app.screening.statement_input import build_screening_input_from_statements
-
-    company_repo = CompanyRepository(session)
-    company = await company_repo.get_by_id(company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-
-    stmt_repo = StatementLineRepository(session)
-    lines = await stmt_repo.latest_approved(company_id)
-    screening_input, reason = build_screening_input_from_statements(
-        company_id=company_id,
-        company=company,
-        lines=lines,
-        market_cap=None,
-    )
-    if screening_input is None:
-        return JSONResponse(
-            status_code=409,
-            content={"status": "INSUFFICIENT_DATA", "reason": reason},
-        )
-
-    service = ShariahScreeningService(session)
-    output = await service.screen_company(screening_input)
-
-    screening_repo = ScreeningRepository(session)
-    result = await screening_repo.upsert_screening_result(
-        company_id=company_id,
-        is_compliant=output.is_compliant,
-        methodology_version=output.methodology_version,
-        methodology_name=DEFAULT_METHODOLOGY.name,
-        overall_reason=output.overall_reason,
-        screened_at=output.screened_at,
-        report_date=output.report_date,
-        report_date_reason=output.report_date_reason,
-    )
-    for rule_result in output.rule_results:
-        await screening_repo.add_rule_result(
-            screening_result_id=result.id,
-            rule_name=rule_result.rule_name,
-            verdict=rule_result.verdict.value,
-            value=float(rule_result.value) if rule_result.value is not None else None,
-            threshold=float(rule_result.threshold) if rule_result.threshold is not None else None,
-            reason=rule_result.reason,
-            missing_input=rule_result.missing_input,
-            source=rule_result.source,
-            source_date=rule_result.source_date,
-        )
-    await session.commit()
-
-    return {
-        "company_id": str(company_id),
-        "ticker": output.ticker,
-        "is_compliant": output.is_compliant,
-        "methodology_version": output.methodology_version,
-        "overall_reason": output.overall_reason,
-        "rule_results": [_rule_payload(r) for r in output.rule_results],
-        "screened_at": output.screened_at.isoformat(),
-        "report_date": output.report_date.isoformat() if output.report_date else None,
-        "report_date_reason": output.report_date_reason,
-    }
-
-
-@router.post("/companies/{company_id}/purification")
-async def estimate_purification(
-    company_id: uuid.UUID,
-    body: PurificationBody,
-    session: AsyncSession = Depends(get_session),
-) -> dict[str, Any]:
-    """Estimate dividend purification in EGP (dividend-method, R32 B3/B4)."""
-    from app.repositories.company import CompanyRepository
-
-    company_repo = CompanyRepository(session)
-    company = await company_repo.get_by_id(company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail="Company not found")
-
-    screening_repo = ScreeningRepository(session)
-    verdict = await screening_repo.get_screening_result(company_id)
-
-    estimate = estimate_dividend_purification(
-        ticker=company.ticker,
-        is_compliant=verdict.is_compliant if verdict is not None else None,
-        dividend_egp=_to_decimal(body.dividend_egp),
-        dps=_to_decimal(body.dps),
-        shares_held=_to_decimal(body.shares_held),
-        non_permissible_revenue=_to_decimal(body.non_permissible_revenue),
-        total_revenue=_to_decimal(body.total_revenue),
-        ratio_provenance=body.ratio_provenance,
-        dps_source=body.dps_source,
-        dps_date=body.dps_date,
-    )
-
-    row = await screening_repo.upsert_purification_estimate(
-        company_id=company_id,
-        methodology_version=DEFAULT_METHODOLOGY.version.value,
-        doctrine=estimate.doctrine,
-        branch=estimate.branch.value,
-        status=estimate.status.value,
-        amount_egp=estimate.amount_egp,
-        dividend_egp=estimate.dividend_egp,
-        ratio=estimate.ratio,
-        ratio_provenance=estimate.ratio_provenance,
-        dps=estimate.dps,
-        dps_source=estimate.dps_source,
-        dps_date=estimate.dps_date,
-        reason=estimate.reason,
-        missing_input=estimate.missing_input,
-        computed_at=datetime.now(UTC),
-    )
-    await session.commit()
-
-    payload = _purification_payload(estimate)
-    payload.update(
-        {
-            "id": str(row.id),
-            "company_id": str(company_id),
-            "methodology_version": row.methodology_version,
-            "computed_at": row.computed_at.isoformat(),
-        }
-    )
-    return payload
-
-
 @router.get("/companies/{company_id}/purification")
 async def get_purification(
     company_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    """Get the latest purification estimate for a company."""
+    """Automatic per-share purification estimate (EGP per share), computed on first view.
+
+    DPS = cash dividends paid in the fiscal year / shares outstanding; the
+    ratio is interest income / revenue. Missing lines -> INSUFFICIENT_DATA
+    naming the line. Never 404 for a known company.
+    """
     from app.repositories.company import CompanyRepository
 
-    company_repo = CompanyRepository(session)
-    company = await company_repo.get_by_id(company_id)
+    company = await CompanyRepository(session).get_by_id(company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    screening_repo = ScreeningRepository(session)
-    row = await screening_repo.get_purification_estimate(company_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Purification estimate not found")
-
-    return {
-        "id": str(row.id),
-        "company_id": str(row.company_id),
-        "methodology_version": row.methodology_version,
-        "status": row.status,
-        "branch": row.branch,
-        "doctrine": row.doctrine or PURIFICATION_DOCTRINE,
-        "amount_egp": str(row.amount_egp) if row.amount_egp is not None else None,
-        "dividend_egp": str(row.dividend_egp) if row.dividend_egp is not None else None,
-        "ratio": str(row.ratio) if row.ratio is not None else None,
-        "ratio_provenance": row.ratio_provenance,
-        "dps": str(row.dps) if row.dps is not None else None,
-        "dps_source": row.dps_source,
-        "dps_date": row.dps_date.isoformat() if row.dps_date else None,
-        "reason": row.reason,
-        "missing_input": row.missing_input,
-        "note": NOT_ZAKAT_COPY,
-        "computed_at": row.computed_at.isoformat(),
-    }
+    state = await RecomputeService(session).ensure_fresh(company_id, Engine.PURIFICATION)
+    meta = compute_meta(state)
+    row = await ScreeningRepository(session).get_purification_estimate(company_id)
+    if row is None:
+        payload: dict[str, Any] = {
+            "id": None,
+            "company_id": str(company_id),
+            "status": "INSUFFICIENT_DATA",
+            "branch": "insufficient-data",
+            "doctrine": PURIFICATION_DOCTRINE,
+            "amount_egp": None,
+            "dividend_egp": None,
+            "ratio": None,
+            "ratio_provenance": None,
+            "dps": None,
+            "dps_source": None,
+            "dps_date": None,
+            "reason": f"computation failed: {meta.get('compute_error') or 'no snapshot'}",
+            "missing_input": None,
+            "note": NOT_ZAKAT_COPY,
+            "computed_at": None,
+        }
+    else:
+        payload = {
+            "id": str(row.id),
+            "company_id": str(row.company_id),
+            "status": row.status,
+            "branch": row.branch,
+            "doctrine": row.doctrine or PURIFICATION_DOCTRINE,
+            "amount_egp": str(row.amount_egp) if row.amount_egp is not None else None,
+            "dividend_egp": str(row.dividend_egp) if row.dividend_egp is not None else None,
+            "ratio": str(row.ratio) if row.ratio is not None else None,
+            "ratio_provenance": row.ratio_provenance,
+            "dps": str(row.dps) if row.dps is not None else None,
+            "dps_source": row.dps_source,
+            "dps_date": row.dps_date.isoformat() if row.dps_date else None,
+            "reason": row.reason,
+            "missing_input": row.missing_input,
+            "note": NOT_ZAKAT_COPY,
+            "computed_at": row.computed_at.isoformat(),
+        }
+    payload.update(meta)
+    payload["methodology_version"] = DEFAULT_METHODOLOGY.version.value
+    payload["basis"] = "per_share"
+    payload["dps_derivation"] = DPS_DERIVATION
+    payload["dps_label"] = DPS_LABEL
+    return payload
 
 
 @router.post("/companies/{company_id}/egx-membership")

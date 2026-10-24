@@ -1,97 +1,76 @@
-import { memo } from 'react'
-import type { FairValueResponse } from '../types'
+import { memo } from "react";
+import { useLang } from "../i18n/useLang";
+import { fmtPct, fmtPrice, fmtSignedPct, toNumber } from "../lib/format";
+import type { FairValueResponse } from "../types";
+import { sensitivityParamKey } from "./research/labels";
+import { ResearchSection } from "./research/parts";
+import DataTable, { type Column } from "./ui/DataTable";
+import { Missing } from "./ui/Missing";
 
-// 1-D sensitivity around the base case, always rendered next to the fair
-// value (frontend-catchup-contract Batch A.3): a table when the backend has
-// rows, an honest note when it has none (nothing is assumed).
+type SensitivityRow = FairValueResponse["sensitivity"][number];
 
-type SensitivityRow = FairValueResponse['sensitivity'][number]
-
-const PARAM_LABEL: Record<string, string> = {
-  discount_rate: 'Discount rate',
-  revenue_growth: 'Revenue growth',
+/** "−3.21%" style text from the backend to a decimal fraction; null when unparseable. */
+function percentTextToFraction(text: string | number | null | undefined): number | null {
+  if (text === null || text === undefined) return null;
+  const n = toNumber(String(text).replace("%", "").replace("−", "-"));
+  return n === null ? null : n / 100;
 }
 
-function paramLabel(row: SensitivityRow): string {
-  const raw =
-    typeof row.parameter === 'string' && row.parameter !== ''
-      ? row.parameter
-      : (row.discount_delta ?? row.discount) !== null &&
-          (row.discount_delta ?? row.discount) !== undefined
-        ? 'discount_rate'
-        : 'revenue_growth'
-  return PARAM_LABEL[raw] ?? raw.replace(/_/g, ' ')
-}
+/**
+ * 1-D sensitivity around the base case, next to the fair value. Read-only: an
+ * explanation when the backend has no rows (nothing is assumed).
+ */
+function SensitivityTable({ rows, baseValue }: { rows: SensitivityRow[]; baseValue: string | null }) {
+  const { t, locale } = useLang();
+  const base = fmtPrice(locale, baseValue);
 
-function cell(row: SensitivityRow, keys: string[]): string {
-  for (const key of keys) {
-    const v = row[key]
-    if (v !== null && v !== undefined && v !== '') return String(v)
-  }
-  return '—'
-}
+  const columns: Column<SensitivityRow>[] = [
+    {
+      id: "parameter",
+      header: t("rv_col_param"),
+      sticky: true,
+      cell: (row) => {
+        const code = typeof row.parameter === "string" ? row.parameter : null;
+        const key = sensitivityParamKey(code);
+        return key ? t(key) : <Missing />;
+      },
+    },
+    {
+      id: "value",
+      header: t("rv_col_param_value"),
+      type: "num",
+      cell: (row) => fmtPct(locale, row.value) ?? <Missing />,
+    },
+    {
+      id: "fair_value",
+      header: t("rv_col_fv"),
+      type: "num",
+      cell: (row) => fmtPrice(locale, row.fair_value) ?? <Missing />,
+    },
+    {
+      id: "change",
+      header: t("rv_col_change"),
+      type: "num",
+      cell: (row) => fmtSignedPct(locale, percentTextToFraction(row.change_from_base)) ?? <Missing />,
+    },
+  ];
 
-function SensitivityTable({
-  rows,
-  baseValue,
-}: {
-  rows: SensitivityRow[]
-  baseValue: string | null
-}) {
-  if (rows.length === 0) {
-    return (
-      <div className="card">
-        <h2 className="section-title">Sensitivity</h2>
-        <p className="muted">
-          No sensitivity rows: the backend needs a discount rate and revenue
-          growth to perturb, and nothing is assumed. Base fair value:{' '}
-          {baseValue ?? '—'}.
-        </p>
-      </div>
-    )
-  }
   return (
-    <div className="card">
-      <h2 className="section-title">Sensitivity</h2>
-      <p className="muted">
-        One input moved at a time around the base case (base fair value:{' '}
-        {baseValue ?? '—'}).
-      </p>
-      <div className="table-container">
-        <table>
-          <caption className="muted">
-            How the fair value moves when one assumption moves
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Parameter</th>
-              <th scope="col">Assumption value</th>
-              <th scope="col">Fair value</th>
-              <th scope="col">Change vs base</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i}>
-                <td>{paramLabel(row)}</td>
-                <td>
-                  {cell(row, [
-                    'value',
-                    'discount_delta',
-                    'growth_delta',
-                    'discount',
-                    'growth',
-                  ])}
-                </td>
-                <td>{cell(row, ['fair_value', 'value'])}</td>
-                <td>{cell(row, ['change_from_base'])}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
+    <ResearchSection
+      title={t("rv_sens_title")}
+      lead={rows.length > 0 && base !== null ? t("rv_sens_lead", { base }) : undefined}
+    >
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => `${String(row.parameter)}:${String(row.value)}`}
+        caption={t("rv_sens_caption")}
+        loadingThing={t("rv_sens_title")}
+        empty={<p className="empty">{t("rv_sens_empty")}</p>}
+        hideDensityToggle
+      />
+    </ResearchSection>
+  );
 }
 
-export default memo(SensitivityTable)
+export default memo(SensitivityTable);

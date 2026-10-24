@@ -1,186 +1,140 @@
-import { useDataQuality } from '../api/client'
-import { qualityLabel, qualityTone } from '../lib/quality'
-import type { QualityTone } from '../lib/quality'
-import type { DataQualityScore } from '../types'
+import "./hub/hubPages.css";
 
-// Canonical scope order — the API returns them in whatever order they were stored.
-const SCOPE_ORDER = [
-  'price_history',
-  'company_profile',
-  'financial_statements',
-] as const
+import { useDataQuality } from "../api/client";
+import type { CopyKey } from "../i18n";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtInt } from "../lib/format";
+import { qualityLabelKey } from "../lib/quality";
+import { parseSourceType, type SourceType } from "../lib/reasons";
+import type { DataQualityScore } from "../types";
+import { BackendText } from "./ui/BackendText";
+import { Notice } from "./ui/Notice";
+import { EmptyState, ErrorState, LoadingState } from "./ui/States";
 
-const SCOPE_LABELS: Record<string, string> = {
-  price_history: 'Price history',
-  company_profile: 'Company profile',
-  financial_statements: 'Financial statements',
-}
+// Canonical scope order: the API returns them in whatever order they were stored.
+const SCOPE_ORDER = ["price_history", "company_profile", "financial_statements"] as const;
 
-const BADGE_CLASS: Record<QualityTone, string> = {
-  positive: 'healthy',
-  warning: 'warning',
-  negative: 'error',
-  muted: 'unknown',
-}
+const SCOPE_KEY: Record<(typeof SCOPE_ORDER)[number], CopyKey> = {
+  price_history: "fn_dq_scope_price_history",
+  company_profile: "fn_dq_scope_company_profile",
+  financial_statements: "fn_dq_scope_financial_statements",
+};
 
-const ICON: Record<QualityTone, string> = {
-  positive: '✓',
-  warning: '!',
-  negative: '✕',
-  muted: '–',
-}
+const SOURCE_TYPE_KEY: Record<SourceType, CopyKey> = {
+  DATA_PROVIDER: "fn_dq_source_data_provider",
+  EGX: "fn_dq_source_egx",
+  FRA: "fn_dq_source_fra",
+  COMPANY: "fn_dq_source_company",
+  MANUAL: "fn_dq_source_manual",
+  SYNTHETIC: "fn_dq_source_synthetic",
+  unknown: "fn_dq_source_unknown",
+};
 
-const TONE_COLOR: Record<QualityTone, string> = {
-  positive: 'var(--green)',
-  warning: 'var(--yellow)',
-  negative: 'var(--red)',
-  muted: 'var(--text-secondary)',
-}
+const COMPONENT_KEY: Record<string, CopyKey> = {
+  completeness: "fn_dq_component_completeness",
+  freshness: "fn_dq_component_freshness",
+  validation: "fn_dq_component_validation",
+  historical_depth: "fn_dq_component_historical_depth",
+  source_reliability: "fn_dq_component_source_reliability",
+};
 
-const BAND_TITLE =
-  'Good: 70–100 · Partial: 40–69 · Poor: below 40 · Insufficient data: no data to assess'
-
-const DEFINITION =
-  'How much usable data we have for this company, on a 0–100 scale. Higher is better.'
-
-// Bands are the same cut-offs the backend uses; reuse qualityTone so quality.ts
-// stays the single status→tone mapping.
-function scoreTone(score: number): QualityTone {
-  return qualityTone(score >= 70 ? 'OK' : score >= 40 ? 'DEGRADED' : 'POOR')
+/** Detail text: the source-type code is translated; everything else is backend text. */
+function Detail({ text }: { text: string }) {
+  const { t } = useLang();
+  const sourceType = parseSourceType(text);
+  if (sourceType) return <>{t("fn_dq_source_type", { type: t(SOURCE_TYPE_KEY[sourceType]) })}</>;
+  return <BackendText>{text}</BackendText>;
 }
 
 function ScopeSection({ item }: { item: DataQualityScore }) {
-  const missing = item.status === 'MISSING'
-  const tone = qualityTone(item.status)
-  const label = qualityLabel(item.status)
-  const pct = (weight: number) => Math.round(weight * 100)
+  const { t, locale } = useLang();
+  const missing = item.status === "MISSING";
+  const scopeName = t(SCOPE_KEY[item.scope] ?? "fn_dq_scope_unknown");
+  const heading = missing
+    ? t("fn_dq_heading_not_scored", { scope: scopeName })
+    : t("fn_dq_heading", { scope: scopeName, score: fmtInt(locale, Math.round(item.score)) ?? "", band: t(qualityLabelKey(item.status)) });
+  const asOf = fmtDate(locale, item.as_of);
 
   return (
     <section className="dq-scope">
-      <div className="dq-scope-head">
-        <span>{SCOPE_LABELS[item.scope] ?? item.scope}</span>
-        <span>As of {item.as_of}</span>
+      <h2 className="section-title">{heading}</h2>
+      {asOf && <p className="table-meta">{t("fn_dq_as_of", { date: asOf })}</p>}
+      {missing && <p className="dq-score-note">{t("fn_dq_missing_note")}</p>}
+      <div className="table-wrap">
+        <table aria-label={scopeName}>
+          <thead>
+            <tr>
+              <th scope="col">{t("fn_dq_col_component")}</th>
+              <th scope="col" className="num" dir="ltr">
+                {t("fn_dq_col_weight")}
+              </th>
+              <th scope="col" className="num" dir="ltr">
+                {t("fn_dq_col_score")}
+              </th>
+              <th scope="col">{t("fn_dq_col_detail")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {item.components.map((component) => {
+              const key = COMPONENT_KEY[component.key];
+              return (
+                <tr key={component.key}>
+                  <th scope="row">{key ? t(key) : component.label}</th>
+                  <td className="num" dir="ltr">
+                    {Math.round(component.weight * 100)}%
+                  </td>
+                  <td className="num" dir="ltr">
+                    {missing ? "—" : Math.round(component.score)}
+                  </td>
+                  <td className="note-cell">
+                    <Detail text={component.reason} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-
-      <div className="dq-score-row">
-        <div className={`dq-score${missing ? ' missing' : ''}`}>
-          {missing ? (
-            <>
-              —<span className="sr-only"> not scored</span>
-            </>
-          ) : (
-            `${item.score.toFixed(1)} / 100`
-          )}
-        </div>
-        <span
-          className={`status-badge ${BADGE_CLASS[tone]}`}
-          title={BAND_TITLE}
-        >
-          <span aria-hidden="true">{ICON[tone]}</span> {label}
-        </span>
-      </div>
-
-      {missing && (
-        <p className="dq-score-note">
-          Not enough data to score. This is not a judgment on the company.
-        </p>
-      )}
-
-      {item.components.map((component) => (
-        <div className="dq-component" key={component.key}>
-          <div className="dq-component-head">
-            <span>{component.label}</span>
-            <span>weight {pct(component.weight)}%</span>
-            {!missing && (
-              <span>{Math.round(component.score)} / 100</span>
-            )}
-          </div>
-          {!missing && (
-            <div
-              className="dq-bar"
-              role="progressbar"
-              aria-valuenow={component.score}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`${component.label}: ${component.score} of 100, weight ${pct(component.weight)}%`}
-            >
-              <div
-                className="dq-bar-fill"
-                style={{
-                  width: `${component.score}%`,
-                  background: TONE_COLOR[scoreTone(component.score)],
-                }}
-              />
-            </div>
-          )}
-          <p className="dq-component-reason">{component.reason}</p>
-        </div>
-      ))}
-
       {/* Issues omitted for MISSING: the strings hard-code "(0/100)", which the
-          headline score and component reasons already say in that state. */}
+          heading and component details already say in that state. */}
       {item.issues.length > 0 && !missing && (
         <div className="dq-issues">
-          <h3 className="card-label">Issues</h3>
-          <ul>
-            {item.issues.map((issue) => (
-              <li className="dq-issue" key={issue}>
-                <span aria-hidden="true">!</span> {issue}
-              </li>
-            ))}
-          </ul>
+          <Notice>
+            <p className="dq-issues-title">{t("fn_dq_issues")}</p>
+            <ul>
+              {item.issues.map((issue) => (
+                <li key={issue}>
+                  <BackendText>{issue}</BackendText>
+                </li>
+              ))}
+            </ul>
+          </Notice>
         </div>
       )}
     </section>
-  )
+  );
 }
 
+/** Financials › Data quality (spec 4.4.3): one table per scope. It describes the inputs, not the company. */
 export default function DataQualityCard({ companyId }: { companyId: string }) {
-  const { data, isLoading, error } = useDataQuality(companyId)
+  const { t } = useLang();
+  const { data, isLoading, error, refetch } = useDataQuality(companyId);
 
-  const items = data
-    ? [...data.items].sort(
-        (a, b) =>
-          (SCOPE_ORDER as readonly string[]).indexOf(a.scope) -
-          (SCOPE_ORDER as readonly string[]).indexOf(b.scope),
-      )
-    : []
+  if (isLoading) return <LoadingState thing={t("fn_dq_title")} />;
+  if (error || !data) return <ErrorState thing={t("fn_dq_title")} onRetry={() => void refetch()} />;
+
+  const items = [...data.items].sort(
+    (a, b) => (SCOPE_ORDER as readonly string[]).indexOf(a.scope) - (SCOPE_ORDER as readonly string[]).indexOf(b.scope),
+  );
 
   return (
-    <div className="card dq-card">
-      <h2 className="section-title">Data quality</h2>
-      <p className="dq-definition">{DEFINITION}</p>
-
-      {isLoading && <div className="loading">Loading data quality...</div>}
-
-      {error && (
-        <div className="alert alert-error">Couldn't load data quality.</div>
-      )}
-
-      {data && items.length === 0 && (
-        <>
-          <div className="dq-empty">
-            <span className="status-badge unknown" aria-hidden="true">
-              –
-            </span>
-            <p>No data-quality assessment has been run for this company yet.</p>
-          </div>
-          <p className="muted">Refresh market data to compute assessments for every company.</p>
-        </>
-      )}
-
+    <div className="page">
+      <p className="dq-definition">{t("fn_dq_definition")}</p>
+      {items.length === 0 && <EmptyState>{t("fn_dq_empty")}</EmptyState>}
       {items.map((item) => (
         <ScopeSection item={item} key={item.scope} />
       ))}
-
-      {data && (
-        <footer className="dq-footer">
-          <p className="dq-disclaimer">{data.disclaimer}</p>
-          <p className="muted">
-            {`Bands: 70+ Good · 40–69 Partial · below 40 Poor · Methodology v${data.methodology_version}`}
-          </p>
-        </footer>
-      )}
+      <p className="table-footnote">{t("fn_dq_footnote", { version: data.methodology_version })}</p>
     </div>
-  )
+  );
 }

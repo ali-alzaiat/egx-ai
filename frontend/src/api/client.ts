@@ -3,7 +3,6 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import type {
   AlertFired,
   AlertRule,
-  CalculateValuationsResponse,
   Company,
   CompanyValuation,
   DailyPrice,
@@ -12,7 +11,6 @@ import type {
   DisclosureDiff,
   DisclosureFact,
   DisclosureFiling,
-  EgxMembership,
   EgxMembershipStatus,
   FairValueResponse,
   FinancialDocument,
@@ -27,14 +25,12 @@ import type {
   ScreeningResult,
   ScoreResponse,
   TechnicalIndicator,
-  CalculateIndicatorsResponse,
   SignalsResponse,
   SyncJobStatus,
   ThesisResponse,
   UniverseCoverage,
   MarketSignal,
   ScoringModelInfo,
-  SignalRun,
   UnscorableCompany,
   ScreenedCompanySummary,
   StatementBundle,
@@ -202,11 +198,6 @@ export function useSignalForTicker(ticker: string | undefined) {
   });
 }
 
-export async function runSignals(): Promise<SignalRun> {
-  const res = await fetch(`${API_BASE}/signals/run`, { method: "POST" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
 export function useDataSources() {
   return useQuery({
     queryKey: ["dataSources"],
@@ -330,27 +321,6 @@ export function useTechnicalIndicators(
   });
 }
 
-export async function calculateIndicators(
-  companyId: string,
-  prices: string,
-  volumes: string,
-  indicatorTypes?: string,
-): Promise<CalculateIndicatorsResponse> {
-  const searchParams = new URLSearchParams();
-  searchParams.set("prices", prices);
-  searchParams.set("volumes", volumes);
-  if (indicatorTypes) searchParams.set("indicator_types", indicatorTypes);
-  const qs = searchParams.toString();
-  const res = await fetch(
-    `${API_BASE}/technical/companies/${companyId}/calculate?${qs}`,
-    {
-      method: "POST",
-    },
-  );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // GET /api/screening/companies (backend/app/api/screening.py::list_screened_companies)
 export function useScreenedCompanies(params: {
   is_compliant?: boolean;
@@ -390,14 +360,6 @@ export function useScreeningResult(
 }
 
 // POST /api/screening/companies/{company_id}/screen — plain async, not useMutation.
-export async function screenCompany(companyId: string): Promise<ScreeningResult> {
-  const res = await fetch(`${API_BASE}/screening/companies/${companyId}/screen`, {
-    method: "POST",
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // GET /api/valuation/companies/{company_id}
 export function useValuations(companyId: string | undefined) {
   return useQuery({
@@ -411,27 +373,6 @@ export function useValuations(companyId: string | undefined) {
 
 // POST /api/valuation/companies/{company_id}/calculate — plain async, not
 // useMutation. Empty call evaluates every model with no supplied assumptions.
-export async function calculateValuations(
-  companyId: string,
-  params?: Record<string, number | undefined>,
-): Promise<CalculateValuationsResponse> {
-  const searchParams = new URLSearchParams();
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && !Number.isNaN(value)) {
-        searchParams.set(key, String(value));
-      }
-    }
-  }
-  const qs = searchParams.toString();
-  const res = await fetch(
-    `${API_BASE}/valuation/companies/${companyId}/calculate${qs ? `?${qs}` : ""}`,
-    { method: "POST" },
-  );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 export async function getCompanyByTicker(ticker: string): Promise<Company | null> {
   const res = await fetch(`${API_BASE}/companies/ticker/${encodeURIComponent(ticker)}`);
   if (res.status === 404) return null;
@@ -440,19 +381,6 @@ export async function getCompanyByTicker(ticker: string): Promise<Company | null
 }
 
 // POST /api/metrics/companies/{company_id}/calculate — plain async, not useMutation.
-export async function calculateMetrics(companyId: string): Promise<{
-  company_id: string;
-  periods_calculated: number;
-  metrics_persisted: number;
-}> {
-  const res = await fetch(
-    `${API_BASE}/metrics/companies/${companyId}/calculate`,
-    { method: "POST" },
-  );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // GET /api/scores/companies/{company_id} — 404 means unknown company;
 // a known but unassessed company returns { assessment: null } (empty state).
 export function useScore(companyId: string | undefined) {
@@ -470,16 +398,6 @@ export function useScore(companyId: string | undefined) {
 }
 
 // POST /api/scores/companies/{company_id}/assess — plain async, not useMutation.
-export async function assessScore(companyId: string): Promise<ScoreResponse> {
-  const res = await fetch(`${API_BASE}/scores/companies/${companyId}/assess`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // GET /api/industry/companies/{company_id}
 export function useIndustrySnapshot(companyId: string | undefined) {
   return useQuery({
@@ -533,31 +451,6 @@ export function usePurification(companyId: string | undefined) {
 }
 
 // POST /api/screening/companies/{company_id}/purification — plain async.
-export async function estimatePurification(
-  companyId: string,
-  body: {
-    dividend_egp?: number;
-    dps?: number;
-    shares_held?: number;
-    non_permissible_revenue?: number;
-    total_revenue?: number;
-    ratio_provenance?: string;
-    dps_source?: string;
-    dps_date?: string;
-  },
-): Promise<PurificationEstimate> {
-  const res = await fetch(
-    `${API_BASE}/screening/companies/${companyId}/purification`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // GET /api/screening/companies/{company_id}/egx-membership — 404 means never recorded.
 // Returns the side-by-side envelope, not the flat POST record.
 export function useEgxMembership(companyId: string | undefined) {
@@ -577,22 +470,6 @@ export function useEgxMembership(companyId: string | undefined) {
 }
 
 // POST /api/screening/companies/{company_id}/egx-membership — plain async.
-export async function recordEgxMembership(
-  companyId: string,
-  body: { member: boolean; review_cycle: string; effective_date?: string; source: string; note?: string },
-): Promise<EgxMembership> {
-  const res = await fetch(
-    `${API_BASE}/screening/companies/${companyId}/egx-membership`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    },
-  );
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // POST /api/ingestion/sync — follows the runSignals pattern (plain fetch,
 // not useMutation). 409 means a job is already live: adopt the returned job
 // and start polling it instead of throwing.
@@ -650,19 +527,6 @@ export function useThesis(companyId: string | undefined) {
 }
 
 // POST /api/theses/companies/{company_id}/assess — plain async, not useMutation.
-export async function assessThesis(
-  companyId: string,
-  body: Record<string, unknown> = {},
-): Promise<ThesisResponse> {
-  const res = await fetch(`${API_BASE}/theses/companies/${companyId}/assess`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
-
 // POST /api/theses/companies/{company_id}/update — rationale required server-side.
 export async function updateThesis(
   companyId: string,
@@ -1049,3 +913,38 @@ export function useStanceRadar(pageSize = 50, shariah?: "egx33") {
   });
 }
 
+
+// GET /api/disclosures/comparison?company_id=&metric= — typed twin of `useComparison`
+// (R43 read-only Thesis & filings tab). 404 = unknown company; 422 = mixed accounting bases.
+export function useDisclosureComparison(companyId: string | undefined, metric: string) {
+  return useQuery({
+    queryKey: ["comparison", companyId, metric, "typed"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${API_BASE}/disclosures/comparison?company_id=${companyId}&metric=${encodeURIComponent(metric)}`,
+      );
+      if (res.status === 404) return null;
+      if (res.status === 422) throw new Error("mixed accounting bases");
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json() as Promise<import("../types").DisclosureComparison>;
+    },
+    enabled: !!companyId,
+    retry: (failureCount: number, error: Error) =>
+      error.message !== "mixed accounting bases" && retryUnless404(failureCount, error),
+  });
+}
+
+// GET /api/metrics/companies/{id} for each peer (read-only peers table on the hub Peers tab).
+export function usePeersMetrics(peerIds: string[]) {
+  const key = peerIds.join(",");
+  return useQuery({
+    queryKey: ["peersMetrics", key],
+    queryFn: async () => {
+      const entries = await Promise.all(
+        peerIds.map(async (id) => [id, await fetchApi<FinancialMetric[]>(`/metrics/companies/${id}`)] as const),
+      );
+      return Object.fromEntries(entries) as Record<string, FinancialMetric[]>;
+    },
+    enabled: peerIds.length > 0,
+  });
+}

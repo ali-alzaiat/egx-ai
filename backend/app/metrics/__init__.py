@@ -31,7 +31,7 @@ from app.metrics.engine import (
     calculate_roe,
 )
 from app.metrics.period_selector import PeriodPair, PeriodSelector
-from app.metrics.service import MetricCalculationInput, MetricCalculationOutput, MetricService
+from app.metrics.service import METRICS_INPUT_VERSION, MetricCalculationOutput, MetricService
 
 __all__ = [
     "ALL_METRICS",
@@ -63,6 +63,6 @@ __all__ = [
     "PeriodSelector",
     "PeriodPair",
     "MetricService",
-    "MetricCalculationInput",
+    "METRICS_INPUT_VERSION",
     "MetricCalculationOutput",
 ]

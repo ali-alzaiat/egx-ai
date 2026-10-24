@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dataquality import scores
@@ -15,10 +15,9 @@ from app.dataquality.scores import (
     DataQualityScore,
     DataQualityStatus,
 )
-from app.ingestion.validation import FinancialFactValidator
 from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
-from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
-from app.models.market import Company, DailyPrice, DataSource
+from app.models.financial import FinancialDocument
+from app.models.market import Company, DailyPrice, DataSource, DataSourceType
 
 CRITICAL_FACT_LABELS = (
     "revenue",
@@ -27,6 +26,8 @@ CRITICAL_FACT_LABELS = (
     "total_equity",
     "operating_cash_flow",
 )
+# The same five critical items as statement-ontology codes (R43 bridge).
+CRITICAL_LINE_CODES = ("revenue", "net_income", "total_assets", "total_equity", "cfo")
 
 PRICE_FIELDS = ("open", "high", "low", "close", "volume")
 PROFILE_FIELDS = ("name", "sector", "industry", "shares_outstanding", "free_float")
@@ -191,44 +192,23 @@ class DataQualityService:
     async def _assess_financial_statements(
         self, company_id: uuid.UUID, as_of: date
     ) -> DataQualityScore:
-        # R14: bound both sets by as_of via each row's own document publication
-        # date, mirroring period_selector.filter_by_publication_date. SQL
-        # ``<= as_of`` excludes NULLs; is_not(None) kept for parity with the
-        # freshness query below.
-        qualifying_document = (
-            select(FinancialDocument.id)
-            .where(FinancialDocument.period_id == FinancialPeriod.id)
-            .where(FinancialDocument.publication_date.is_not(None))
-            .where(FinancialDocument.publication_date <= as_of)
-        )
-        periods = (
-            await self.session.execute(
-                select(FinancialPeriod)
-                .where(FinancialPeriod.company_id == company_id)
-                .where(qualifying_document.exists())
-            )
-        ).scalars().all()
-        facts: list[FinancialFact] = list(
-            (
-                await self.session.execute(
-                    select(FinancialFact)
-                    .join(
-                        FinancialDocument,
-                        FinancialFact.document_id == FinancialDocument.id,
-                    )
-                    .where(FinancialFact.company_id == company_id)
-                    .where(FinancialDocument.publication_date.is_not(None))
-                    .where(FinancialDocument.publication_date <= as_of)
-                )
-            ).scalars().all()
-        )
+        """Score the approved statement lines (R43: the only fundamentals input).
 
-        if not periods and not facts:
+        Same ``score_for`` call and pinned constants; only the row source changed
+        from ``FinancialFact`` to the statement-line bridge. R14 bound: lines
+        published after ``as_of`` are excluded; undated (vendor) lines are kept.
+        """
+        from app.models.statements import ExtStatus, FinancialStatementLine
+        from app.statements.bridge import load_company_statements
+
+        bundle = await load_company_statements(self.session, company_id, as_of=as_of)
+        latest = bundle.latest()
+        if latest is None:
             score = scores.score_for(
                 scope="financial_statements",
                 as_of=as_of,
                 present=0,
-                required=len(CRITICAL_FACT_LABELS),
+                required=len(CRITICAL_LINE_CODES),
                 observed=0,
                 expected_depth=8,
                 days_stale=None,
@@ -239,87 +219,78 @@ class DataQualityService:
             )
             score = self._append_issues(
                 score,
-                "validation: no facts to validate \u2014 check not run",
-                "freshness: no publication dates available \u2014 check not run",
+                "validation: no approved statement lines — check not run",
+                "freshness: no publication dates available — check not run",
             )
-            await self._persist(
-                company_id, "financial_statements", score, None, as_of
-            )
+            await self._persist(company_id, "financial_statements", score, None, as_of)
             return score
 
-        present_set = set()
-        for f in facts:
-            label = f.normalized_label or f.reported_label or ""
-            label = label.casefold().strip()
-            if label in CRITICAL_FACT_LABELS:
-                present_set.add(label)
-
-        latest_doc = (
-            await self.session.execute(
-                select(FinancialDocument)
-                .join(
-                    FinancialPeriod,
-                    FinancialDocument.period_id == FinancialPeriod.id,
-                )
-                .where(FinancialPeriod.company_id == company_id)
-                .where(FinancialDocument.publication_date.is_not(None))
-                .where(FinancialDocument.publication_date <= as_of)
-                .order_by(FinancialDocument.publication_date.desc())
+        present = sum(1 for code in CRITICAL_LINE_CODES if latest.get(code) is not None)
+        published = [lv.published_date for lv in latest.lines.values() if lv.published_date]
+        if published:
+            reference = max(published)
+            freshness_reason = (
+                f"latest filing published {reference.isoformat()}; "
+                f"{(as_of - reference).days} days stale"
             )
-        ).scalars().first()
-
-        if latest_doc is None or latest_doc.publication_date is None:
-            days_stale = None
-            source_type = None
         else:
-            days_stale = (as_of - latest_doc.publication_date).days
-            source = await self._get_source(latest_doc.source_id)
-            source_type = source.source_type if source else None
+            reference = latest.period_end
+            freshness_reason = (
+                "no publication date (vendor data); measured from period end "
+                f"{latest.period_end.isoformat()}"
+            )
+        days_stale = (as_of - reference).days
 
-        validator = FinancialFactValidator()
-        results = validator.validate_facts(facts)
-        errors = sum(len(r.errors) for r in results)
-        warnings = sum(len(r.warnings) for r in results)
+        status_counts: dict[ExtStatus, int] = {}
+        for status in (ExtStatus.rejected, ExtStatus.extraction_candidate):
+            count = (
+                await self.session.execute(
+                    select(func.count())
+                    .select_from(FinancialStatementLine)
+                    .where(FinancialStatementLine.company_id == company_id)
+                    .where(FinancialStatementLine.period_id == latest.period_id)
+                    .where(FinancialStatementLine.ext_status == status)
+                )
+            ).scalar_one()
+            status_counts[status] = int(count)
+
+        doc_ids = {lv.document_id for lv in latest.lines.values() if lv.document_id}
+        source_type: DataSourceType | None = None
+        source_id: uuid.UUID | None = None
+        if doc_ids:
+            rows = (
+                await self.session.execute(
+                    select(DataSource)
+                    .join(FinancialDocument, FinancialDocument.source_id == DataSource.id)
+                    .where(FinancialDocument.id.in_(doc_ids))
+                )
+            ).scalars().all()
+            weakest = min(
+                rows,
+                key=lambda src: scores.source_reliability(src.source_type),
+                default=None,
+            )
+            if weakest is not None:
+                source_type = weakest.source_type
+                source_id = weakest.id
 
         score = scores.score_for(
             scope="financial_statements",
             as_of=as_of,
-            present=len(present_set),
-            required=len(CRITICAL_FACT_LABELS),
-            observed=len(periods),
+            present=present,
+            required=len(CRITICAL_LINE_CODES),
+            observed=len(bundle.periods),
             expected_depth=8,
             days_stale=days_stale,
-            errors=errors,
-            warnings=warnings,
+            errors=status_counts[ExtStatus.rejected],
+            warnings=status_counts[ExtStatus.extraction_candidate],
             source_type=source_type,
             no_rows=False,
         )
-
-        issues = list(score.issues)
-        if not facts:
-            issues.append(
-                "validation: no facts to validate \u2014 check not run"
-            )
-        if latest_doc is None:
-            issues.append(
-                "freshness: no publication dates available \u2014 check not run"
-            )
         components = list(score.components)
-        if latest_doc is not None and latest_doc.publication_date is not None:
-            pub = latest_doc.publication_date.isoformat()
-            components[1] = replace(
-                components[1],
-                reason=f"latest filing published {pub}; {days_stale} days stale",
-            )
-        score = replace(
-            score,
-            components=tuple(components),
-            issues=tuple(issues),
-        )
-        source_id = latest_doc.source_id if latest_doc is not None else None
-        await self._persist(
-            company_id, "financial_statements", score, source_id, as_of
-        )
+        components[1] = replace(components[1], reason=freshness_reason)
+        score = replace(score, components=tuple(components))
+        await self._persist(company_id, "financial_statements", score, source_id, as_of)
         return score
 
     async def latest(

@@ -113,10 +113,16 @@ async def upload_filing(
     filing_type: str = Form("Q"),
     accounting_basis: str = Form("EAS"),
     bulletin_id: str | None = Form(None),
+    auto_parse: bool = Form(True),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    """Upload a disclosure PDF into the registry mirror. Same bytes twice → one row."""
+    """Upload a disclosure PDF into the registry mirror. Same bytes twice → one row.
+
+    With ``auto_parse`` (default) the stored bytes are parsed right away with the
+    default parse options; a parse failure never fails the upload. Parsed facts
+    land in ``financial_facts`` and do not feed the engines (R43 section 1.1).
+    """
     try:
         filing, created = await _service(session).upload(
             company_id=company_id,
@@ -131,7 +137,29 @@ async def upload_filing(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {"filing": DisclosureService.filing_payload(filing), "created": created}
+    parse: dict[str, Any] | None = None
+    if auto_parse:
+        defaults = ParseBody()
+        try:
+            async with session.begin_nested():
+                parse = await _service(session).parse_filing(
+                    filing.id,
+                    engine=defaults.engine,
+                    method=defaults.method,
+                    statement_pages=defaults.statement_pages or None,
+                    metrics=defaults.metrics,
+                    fact_type=defaults.fact_type,
+                    currency=defaults.currency,
+                    audit_state=defaults.audit_state,
+                    eas_tags=defaults.eas_tags,
+                )
+        except Exception as exc:  # noqa: BLE001 - a parse failure never fails the upload
+            parse = {"status": "failed", "reason": f"{type(exc).__name__}: {exc}"}
+    return {
+        "filing": DisclosureService.filing_payload(filing),
+        "created": created,
+        "parse": parse,
+    }
 
 
 @router.get("/filings")

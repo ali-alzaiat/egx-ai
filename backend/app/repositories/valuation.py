@@ -209,5 +209,7 @@ class FairValueRepository:
             .where(
                 ValuationFairValue.methodology_version == VALUATION_METHODOLOGY_VERSION
             )
+            # Upserts bypass the identity map; always read the stored row.
+            .execution_options(populate_existing=True)
         )
         return result.scalars().first()

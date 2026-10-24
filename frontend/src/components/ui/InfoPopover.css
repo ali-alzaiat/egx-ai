@@ -1,0 +1,24 @@
+.info-popover { position: relative; display: inline-flex; vertical-align: middle; }
+.info-popover-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 0; border-radius: var(--radius-pill);
+  background: transparent; color: var(--text-3); cursor: pointer;
+}
+.info-popover-btn:hover { color: var(--text); background: var(--surface-2); }
+.info-popover-body {
+  position: absolute; inset-block-start: calc(100% + var(--space-1)); inset-inline-start: 0; z-index: 30;
+  width: max-content; max-width: min(320px, calc(100vw - 2 * var(--space-4)));
+  padding: var(--space-3) var(--space-4); background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-pop);
+  font-size: var(--fs-table); line-height: var(--lh-table); font-weight: 400; text-align: start;
+}
+.info-popover-body ul { margin: var(--space-2) 0 0; padding-inline-start: var(--space-5); }
+
+/* Phones: a bottom sheet, so the popover never runs off either screen edge in RTL or LTR. */
+@media (max-width: 767px) {
+  .info-popover { position: static; }
+  .info-popover-body {
+    position: fixed; inset-inline: var(--space-4); inset-block-start: auto; inset-block-end: var(--space-4);
+    width: auto; max-width: none; z-index: 60;
+  }
+}

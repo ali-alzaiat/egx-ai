@@ -1,12 +1,17 @@
 """Technical analysis service."""
 
+import json
 import logging
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import NamedTuple
 
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.market import Company, DailyPrice
+from app.models.technical import IndicatorStatusDB, IndicatorTypeDB, TechnicalIndicator
 from app.technical.indicators import (
     IndicatorResult,
     IndicatorType,
@@ -20,6 +25,9 @@ from app.technical.indicators import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: Compute-state version of the stored-prices technical engine (R43).
+TECHNICAL_METHODOLOGY_VERSION = "technical-1.0"
 
 
 class TechnicalInput(NamedTuple):
@@ -111,3 +119,50 @@ class TechnicalService:
             indicators=indicators,
             calculated_at=datetime.now(UTC),
         )
+
+    async def compute_from_prices(
+        self, company_id: uuid.UUID
+    ) -> tuple[TechnicalOutput, date | None]:
+        """Indicators over every stored bar (ascending), replacing the company's set.
+
+        Same lookback the client used to send (the full stored series). With no
+        bars every indicator is INSUFFICIENT_DATA; nothing is invented.
+        """
+        company = await self.session.get(Company, company_id)
+        if company is None:
+            raise LookupError(f"company {company_id} not found")
+        bars = (
+            await self.session.execute(
+                select(DailyPrice)
+                .where(DailyPrice.company_id == company_id)
+                .order_by(DailyPrice.date.asc())
+            )
+        ).scalars().all()
+        price_as_of = bars[-1].date if bars else None
+        output = await self.calculate_indicators(
+            TechnicalInput(
+                company_id=str(company_id),
+                ticker=company.ticker,
+                prices=[b.close for b in bars],
+                volumes=[int(b.volume) for b in bars],
+                highs=[b.high for b in bars],
+                lows=[b.low for b in bars],
+            )
+        )
+        await self.session.execute(
+            delete(TechnicalIndicator).where(TechnicalIndicator.company_id == company_id)
+        )
+        for result in output.indicators:
+            self.session.add(
+                TechnicalIndicator(
+                    company_id=company_id,
+                    indicator_type=IndicatorTypeDB(result.indicator.value),
+                    value=result.value,
+                    status=IndicatorStatusDB(result.status.value),
+                    parameters=json.dumps(result.parameters) if result.parameters else None,
+                    reason=result.reason,
+                    calculated_at=output.calculated_at,
+                )
+            )
+        await self.session.flush()
+        return output, price_as_of

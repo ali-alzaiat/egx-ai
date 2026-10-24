@@ -130,3 +130,21 @@
 2026-10-23 | architect -> staff-backend | .workflow/design/r43-computed-company-data.md | R43 contract filed (M1 bridge, M2 recompute, M3 API, migration 023; D-6 analyst ruling, D-8 sourced valuation assumptions, D-9 sector data scheduled separately); dispatched staff-backend
 2026-10-23 | router -> researcher | .workflow/inbox/researcher.md | dispatched: D-9 EGX sector source + D-8 sourced valuation assumptions
 2026-10-23 | router -> - | .workflow/AGENT_RULES.md | DONE: token budget — sonnet for 9 roles, compact agent rules, agents write own deliverables, 150-word handbacks, inbox = current task only, skip-step rules
+2026-10-24 | ux-expert -> staff-frontend | .workflow/design/ui-redesign-2026-10.md | spec filed by ux-expert (68 KB); dispatched FE-1 foundation (tokens, shell, mobile nav, shared ui, hub routing, admin shell, dict split)
+2026-10-24 | researcher -> pm | .workflow/research/r43-sector-and-valuation-sources.md | D-8/D-9 sources filed (EGX sectors for all 263 stocks; CBE T-bill 25.9%, Damodaran ERP 13.94%); dispatched pm for R44
+2026-10-24 | pm -> staff-backend | .workflow/decisions/R44-sectors-and-valuation-assumptions.md | R44 filed (sectors for peers/valuation only; Shariah via per-company activity tags, unreviewed = UNKNOWN; discount 28.36% EGP, terminal growth 5.4%, relative multiples INSUFFICIENT; D-6 accepted with labels); queued behind R43 backend
+2026-10-24 | staff-frontend -> qa-ui | .workflow/inbox/qa-ui.md | FE-1 foundation done (gates clean); QA shell/routing/RTL/mobile
+2026-10-24 | router (fast lane) | frontend shell | fixed qa-fe1 M1 + 3 L (main overflow clip, nested NotFound h2, search Esc focus, hub tab re-scroll); spec 9.1 uses clientWidth; ChevronIcon left for lanes
+2026-10-24 | router -> staff-frontend x2 | .workflow/inbox/staff-frontend-lane{A,C}.md | FE-1 merged (c7122a4); lanes A (market pages) and C (tracking + admin) in parallel; lane B waits for R43 M3
+2026-10-24 | user -> router | .workflow/decisions/R45-owner-review-r43-ui.md | owner review: R43 arch + R44 approved; UI direction changed to friendly retail (U1); ux-expert to propose variants
+2026-10-24 | router -> ux-expert | .workflow/inbox/ux-expert.md | friendly retail direction: 3 variants + preview page, ASK USER
+2026-10-24 | staff-backend -> qa-api + analyst | .workflow/inbox/{qa-api,analyst}.md | R43 backend done (878 passed, ruff/mypy clean); targeted QA + financial review
+2026-10-24 | user -> router -> staff-frontend | R45 U1 = variant A Cobalt Cards; FE-2 re-skin dispatched (shared layer only)
+2026-10-24 | router -> staff-backend + researcher + qa-ui | R43 fixes (analyst F1-F17, qa-api F1-F4, rulings M3-M5); long-run cost of equity sourcing; QA of lanes A/C + re-skin
+2026-10-24 | researcher -> user -> router | R45 M5: long-run CoE 17.51% (B), ERP 4.20% (explicit 28.33%); sent to staff-backend
+2026-10-24 | router (fast lane) | frontend | fixed qa-ui-lanes #1-4,#9 (table-wrap relative in ui.css, source-provisional in ui.css, Companies.css removed, Dashboard mixed-text stats not forced LTR, fmtPct U+2212); #8 stale (nested NotFound already h2); sidebar compacted per user
+2026-10-24 | user -> router | R45 F13: 3y revenue CAGR capped at sourced nominal GDP growth; researcher sources the cap, staff-backend implements
+2026-10-24 | researcher -> user -> router | R45 F13 cap = 13.59% (G1); sent to staff-backend
+2026-10-24 | router -> staff-frontend x2 | .workflow/inbox/staff-frontend-laneB{1,2}.md | hub tabs redesign + translation + R43 read-only; i18n guard a28bdb8 lists 14 pending files
+2026-10-24 | user -> router -> staff-backend | R45 fade horizon = 5y for all models
+2026-10-24 | router (fast lane) | backend valuation | fade horizon applied to FCFE/AFFO stable stage (years 6-10 at long-run rate); tests updated

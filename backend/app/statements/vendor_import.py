@@ -47,17 +47,28 @@ from app.statements.ontology import STATEMENT_LINES, STATEMENT_ONTOLOGY_VERSION
 from app.statements.validator import StatementValidator
 
 if TYPE_CHECKING:
+    import uuid
+
     from sqlalchemy.ext.asyncio import AsyncSession
 
-VENDOR_MAPPING_VERSION = "stockanalysis-map-1.0"
+VENDOR_MAPPING_VERSION = "stockanalysis-map-1.2"
 VENDOR_SOURCE_NAME = "STOCKANALYSIS_SPG"
 VENDOR_DOCUMENT_TYPE = "VENDOR_ANNUAL_STATEMENTS"
 DEFAULT_DIR = Path(__file__).resolve().parents[3] / "data" / "vendor" / "stockanalysis"
 
 AS_REPORTED = "as_reported"
 MAGNITUDE = "magnitude"
+#: Vendor ``equity`` (shareholders' equity incl. any minority) used as common equity
+#: only when the period has no ``totalCommonEquity`` and no non-zero minority
+#: interest (map 1.2; the vendor omits zero rows - 87 of 230 files, and
+#: assets = liabilities + equity holds in all 408 such periods).
+EQUITY_IF_NO_MINORITY = "equity_if_no_minority"
 
-# (statement, vendor field id, ontology code, transform)
+# (statement, vendor field id, ontology code, transform). When two entries map
+# to the same code, the first one present for a period wins and the later one
+# is skipped for that period (never both): banks carry interest income under
+# ``interestIncomeTotalBank`` instead of ``interestIncome`` (map 1.1); total equity
+# falls back from ``totalCommonEquity`` to ``equity`` (map 1.2, see above).
 FIELD_MAP: tuple[tuple[str, str, str, str], ...] = (
     ("income", "revenue", "revenue", AS_REPORTED),
     ("income", "cor", "cost_of_revenue", AS_REPORTED),
@@ -68,6 +79,9 @@ FIELD_MAP: tuple[tuple[str, str, str, str], ...] = (
     ("income", "taxexp", "income_tax", AS_REPORTED),
     ("income", "netinccmn", "net_income", AS_REPORTED),
     ("income", "epsBasic", "eps", AS_REPORTED),
+    ("income", "interestIncome", "interest_income", AS_REPORTED),
+    ("income", "interestIncomeTotalBank", "interest_income", AS_REPORTED),
+    ("income", "sharesBasic", "weighted_avg_shares_basic", AS_REPORTED),
     ("balance", "assets", "total_assets", AS_REPORTED),
     ("balance", "assetsc", "current_assets", AS_REPORTED),
     ("balance", "cashneq", "cash_and_equivalents", AS_REPORTED),
@@ -78,7 +92,9 @@ FIELD_MAP: tuple[tuple[str, str, str, str], ...] = (
     # Common equity excludes minority interest, which maps separately, so the
     # assets = liabilities + equity + minority identity does not double count.
     ("balance", "totalCommonEquity", "total_equity", AS_REPORTED),
+    ("balance", "equity", "total_equity", EQUITY_IF_NO_MINORITY),
     ("balance", "minorityInterestBS", "minority_interests", AS_REPORTED),
+    ("balance", "sharesOutTotalCommon", "shares_outstanding", AS_REPORTED),
     ("cash_flow", "ncfo", "cfo", AS_REPORTED),
     ("cash_flow", "ncfi", "cfi", AS_REPORTED),
     ("cash_flow", "ncff", "cff", AS_REPORTED),
@@ -103,6 +119,7 @@ class ImportSummary:
     rejected: int = 0
     held: int = 0
     skipped: list[str] = field(default_factory=list)
+    company_ids: list[uuid.UUID] = field(default_factory=list)
 
 
 def _decimal(raw: Any) -> Decimal | None:
@@ -148,12 +165,23 @@ def vendor_periods(payload: dict[str, Any]) -> list[VendorPeriod]:
             value = _decimal(values[i])
             if value is None:
                 continue
+            if transform == EQUITY_IF_NO_MINORITY:
+                minority = data.get("minorityInterestBS")
+                has_minority = (
+                    isinstance(minority, list)
+                    and i < len(minority)
+                    and (_decimal(minority[i]) or Decimal(0)) != 0
+                )
+                if has_minority:
+                    continue  # equity would include minority interest: leave it unmapped
             if transform == MAGNITUDE:
                 value = abs(value)
             end = date.fromisoformat(str(key))
             period = periods.setdefault(
                 end, VendorPeriod(fiscal_year=int(years[i]), period_end=end, currency=currency)
             )
+            if any(c.ontology_code == code for c in period.candidates):
+                continue  # an earlier field already supplied this code (first wins)
             period.candidates.append(
                 LineCandidate(
                     ontology_code=code,
@@ -264,6 +292,7 @@ async def import_payload(
             else:
                 summary.held += 1
     summary.companies += 1
+    summary.company_ids.append(company.id)
 
 
 async def import_directory(
@@ -283,6 +312,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("tickers", nargs="*", help="limit to these tickers")
     parser.add_argument("--dir", type=Path, default=DEFAULT_DIR)
+    parser.add_argument(
+        "--no-recompute", action="store_true", help="skip the automatic snapshot recompute"
+    )
     args = parser.parse_args()
     if not args.dir.exists():
         print(f"No vendor files at {args.dir}; nothing to import.")
@@ -303,6 +335,10 @@ def main() -> int:
     )
     if s.skipped:
         print(f"Skipped (no company row or no statements): {', '.join(s.skipped)}")
+    if not args.no_recompute and s.company_ids:
+        from app.services.recompute import after_statement_import
+
+        print(asyncio.run(after_statement_import(s.company_ids)).summary())
     return 0
 
 

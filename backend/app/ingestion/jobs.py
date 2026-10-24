@@ -1,4 +1,4 @@
-"""In-process market refresh job (universe -> prices -> assessment).
+"""In-process market refresh job (universe -> prices -> assessment -> recompute).
 
 State is intentionally in-memory: a single-user tool needs a button, not a job
 table, and a process restart simply returns the status to ``idle``. One job runs
@@ -21,6 +21,7 @@ from app.db.session import async_session_factory
 from app.ingestion.egx.provider import EGXMarketDataProvider
 from app.ingestion.sync import fetch_and_write_prices
 from app.models.market import Company, CompanyStatus
+from app.services.recompute import after_price_sync, company_ids_for_tickers
 from app.services.universe import UniverseService
 
 if TYPE_CHECKING:
@@ -80,6 +81,7 @@ class SyncJob:
     universe: dict[str, int] | None = None
     prices: dict[str, Any] | None = None
     assessment: dict[str, int] | None = None
+    recompute: dict[str, Any] | None = None
     error: str | None = None
     task: asyncio.Task[None] | None = field(default=None, repr=False)
 
@@ -93,6 +95,7 @@ class SyncJob:
             "universe": self.universe,
             "prices": self.prices,
             "assessment": self.assessment,
+            "recompute": self.recompute,
             "error": self.error,
         }
 
@@ -212,6 +215,12 @@ async def _run_phases(
     job.phase = "assessment"
     assessed, written = await _assess_all_companies()
     job.assessment = {"companies_assessed": assessed, "scores_written": written}
+
+    job.phase = "recompute"
+    async with _session_factory() as session:
+        synced_ids = await company_ids_for_tickers(session, summary.fetched_tickers)
+    result = await after_price_sync(synced_ids, session_factory=_session_factory)
+    job.recompute = result.as_dict()
 
     job.phase = None
     job.status = STATUS_PARTIAL if summary.failures else STATUS_DONE

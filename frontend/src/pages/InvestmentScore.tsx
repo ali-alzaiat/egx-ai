@@ -1,274 +1,157 @@
-import "./InvestmentScore.css";
+import { useParams } from "react-router-dom";
+import { useCompanyByTicker, useScore } from "../api/client";
+import { SCORE_COMPONENTS, SCORE_COMPONENT_KEYS, confidenceLabelKey, type ScoreComponentKey } from "../components/research/labels";
+import { ProvisionalTag, ResearchSection, TechnicalDetails } from "../components/research/parts";
+import { MissingReason, Reason } from "../components/research/reasons";
+import DataTable, { type Column } from "../components/ui/DataTable";
+import { Notice } from "../components/ui/Notice";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtNum, fmtPct } from "../lib/format";
+import type { ScoreAssessment, ScoreComponent } from "../types";
 
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { assessScore, useCompanyByTicker, useScore } from '../api/client'
-import { formatAsOf } from '../lib/format'
-import CompanyNotFound from '../components/CompanyNotFound'
-import type { ScoreAssessment, ScoreCheck } from '../types'
-
-const COMPONENT_ORDER = ['value', 'past', 'health', 'dividend', 'growth'] as const
-
-const COMPONENT_LABELS: Record<string, string> = {
-  value: 'Value',
-  past: 'Past performance',
-  health: 'Financial health',
-  dividend: 'Dividend',
-  growth: 'Growth',
+interface ComponentRow {
+  key: ScoreComponentKey;
+  component: ScoreComponent;
 }
 
-function isStale(asOf: string | undefined): boolean {
-  if (!asOf) return false
-  const t = new Date(asOf).getTime()
-  if (Number.isNaN(t)) return false
-  return Date.now() - t > 90 * 24 * 60 * 60 * 1000
+function oneDecimal(locale: string, value: number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  return fmtNum(locale, value, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-function statusWord(status: string): string {
-  if (status === 'AVAILABLE' || status === 'PASS') return 'Available'
-  if (status === 'FAIL') return 'Fail'
-  if (status === 'NOT_RUN') return 'Not run'
-  return 'Not enough data'
-}
+function ScoreBody({ assessment, provisional }: { assessment: ScoreAssessment; provisional: boolean }) {
+  const { t, locale } = useLang();
+  const headline = assessment.headline;
+  const total = oneDecimal(locale, headline.value);
+  const rows: ComponentRow[] = SCORE_COMPONENTS.flatMap((key) => {
+    const component = assessment.components[key];
+    return component ? [{ key, component }] : [];
+  });
+  const weight = rows.length > 0 ? fmtPct(locale, 1 / rows.length) : null;
+  const zone = assessment.buy_zone.in_buy_zone;
+  const asOf = fmtDate(locale, assessment.as_of);
 
-function isInsufficient(status: string): boolean {
-  return status !== 'AVAILABLE' && status !== 'PASS' && status !== 'FAIL'
-}
+  const columns: Column<ComponentRow>[] = [
+    { id: "component", header: t("rc_col_component"), sticky: true, cell: (row) => t(SCORE_COMPONENT_KEYS[row.key]) },
+    {
+      id: "score",
+      header: t("rc_col_score"),
+      type: "num",
+      cell: (row) => oneDecimal(locale, row.component.score) ?? <MissingReason reason={row.component.reason} />,
+    },
+    { id: "weight", header: t("rs_col_weight"), type: "num", cell: () => weight ?? <MissingReason reason={null} /> },
+    {
+      id: "reason",
+      header: t("rs_col_reason"),
+      cell: (row) => (row.component.reason ? <Reason reason={row.component.reason} /> : "—"),
+    },
+  ];
 
-function StatusBadge({ status }: { status: string }) {
-  const insufficient = isInsufficient(status) && status !== 'NOT_RUN'
-  return (
-    <span
-      className={insufficient ? 'score-badge score-badge-missing' : 'score-badge'}
-      title={insufficient ? 'INSUFFICIENT_DATA — not enough stored data to run this' : status}
-    >
-      {insufficient ? 'INSUFFICIENT_DATA' : statusWord(status)}
-    </span>
-  )
-}
-
-function inputsTitle(check: ScoreCheck): string {
-  const entries = Object.entries(check.inputs ?? {})
-    .filter(([, v]) => v !== null && v !== undefined && v !== '')
-    .map(([k, v]) => `${k}=${v}`)
-  return entries.length > 0 ? entries.join(' · ') : 'No stored inputs'
-}
-
-function ScoreBody({ assessment }: { assessment: ScoreAssessment }) {
-  const stale = isStale(assessment.as_of)
-  const headline = assessment.headline
-  const headlineValue = headline.value
-  const headlineMissing = headlineValue === null || headlineValue === undefined
-  const sources = assessment.inputs_echo?.sources ?? {}
-  const sourceList = Object.entries(sources)
-    .filter(([, v]) => v !== null && v !== undefined && v !== '')
-    .map(([k, v]) => `${k}: ${typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}`)
   return (
     <>
-      {stale && (
-        <div className="alert alert-error" role="alert">
-          This score is over 90 days old (as of {formatAsOf(assessment.as_of)}).
-          Re-assess before relying on it.
+      <div className="card-surface rs-hero">
+        <span className="rs-hero-label">{t("rc_total")}</span>
+        <div>
+          {total !== null ? (
+            <span className="rs-figure" dir="ltr">
+              {total}
+              <span className="rs-figure-unit">/ 100</span>
+            </span>
+          ) : (
+            <span className="rs-figure">
+              <MissingReason reason={headline.reason} />
+            </span>
+          )}
+        </div>
+        <p className="rs-note">
+          {t("rc_confidence", {
+            level: t(confidenceLabelKey(assessment.confidence.level)),
+            n: assessment.n_with_data,
+            total: assessment.n_checks_total,
+          })}
+        </p>
+        {provisional && (
+          <div className="rs-tags">
+            <ProvisionalTag />
+          </div>
+        )}
+      </div>
+
+      <div className="rs-wrap-table">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.key}
+          caption={t("rc_title")}
+          loadingThing={t("rc_thing")}
+          footnote={t("rc_components_caption")}
+          hideDensityToggle
+        />
+      </div>
+
+      {typeof zone === "boolean" && (
+        <div className="rs-card">
+          <h3 className="rs-block-title">{t("rc_zone_title")}</h3>
+          <p className="rs-sentence">{t(zone ? "rc_zone_in" : "rc_zone_out")}</p>
+          <p className="rs-note">{t("rc_zone_note")}</p>
         </div>
       )}
 
-      <div className="card">
-        <h2>Headline score</h2>
-        <p className="headline-value">
-          {headlineMissing ? '—' : headlineValue.toFixed(1)}
-          <span className="muted"> / 100</span>{' '}
-          {headlineMissing && <StatusBadge status={headline.status} />}
-        </p>
-        <p>{headline.detail}</p>
-        <p className="muted">{headline.reason}</p>
-        <p className="muted">
-          As of {formatAsOf(assessment.as_of)} · methodology v{assessment.methodology_version} ·
-          valuation v{assessment.valuation_methodology_version} · profile {assessment.profile.profile_id} ({assessment.profile.health_track})
-        </p>
-      </div>
-
-      <div className="card">
-        <h2>Confidence — {assessment.confidence.level}</h2>
-        <p>{assessment.confidence.reason}</p>
-        <p className="muted">
-          {assessment.n_with_data} of {assessment.n_checks_total} checks with data
-          {assessment.confidence.dq_score !== null && assessment.confidence.dq_score !== undefined
-            ? ` · data-quality score ${assessment.confidence.dq_score}`
-            : ''}
-          {` · ${assessment.confidence.n_checks_run} checks run`}
-        </p>
-      </div>
-
-      <div className="table-container">
-        <table>
-          <caption className="muted">
-            Five components, equal-weighted; the headline is their mean and stays
-            blank below the data floor — never a default score.
-          </caption>
-          <thead>
-            <tr>
-              <th>Component</th>
-              <th>Score</th>
-              <th>Status</th>
-              <th>Checks passed</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {COMPONENT_ORDER.map((key) => {
-              const c = assessment.components[key]
-              if (!c) return null
-              return (
-                <tr key={key}>
-                  <td>{COMPONENT_LABELS[key] ?? key}</td>
-                  <td>{c.score === null || c.score === undefined ? '—' : c.score.toFixed(1)}</td>
-                  <td><StatusBadge status={c.status} /></td>
-                  <td>{c.passes}/{c.total}</td>
-                  <td>{c.reason || '—'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {assessment.checks.length > 0 && (
-        <div className="table-container">
-          <table>
-            <caption className="muted">
-              Per-check detail — hover a check for the stored inputs behind it.
-            </caption>
-            <thead>
-              <tr>
-                <th>Check</th>
-                <th>Component</th>
-                <th>Status</th>
-                <th>Threshold</th>
-                <th>Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assessment.checks.map((check) => (
-                <tr key={`${check.component}:${check.check_key}`} title={inputsTitle(check)}>
-                  <td>{check.check_key}</td>
-                  <td>{COMPONENT_LABELS[check.component] ?? check.component}</td>
-                  <td><StatusBadge status={check.status} /></td>
-                  <td>{check.threshold || '—'}</td>
-                  <td>{check.reason || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {assessment.checks_not_run.length > 0 && (
-        <div className="card">
-          <h2>Checks not run ({assessment.checks_not_run.length})</h2>
-          <p className="muted">{assessment.checks_not_run.join(', ')}</p>
-        </div>
-      )}
-
-      <div className="card">
-        <h2>Buy zone (display only)</h2>
-        <p>
-          {typeof assessment.buy_zone.in_buy_zone === 'boolean'
-            ? assessment.buy_zone.in_buy_zone
-              ? 'Price is within the margin-of-safety zone — potentially of interest under these assumptions.'
-              : 'Price is above the margin-of-safety zone under these assumptions.'
-            : String(assessment.buy_zone.reason ?? 'Buy zone not computed.')}
-        </p>
-        <p className="muted">This is context, not advice.</p>
-      </div>
-
-      <p className="muted">{assessment.disclaimer}</p>
-      <p className="muted" title={sourceList.join('\n') || 'No recorded sources'}>
-        Scale {assessment.scale} · score methodology v{assessment.methodology_version} ·
-        valuation methodology v{assessment.valuation_methodology_version}
-        {sourceList.length > 0 ? ` · sources: ${sourceList.join(' · ')}` : ''}
+      <p className="rs-note">
+        {t("rv_footer", {
+          version: assessment.methodology_version,
+          asof: asOf !== null ? t("rs_as_of", { date: asOf }) : t("rs_no_data_reason"),
+        })}
+        {" · "}
+        {t("rs_research_note")}
       </p>
+
+      <TechnicalDetails>
+        <span>{`score_methodology = ${assessment.methodology_version}`}</span>
+        <span>{`valuation_methodology = ${assessment.valuation_methodology_version}`}</span>
+        <span>{`profile = ${assessment.profile.profile_id} (${assessment.profile.health_track})`}</span>
+        {assessment.checks.map((check) => (
+          <span key={`${check.component}:${check.check_key}`}>
+            {`${check.component}.${check.check_key} [${check.status}] threshold ${check.threshold || "-"}`}
+          </span>
+        ))}
+        {assessment.checks_not_run.length > 0 && <span>{`not_run = ${assessment.checks_not_run.join(", ")}`}</span>}
+      </TechnicalDetails>
     </>
-  )
+  );
 }
 
+/**
+ * Investment score tab section (R43 #4): five components computed on read from
+ * statement lines, metrics and the fair-value snapshot. No Assess button; an
+ * empty state only names why the score is unavailable.
+ */
 export default function InvestmentScore() {
-  const { ticker } = useParams<{ ticker: string }>()
-  const queryClient = useQueryClient()
-  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
-  const {
-    data: score,
-    isLoading: scoreLoading,
-    error: scoreError,
-    refetch,
-  } = useScore(company?.id)
+  const { ticker } = useParams<{ ticker: string }>();
+  const { t } = useLang();
+  const { data: company } = useCompanyByTicker(ticker);
+  const { data: score, isLoading, error, refetch } = useScore(company?.id);
 
-  const [running, setRunning] = useState(false)
-  const [runError, setRunError] = useState<string | null>(null)
+  if (!company || isLoading) return <LoadingState thing={t("rc_thing")} />;
+  if (error) return <ErrorState thing={t("rc_thing")} onRetry={() => void refetch()} />;
 
-  const handleAssess = async (): Promise<void> => {
-    if (!company) return
-    setRunning(true)
-    setRunError(null)
-    try {
-      await assessScore(company.id)
-      await queryClient.invalidateQueries({ queryKey: ['score'] })
-      await refetch()
-    } catch (err) {
-      setRunError(err instanceof Error ? err.message : 'Assessment failed')
-    } finally {
-      setRunning(false)
-    }
-  }
-
-  if (companyLoading || scoreLoading) {
-    return <div className="loading">Loading company...</div>
-  }
-
-  if (companyError || !company) {
-    return <CompanyNotFound ticker={ticker} />
-  }
-
-  const assessment = score?.assessment ?? null
-
+  const assessment = score?.assessment ?? null;
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <h2>Investment Score - {company.ticker}</h2>
-          <p className="subtitle">{company.name}</p>
-        </div>
-        <button className="btn btn-primary" onClick={handleAssess} disabled={running}>
-          {running ? 'Assessing…' : 'Assess score'}
-        </button>
-      </div>
-
-
-      {runError && (
-        <div className="alert alert-error">
-          {runError}{' '}
-          <button className="link-btn" onClick={handleAssess}>
-            Retry
-          </button>
-        </div>
+    <ResearchSection title={t("rc_title")}>
+      {score?.compute_status === "failed" && assessment && <Notice variant="warning">{t("rs_compute_failed")}</Notice>}
+      {assessment ? (
+        <ScoreBody assessment={assessment} provisional={score?.provisional === true} />
+      ) : (
+        <>
+          <EmptyState>{t("rc_empty", { ticker: company.ticker })}</EmptyState>
+          {score?.compute_error && (
+            <p className="rs-note">
+              <Reason reason={score.compute_error} />
+            </p>
+          )}
+        </>
       )}
-      {scoreError && (
-        <div className="alert alert-error">
-          Couldn't load the investment score.{' '}
-          <button className="link-btn" onClick={() => refetch()}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {!assessment && !scoreError && (
-        <div className="empty">
-          No score assessed yet for {company.ticker}. Assess to compute the
-          five-component score from stored data — nothing is defaulted.
-        </div>
-      )}
-
-      {assessment && <ScoreBody assessment={assessment} />}
-    </div>
-  )
+    </ResearchSection>
+  );
 }

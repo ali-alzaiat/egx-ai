@@ -1,109 +1,117 @@
-"""Build a ScreeningInput from approved statement lines (zborsa Task 8).
+"""Build a ScreeningInput from approved statement lines (R43: the canonical Shariah engine).
 
-The existing Shariah methodology (versioned record, unchanged) is reused
-verbatim. Only the *inputs* change: interest-bearing debt, total assets,
-cash & equivalents and revenue are read from the approved stream of
-``FinancialStatementLine`` rows instead of legacy ``FinancialFact`` rows.
-Interest income is not part of the statement ontology v1, so it stays
-``None`` and the corresponding rule reports ``INSUFFICIENT_DATA`` rather
-than a synthetic pass/fail (no fabricated data).
+The Shariah methodology (versioned record, unchanged) is reused verbatim; only
+the inputs come from the statement-line bridge, latest ANNUAL period only.
+Partial data never returns None: each missing input goes in as ``None`` and its
+rule reports INSUFFICIENT_DATA naming the missing statement line.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import date
-from decimal import Decimal
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from app.screening.service import ScreeningInput
+from app.screening.rules import ScreeningRuleResult, ScreeningVerdict
+from app.screening.service import RuleProvenance, ScreeningInput
+from app.statements import bridge
 
 if TYPE_CHECKING:
-    import uuid
-    from collections.abc import Sequence
+    from decimal import Decimal
 
     from app.models.market import Company
-    from app.models.statements import FinancialStatementLine
+    from app.statements.bridge import CompanyStatements, LineValue, PeriodLines
 
-_REQUIRED_CODES: tuple[str, ...] = (
-    "interest_bearing_debt",
-    "total_assets",
-    "cash_and_equivalents",
-    "revenue",
-)
+#: Statement-line codes behind each ratio rule.
+RULE_LINE_CODES: dict[str, tuple[str, ...]] = {
+    "debt_ratio": ("interest_bearing_debt", "total_assets"),
+    "interest_income_ratio": ("interest_income", "revenue"),
+    "cash_securities_ratio": ("cash_and_equivalents", "total_assets"),
+}
+
+#: Rule-level input labels -> the statement line that feeds them.
+RULE_LABEL_TO_LINE: dict[str, str] = {
+    "total_debt": "interest_bearing_debt",
+    "total_assets": "total_assets",
+    "interest_income": "interest_income",
+    "total_revenue": "revenue",
+    "cash_and_equivalents": "cash_and_equivalents",
+}
+
+NO_STATEMENTS_REASON = "no approved statement lines"
 
 
-def _latest_period_lines(
-    lines: Sequence[FinancialStatementLine],
-) -> list[FinancialStatementLine]:
-    """Pick the statement period with the newest publication date.
-
-    All approved lines for a company span multiple periods; screening uses
-    one coherent period. When publication dates are missing we fall back to
-    the largest group (most lines) so the result is still deterministic.
-    """
+def _rule_source(lines: list[LineValue]) -> RuleProvenance | None:
     if not lines:
-        return []
-    groups: dict[uuid.UUID, list[FinancialStatementLine]] = defaultdict(list)
-    for line in lines:
-        groups[line.period_id].append(line)
-    if len(groups) == 1:
-        return list(next(iter(groups.values())))
-    # Prefer the period whose newest published_date is greatest.
-    def period_key(period_lines: list[FinancialStatementLine]) -> tuple[int, int]:
-        dates = [pl.published_date for pl in period_lines if pl.published_date is not None]
-        latest = max(dates) if dates else date.min
-        # Encode date as ordinal; missing dates sort last via 0 sentinel handled above.
-        return (latest.toordinal() if latest != date.min else 0, len(period_lines))
-
-    best = max(groups.values(), key=period_key)
-    return list(best)
+        return None
+    tier = bridge.tier_of(lines)
+    head = next((lv for lv in lines if lv.source_tier == tier), lines[0])
+    pages = sorted({lv.source_page for lv in lines if lv.source_page})
+    source = (
+        f"{tier}: {head.document_type or 'statement'} FY{head.fiscal_year} "
+        f"(period end {head.period_end.isoformat()})"
+    )
+    if pages:
+        source += f", p.{', '.join(pages)}"
+    dated = [lv.published_date for lv in lines if lv.published_date is not None]
+    return RuleProvenance(source=source, source_date=max(dated) if dated else None)
 
 
 def build_screening_input_from_statements(
-    company_id: uuid.UUID,
-    company: Company,
-    lines: Sequence[FinancialStatementLine],
-    market_cap: Decimal | None,
-) -> tuple[ScreeningInput | None, str | None]:
-    """Map approved statement lines onto a ``ScreeningInput``.
+    company: Company, statements: CompanyStatements
+) -> ScreeningInput:
+    """Map the latest period's lines onto a ``ScreeningInput`` (never None)."""
+    p = statements.latest()
 
-    Returns ``(None, reason)`` when any required ontology code is absent so
-    the caller can surface ``INSUFFICIENT_DATA`` instead of a verdict.
-    ``market_cap`` is accepted for the market-side inputs future rules may
-    need; v1 rules do not consume it (never invent a value).
-    """
-    del market_cap  # accepted for contract parity; no v1 rule consumes it
-    period_lines = _latest_period_lines(lines)
-    by_code: dict[str, Decimal | None] = {}
-    for line in period_lines:
-        if line.value is not None:
-            by_code[line.ontology_code] = Decimal(str(line.value))
-        else:
-            by_code.setdefault(line.ontology_code, None)
+    def value(code: str) -> Decimal | None:
+        lv = p.get(code) if p is not None else None
+        return lv.value if lv is not None else None
 
-    # A code present with a None value counts as missing too.
-    missing = [
-        code for code in _REQUIRED_CODES
-        if by_code.get(code) is None
-    ]
-    # But a code that is genuinely absent from by_code is also missing (already covered).
-    if missing:
-        return None, "missing required statement lines: " + ", ".join(missing)
-
-    total_debt = by_code.get("interest_bearing_debt")
-    total_assets = by_code.get("total_assets")
-    cash_and_securities = by_code.get("cash_and_equivalents")
-    total_revenue = by_code.get("revenue")
+    provenance: dict[str, RuleProvenance] = {
+        "industry_screen": RuleProvenance(source="company record", source_date=None)
+    }
+    if p is not None:
+        for rule_name, codes in RULE_LINE_CODES.items():
+            prov = _rule_source([lv for c in codes if (lv := p.get(c)) is not None])
+            if prov is not None:
+                provenance[rule_name] = prov
 
     return ScreeningInput(
-        company_id=str(company_id),
+        company_id=str(company.id),
         ticker=company.ticker,
         industry=company.industry,
-        total_debt=total_debt,
-        total_assets=total_assets,
-        interest_income=None,
-        total_revenue=total_revenue,
-        cash_and_securities=cash_and_securities,
-        provenance=None,
-    ), None
+        total_debt=value("interest_bearing_debt"),
+        total_assets=value("total_assets"),
+        interest_income=value("interest_income"),
+        total_revenue=value("revenue"),
+        cash_and_securities=value("cash_and_equivalents"),
+        provenance=provenance,
+    )
+
+
+def name_missing_lines(
+    rules: list[ScreeningRuleResult], p: PeriodLines | None
+) -> list[ScreeningRuleResult]:
+    """Rewrite INSUFFICIENT rules so ``missing_input``/``reason`` name statement lines."""
+    out: list[ScreeningRuleResult] = []
+    for rule in rules:
+        if rule.verdict != ScreeningVerdict.INSUFFICIENT_DATA or not rule.missing_input:
+            out.append(rule)
+            continue
+        labels = [part.strip() for part in rule.missing_input.split(",") if part.strip()]
+        codes = [RULE_LABEL_TO_LINE.get(label) for label in labels]
+        if any(code is None for code in codes):
+            out.append(rule)
+            continue
+        line_codes = [c for c in codes if c is not None]
+        reason = "; ".join(bridge.missing_reason(code, p) for code in line_codes)
+        out.append(replace(rule, missing_input=", ".join(line_codes), reason=reason))
+    return out
+
+
+def statement_sources(statements: CompanyStatements) -> list[LineValue]:
+    """Every line the screen read (for the tier / provisional summary)."""
+    p = statements.latest()
+    if p is None:
+        return []
+    codes = {c for codes in RULE_LINE_CODES.values() for c in codes}
+    return [lv for c in sorted(codes) if (lv := p.get(c)) is not None]

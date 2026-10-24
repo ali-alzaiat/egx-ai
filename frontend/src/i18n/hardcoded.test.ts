@@ -16,20 +16,6 @@ const LATIN_WORD = /[A-Z]?[a-z]{2,}/;
 
 /** Hub tab files not yet migrated (Lane B). Remove each entry as it is translated; the list must end empty. */
 const PENDING = new Set<string>([
-  "components/DataQualityCard.tsx",
-  "components/FairValueCard.tsx",
-  "components/PeersTab.tsx",
-  "components/SensitivityTable.tsx",
-  "pages/CompanyDetail.tsx",
-  "pages/Disclosures.tsx",
-  "pages/FinancialData.tsx",
-  "pages/FinancialMetrics.tsx",
-  "pages/InvestmentScore.tsx",
-  "pages/Peers.tsx",
-  "pages/ShariahScreening.tsx",
-  "pages/TechnicalAnalysis.tsx",
-  "pages/Thesis.tsx",
-  "pages/Valuation.tsx",
 ]);
 
 /** Every .tsx source under src/, keyed "pages/Foo.tsx", read as raw text by Vite. */

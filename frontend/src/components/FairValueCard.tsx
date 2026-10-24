@@ -1,280 +1,195 @@
-import { memo } from 'react'
-import type { FairValueResponse } from '../types'
-import { formatAsOf, formatPrice } from '../lib/format'
-import './FairValueCard.css'
+import { memo } from "react";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtPct, fmtPrice, toNumber } from "../lib/format";
+import type { FairValueLeg, FairValueResponse } from "../types";
+import {
+  confidenceLabelKey,
+  dqStatusKey,
+  modelLabelKey,
+  statusKey,
+} from "./research/labels";
+import { ProvisionalTag, ResearchSection } from "./research/parts";
+import { MissingReason, Reason } from "./research/reasons";
+import DataTable, { type Column } from "./ui/DataTable";
+import { Missing } from "./ui/Missing";
+import { Notice } from "./ui/Notice";
 
-// Weighted fair value always renders paired with its assumptions — never a
-// bare point estimate (frontend-catchup-contract Batch A.3).
+const LEG_ORDER = ["intrinsic", "relative", "fallback"] as const;
+type LegName = (typeof LEG_ORDER)[number];
 
-const LEG_ORDER = ['intrinsic', 'relative', 'fallback'] as const
+const LEG_ROLE = {
+  intrinsic: "rv_leg_intrinsic",
+  relative: "rv_leg_relative",
+  fallback: "rv_leg_fallback",
+} as const;
 
-const LEG_LABEL: Record<string, string> = {
-  intrinsic: 'Intrinsic',
-  relative: 'Relative',
-  fallback: 'Fallback',
+const VERDICT_KEY = {
+  POTENTIALLY_UNDERVALUED: "rv_verdict_under",
+  POTENTIALLY_OVERVALUED: "rv_verdict_over",
+  AROUND_FAIR_VALUE: "rv_verdict_near",
+} as const;
+
+interface LegRow {
+  name: LegName;
+  leg: FairValueLeg;
+  weight: string | undefined;
 }
 
-const VERDICT_LABEL: Record<string, string> = {
-  POTENTIALLY_UNDERVALUED: 'Potentially undervalued',
-  POTENTIALLY_OVERVALUED: 'Potentially overvalued',
-  AROUND_FAIR_VALUE: 'Around fair value',
-  INSUFFICIENT_DATA: 'Not enough data',
-}
+const SCENARIOS = ["bear", "base", "bull"] as const;
+const SCENARIO_KEY = { bear: "target_bear", base: "target_base", bull: "target_bull" } as const;
 
-// Rule 10: interpretation only, never a BUY/SELL instruction.
-const VERDICT_DETAIL: Record<string, string> = {
-  POTENTIALLY_UNDERVALUED:
-    'Price is below fair value by more than the required margin for this confidence level; potentially undervalued under these assumptions.',
-  POTENTIALLY_OVERVALUED:
-    'Price is above fair value by more than the required margin for this confidence level; potentially overvalued under these assumptions.',
-  AROUND_FAIR_VALUE:
-    'Price is within the required margin of fair value for this confidence level; around fair value under these assumptions.',
-  INSUFFICIENT_DATA:
-    'No verdict: fair value or current price is unavailable, so no comparison is made.',
-}
+/**
+ * Weighted fair value, read-only (R43 #1): the headline estimate under the stated
+ * methodology, the verdict sentence, the scenario range and the model legs. The
+ * verdict comes from the backend; the UI never recomputes it.
+ */
+function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
+  const { t, locale } = useLang();
+  const fv = fairValue.fair_value;
+  const headline = fmtPrice(locale, fv.status === "AVAILABLE" ? fv.value : null);
+  const price = fmtPrice(locale, fairValue.current_price.value);
+  const priceDate = fmtDate(locale, fairValue.current_price.as_of);
+  const verdictLabel = fairValue.verdict?.label ?? "INSUFFICIENT_DATA";
+  const verdictKey = verdictLabel in VERDICT_KEY ? VERDICT_KEY[verdictLabel as keyof typeof VERDICT_KEY] : null;
+  const dqStatus = fairValue.confidence.dq_status;
+  const degraded = dqStatus !== "OK" && headline !== null;
+  const bear = fmtPrice(locale, fairValue.scenarios.bear.value);
+  const bull = fmtPrice(locale, fairValue.scenarios.bull.value);
+  const margin = fmtPct(locale, fairValue.confidence.required_discount);
 
-const VERDICT_BADGE: Record<string, string> = {
-  POTENTIALLY_UNDERVALUED: 'healthy',
-  POTENTIALLY_OVERVALUED: 'warning',
-  AROUND_FAIR_VALUE: 'unknown',
-  INSUFFICIENT_DATA: 'unknown',
-}
+  const legRows: LegRow[] = LEG_ORDER.map((name) => ({
+    name,
+    leg: fairValue.legs[name],
+    weight: fairValue.weights[name],
+  }));
+  const legColumns: Column<LegRow>[] = [
+    {
+      id: "model",
+      header: t("rs_col_model"),
+      sticky: true,
+      cell: (row) => {
+        const key = modelLabelKey(row.leg.model);
+        return (
+          <span className="rs-cell-stack">
+            <span>{key ? t(key) : row.leg.model}</span>
+            <span className="rs-cell-sub">{t(LEG_ROLE[row.name])}</span>
+          </span>
+        );
+      },
+    },
+    {
+      id: "value",
+      header: t("col_value"),
+      type: "num",
+      cell: (row) => fmtPrice(locale, row.leg.status === "AVAILABLE" ? row.leg.value : null) ?? <MissingReason reason={row.leg.reason} />,
+    },
+    {
+      id: "weight",
+      header: t("rs_col_weight"),
+      type: "num",
+      cell: (row) => (toNumber(row.weight) === null ? <Missing /> : fmtPct(locale, row.weight)),
+    },
+    {
+      id: "status",
+      header: t("col_status"),
+      cell: (row) => <span className="rs-status-word">{t(statusKey(row.leg.status))}</span>,
+    },
+    {
+      id: "reason",
+      header: t("rs_col_reason"),
+      cell: (row) => (row.leg.reason ? <Reason reason={row.leg.reason} /> : "—"),
+    },
+  ];
 
-const LADDER_TITLE =
-  'Confidence ladder (methodology v1.0): VeryHigh needs a 10% margin, High 15%, Medium 20%, Low/POOR/MISSING 30%. Weaker inputs need a bigger discount before any verdict.'
+  const scenarioRow = [{ id: "range" }];
+  const scenarioMissing = SCENARIOS.every((name) => fmtPrice(locale, fairValue.scenarios[name].value) === null);
+  const scenarioColumns: Column<{ id: string }>[] = SCENARIOS.map((name) => ({
+    id: name,
+    header: t(SCENARIO_KEY[name]),
+    type: "num" as const,
+    cell: () => {
+      const s = fairValue.scenarios[name];
+      return fmtPrice(locale, s.status === "AVAILABLE" ? s.value : null) ?? <MissingReason reason={s.reason} />;
+    },
+  }));
 
-function statusWord(status: string): string {
-  if (status === 'AVAILABLE') return 'Available'
-  if (status === 'INVALID') return 'Invalid inputs'
-  return 'Not enough data'
-}
-
-interface VerdictShape {
-  label?: unknown
-  detail?: unknown
-  discount?: unknown
-}
-
-// The API sends verdict as { label, detail, discount }; the frozen
-// FairValueResponse type declares a string, so accept both at runtime.
-function readVerdict(verdict: unknown): {
-  label: string
-  detail: string
-  discount: string | null
-} {
-  if (typeof verdict === 'string') {
-    return {
-      label: verdict,
-      detail: VERDICT_DETAIL[verdict] ?? verdict,
-      discount: null,
-    }
-  }
-  if (verdict !== null && typeof verdict === 'object') {
-    const v = verdict as VerdictShape
-    const label =
-      typeof v.label === 'string' ? v.label : 'INSUFFICIENT_DATA'
-    return {
-      label,
-      detail:
-        typeof v.detail === 'string'
-          ? v.detail
-          : (VERDICT_DETAIL[label] ?? label),
-      discount: typeof v.discount === 'string' ? v.discount : null,
-    }
-  }
-  return {
-    label: 'INSUFFICIENT_DATA',
-    detail: VERDICT_DETAIL.INSUFFICIENT_DATA ?? 'No verdict available.',
-    discount: null,
-  }
-}
-
-function formatDiscount(discount: string | null): string {
-  if (discount === null) return '—'
-  const n = Number(discount)
-  return Number.isFinite(n) ? `${(n * 100).toFixed(1)}%` : discount
-}
-
-function LegRows({ fairValue }: { fairValue: FairValueResponse }) {
   return (
     <>
-      {LEG_ORDER.map((leg) => {
-        const row = fairValue.legs[leg]
-        const available = row.status === 'AVAILABLE'
-        return (
-          <tr key={leg}>
-            <td>
-              {LEG_LABEL[leg] ?? leg}{' '}
-              <span className="muted">({row.model})</span>
-            </td>
-            <td>{available ? formatPrice(row.value) : '—'}</td>
-            <td>{fairValue.weights[leg] ?? '—'}</td>
-            <td>
-              <span
-                className={`status-badge ${available ? 'healthy' : 'unknown'}`}
-              >
-                {statusWord(row.status)}
+      <ResearchSection title={t("rv_estimate_title")} aside={fairValue.provisional ? <ProvisionalTag /> : null}>
+        <div className="card-surface rs-hero">
+          <span className="rs-hero-label">{t("rv_headline")}</span>
+          <div>
+            {headline !== null ? (
+              <span className="rs-figure" dir="ltr">
+                {headline}
+                <span className="rs-figure-unit">{t("egp")}</span>
               </span>
-            </td>
-            <td>{row.reason ?? '—'}</td>
-          </tr>
-        )
-      })}
+            ) : (
+              <span className="rs-figure">
+                <MissingReason reason={fv.reason} />
+              </span>
+            )}
+          </div>
+          <p className="rs-note">
+            {price !== null && priceDate !== null
+              ? t("rv_price_line", { price, date: priceDate })
+              : t("rv_price_missing")}
+          </p>
+          <p className="rs-sentence">
+            {verdictKey ? (
+              t(verdictKey)
+            ) : (
+              <>
+                {t("rv_verdict_none")} (<Reason reason={fv.reason} />)
+              </>
+            )}
+          </p>
+          <p className="rs-note" title={t("rv_confidence_title")}>
+            {t("rv_confidence", {
+              level: t(confidenceLabelKey(fairValue.confidence.level)),
+              margin: margin ?? t("rs_no_data_reason"),
+            })}
+          </p>
+        </div>
+        {degraded && (
+          <Notice variant="warning">
+            {t("rv_dq_notice", { status: t(dqStatusKey(dqStatus)) })}
+            {bear !== null && bull !== null && <> {t("rv_range", { bear, bull })}</>}
+          </Notice>
+        )}
+      </ResearchSection>
+
+      <ResearchSection title={t("rv_scenarios_title")} lead={t("rv_scenarios_note")}>
+        {scenarioMissing ? (
+          <p className="rs-note">
+            <Reason reason={fairValue.scenarios.base.reason ?? fairValue.scenarios.bear.reason ?? fv.reason} />
+          </p>
+        ) : (
+          <DataTable
+            columns={scenarioColumns}
+            rows={scenarioRow}
+            rowKey={(row) => row.id}
+            caption={t("rv_scenarios_title")}
+            loadingThing={t("rv_thing")}
+            hideDensityToggle
+          />
+        )}
+      </ResearchSection>
+
+      <ResearchSection title={t("rv_legs_title")}>
+        <div className="rs-wrap-table">
+          <DataTable
+            columns={legColumns}
+            rows={legRows}
+            rowKey={(row) => row.name}
+            caption={t("rv_legs_caption")}
+            loadingThing={t("rv_thing")}
+            hideDensityToggle
+          />
+        </div>
+      </ResearchSection>
     </>
-  )
+  );
 }
 
-function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
-  const verdict = readVerdict(fairValue.verdict)
-  const dqStatus = fairValue.confidence.dq_status ?? 'POOR'
-  const degraded = dqStatus !== 'OK'
-  const fv = fairValue.fair_value
-  const available = fv.status === 'AVAILABLE' && fv.value !== null
-  const assumptions = Object.entries(fairValue.inputs).filter(
-    ([, v]) => v !== null && v !== undefined,
-  )
-  const bear = fairValue.scenarios.bear.value
-  const bull = fairValue.scenarios.bull.value
-
-  return (
-    <div className="card fv-card">
-      <h2 className="section-title">Weighted fair value</h2>
-
-      <p className="fv-headline">
-        {available ? formatPrice(fv.value) : '—'}
-        <span className="muted">
-          {fairValue.current_price.value
-            ? ` (price ${formatPrice(fairValue.current_price.value)})`
-            : ' (no current price)'}
-        </span>
-      </p>
-
-      <p>
-        <span
-          className={`status-badge ${VERDICT_BADGE[verdict.label] ?? 'unknown'}`}
-        >
-          {VERDICT_LABEL[verdict.label] ?? verdict.label}
-        </span>{' '}
-        {verdict.detail}
-      </p>
-
-      {verdict.discount !== null ? (
-        <p className="muted">
-          Implied discount to fair value: {formatDiscount(verdict.discount)}
-        </p>
-      ) : null}
-
-      {degraded ? (
-        <div className="alert alert-error" role="alert">
-          Data quality is {dqStatus}: treat this as a wide range, not a point
-          estimate. {fairValue.confidence.reason}
-          {bear !== null && bull !== null && bear !== undefined && bull !== undefined ? (
-            <>
-              {' '}
-              Range under stated assumptions: bear {formatPrice(bear)} → bull{' '}
-              {formatPrice(bull)}.
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
-      {!available ? (
-        <div className="alert alert-error">
-          {fv.reason ?? 'Not enough data for a fair value.'}
-        </div>
-      ) : null}
-
-      <p className="muted" title={LADDER_TITLE}>
-        Confidence {fairValue.confidence.level} · needs a{' '}
-        {formatDiscount(fairValue.confidence.required_discount)} margin ·
-        financial-statements quality{' '}
-        {fairValue.confidence.dq_score === null ||
-        fairValue.confidence.dq_score === undefined
-          ? 'unscored'
-          : `${Number(fairValue.confidence.dq_score).toFixed(1)}/100`}{' '}
-        ({dqStatus})
-      </p>
-
-      <div className="table-container">
-        <table>
-          <caption className="muted">
-            Per-model legs and the fixed weights behind the headline value
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Leg</th>
-              <th scope="col">Value</th>
-              <th scope="col">Weight</th>
-              <th scope="col">Status</th>
-              <th scope="col">Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            <LegRows fairValue={fairValue} />
-          </tbody>
-        </table>
-      </div>
-
-      <div className="table-container">
-        <table>
-          <caption className="muted">
-            Scenario range under stated assumptions — what each scenario
-            implies, not what the price will do
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">Bear</th>
-              <th scope="col">Base</th>
-              <th scope="col">Bull</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {(['bear', 'base', 'bull'] as const).map((name) => {
-                const s = fairValue.scenarios[name]
-                return (
-                  <td key={name} title={s.reason ?? undefined}>
-                    {s.status === 'AVAILABLE' ? formatPrice(s.value) : '—'}
-                  </td>
-                )
-              })}
-            </tr>
-          </tbody>
-        </table>
-        <p className="muted">{fairValue.scenarios.note}</p>
-      </div>
-
-      <h3 className="card-label">Key assumptions</h3>
-      {assumptions.length > 0 ? (
-        <p className="muted">
-          {assumptions
-            .map(
-              ([k, v]) =>
-                `${k}=${v} (${fairValue.input_sources[k] ?? 'unknown source'})`,
-            )
-            .join(' · ')}
-        </p>
-      ) : (
-        <p className="muted">
-          No caller-supplied assumptions; legs fell back to metrics or
-          INSUFFICIENT_DATA.
-        </p>
-      )}
-
-      <p className="muted">
-        As of {formatAsOf(fairValue.as_of)} · methodology v
-        {fairValue.methodology_version} · profile{' '}
-        {fairValue.profile.profile_id} (primary:{' '}
-        {fairValue.profile.primary_model}, fallback:{' '}
-        {fairValue.profile.fallback_model}
-        {fairValue.profile.preferred_multiple
-          ? `, prefers ${fairValue.profile.preferred_multiple}`
-          : ''}
-        ) · {fairValue.n_with_data} model legs with data · price as of{' '}
-        {formatAsOf(fairValue.current_price.as_of)}
-      </p>
-    </div>
-  )
-}
-
-export default memo(FairValueCard)
+export default memo(FairValueCard);

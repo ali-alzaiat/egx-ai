@@ -1,3 +1,4 @@
+import type { CopyKey } from '../i18n'
 import type { DataQualityStatus } from '../types'
 
 export type QualityTone = 'positive' | 'warning' | 'negative' | 'muted'
@@ -17,18 +18,18 @@ export function qualityTone(status: DataQualityStatus | string): QualityTone {
   }
 }
 
-/** The only place a data-quality status maps to its badge word. */
-export function qualityLabel(status: DataQualityStatus | string): string {
+/** The only place a data-quality status maps to its word; the caller translates the key. */
+export function qualityLabelKey(status: DataQualityStatus | string): CopyKey {
   switch (status) {
     case 'OK':
-      return 'Good'
+      return 'fn_dq_band_good'
     case 'DEGRADED':
-      return 'Partial'
+      return 'fn_dq_band_partial'
     case 'POOR':
-      return 'Poor'
+      return 'fn_dq_band_poor'
     case 'MISSING':
-      return 'Insufficient data'
+      return 'fn_dq_band_missing'
     default:
-      return 'Unknown'
+      return 'fn_dq_band_unknown'
   }
 }

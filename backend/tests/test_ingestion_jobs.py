@@ -121,6 +121,13 @@ async def test_full_refresh_happy_path(client, refresh_env, monkeypatch, db_sess
         done["assessment"]["scores_written"]
         == done["assessment"]["companies_assessed"] * 3
     )
+    # R43 AC-6: the final recompute phase reports per-step counts.
+    recompute = done["recompute"]
+    assert recompute is not None
+    assert recompute["technical"]["computed"] == done["prices"]["companies_fetched"]
+    for step in ("fair_value", "score", "thesis"):
+        assert set(recompute[step]) == {"computed", "fresh", "failed"}
+    assert set(recompute["signals"]) == {"ran", "as_of", "scored", "error"}
 
     # Count only the companies the stub seeded (COMI + HRHO) so this assertion
     # is stable on any DB state — R21: the old global census broke on non-empty

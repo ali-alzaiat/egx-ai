@@ -35,6 +35,24 @@ def _safe_divide(
         return None
 
 
+def _safe_percent(
+    numerator: Decimal,
+    denominator: Decimal,
+    precision: int = 2,
+) -> Decimal | None:
+    """``numerator / denominator`` as a percentage, rounded **after** x100.
+
+    Rounding the fraction first (R43 analyst F1) turned 0.10526 into 11 %.
+    """
+    if denominator == 0:
+        return None
+    try:
+        result = numerator * Decimal(100) / denominator
+        return result.quantize(Decimal(10) ** -precision, rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return None
+
+
 def _calculate_growth(
     current: Decimal,
     previous: Decimal,
@@ -48,7 +66,7 @@ def _calculate_growth(
             reason="Previous period value is zero, growth undefined",
         )
 
-    growth = _safe_divide(current - previous, abs(previous), precision)
+    growth = _safe_percent(current - previous, abs(previous), precision)
     if growth is None:
         return MetricResult(
             value=None,
@@ -64,7 +82,7 @@ def _calculate_growth(
         )
 
     return MetricResult(
-        value=growth * Decimal("100"),
+        value=growth,
         status=MetricStatus.AVAILABLE,
         warnings=warnings if warnings else None,
     )
@@ -83,7 +101,7 @@ def _calculate_margin(
             reason="Revenue is zero, margin undefined",
         )
 
-    margin = _safe_divide(numerator, denominator, precision)
+    margin = _safe_percent(numerator, denominator, precision)
     if margin is None:
         return MetricResult(
             value=None,
@@ -92,7 +110,7 @@ def _calculate_margin(
         )
 
     return MetricResult(
-        value=margin * Decimal("100"),
+        value=margin,
         status=MetricStatus.AVAILABLE,
     )
 
@@ -148,17 +166,26 @@ def _calculate_average_ratio(
             status=MetricStatus.INVALID,
             reason="Average denominator is zero, ratio undefined",
         )
+    if average < 0:
+        return MetricResult(
+            value=None,
+            status=MetricStatus.INSUFFICIENT_DATA,
+            reason=(
+                f"Average of current and previous capital is negative ({average}); "
+                "a return on negative capital is not meaningful"
+            ),
+        )
 
-    result = _safe_divide(numerator, average, precision)
+    if as_percentage:
+        result = _safe_percent(numerator, average, precision)
+    else:
+        result = _safe_divide(numerator, average, precision)
     if result is None:
         return MetricResult(
             value=None,
             status=MetricStatus.INVALID,
             reason="Division by zero in ratio calculation",
         )
-
-    if as_percentage:
-        result = result * Decimal("100")
 
     return MetricResult(
         value=result,
@@ -244,7 +271,13 @@ def calculate_debt_to_equity(
     total_debt: Decimal,
     total_equity: Decimal,
 ) -> MetricResult:
-    """Calculate debt-to-equity ratio."""
+    """Calculate debt-to-equity ratio (negative equity is not meaningful)."""
+    if total_equity < 0:
+        return MetricResult(
+            value=None,
+            status=MetricStatus.INSUFFICIENT_DATA,
+            reason=f"Total equity is negative ({total_equity}); debt-to-equity is not meaningful",
+        )
     return _calculate_ratio(total_debt, total_equity)
 
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { qualityLabel, qualityTone } from './quality'
+import { qualityLabelKey, qualityTone } from './quality'
 
 describe('qualityTone', () => {
   it('maps OK to positive', () => {
@@ -23,24 +23,15 @@ describe('qualityTone', () => {
   })
 })
 
-describe('qualityLabel', () => {
-  it('maps OK to Good', () => {
-    expect(qualityLabel('OK')).toBe('Good')
+describe('qualityLabelKey', () => {
+  it('maps each status to its copy key', () => {
+    expect(qualityLabelKey('OK')).toBe('fn_dq_band_good')
+    expect(qualityLabelKey('DEGRADED')).toBe('fn_dq_band_partial')
+    expect(qualityLabelKey('POOR')).toBe('fn_dq_band_poor')
+    expect(qualityLabelKey('MISSING')).toBe('fn_dq_band_missing')
   })
 
-  it('maps DEGRADED to Partial', () => {
-    expect(qualityLabel('DEGRADED')).toBe('Partial')
-  })
-
-  it('maps POOR to Poor', () => {
-    expect(qualityLabel('POOR')).toBe('Poor')
-  })
-
-  it('maps MISSING to Insufficient data', () => {
-    expect(qualityLabel('MISSING')).toBe('Insufficient data')
-  })
-
-  it('falls back to Unknown for an unknown status', () => {
-    expect(qualityLabel('SOMETHING_ELSE')).toBe('Unknown')
+  it('falls back to the unknown key for an unknown status', () => {
+    expect(qualityLabelKey('SOMETHING_ELSE')).toBe('fn_dq_band_unknown')
   })
 })

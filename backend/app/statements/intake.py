@@ -70,6 +70,7 @@ class ManualFilingResult:
     document_id: uuid.UUID
     period_id: uuid.UUID
     lines: list[dict[str, str | None]] = field(default_factory=list)
+    company_id: uuid.UUID | None = None
 
 
 async def priority_companies(session: AsyncSession) -> dict[uuid.UUID, list[str]]:
@@ -238,6 +239,7 @@ async def record_manual_filing(
     return ManualFilingResult(
         document_id=document.id,
         period_id=period.id,
+        company_id=company.id,
         lines=[
             {
                 "code": v.candidate.ontology_code,

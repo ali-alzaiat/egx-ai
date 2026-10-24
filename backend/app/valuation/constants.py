@@ -1,4 +1,15 @@
-"""Pinned constants for Phase-3 fair value (methodology version 1.0).
+"""Pinned constants for Phase-3 fair value (methodology version 1.2).
+
+1.1 (R45 M5): the discount rate fades. Explicit-stage flows use the cost of equity
+(risk-free rate + equity risk premium); the Gordon terminal value is capitalised
+at the sourced long-run cost of equity, on the same inflation horizon as the
+terminal growth rate. R44 (b): the cost of equity and terminal growth are computed
+from sourced rows (see ``app.valuation.assumptions``), not stored by hand.
+
+1.2 (owner rulings F13 + router): stage-1 growth is the company's 3-year revenue CAGR
+(four annual revenue points) capped at the sourced Egypt nominal GDP growth, not the
+latest single-year growth; the excess-returns and DDM terminal values use the same
+long-run cost of equity as the two-stage models.
 
 Sources:
 - 4-model split + P/E→P/S→P/B router: Simply Wall St valuation methodology,
@@ -18,7 +29,13 @@ Sources:
 
 from decimal import Decimal
 
-VALUATION_METHODOLOGY_VERSION = "1.0"
+VALUATION_METHODOLOGY_VERSION = "1.2"
+
+#: Explicit stage, in years, valued at the first-stage cost of equity before the terminal
+#: value is capitalised at the long-run cost of equity. One value for every model
+#: (FCFE/AFFO stage 1, excess returns, DDM); it matches the 2027-2031 horizon of the
+#: sourced nominal GDP growth cap (owner ruling, R45). Changing it needs a version bump.
+EXPLICIT_STAGE_YEARS = 5
 
 DEFAULT_VALUATION_PROFILE_KEY = "default"
 

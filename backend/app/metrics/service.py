@@ -1,48 +1,46 @@
-"""Metric service for orchestrating metric calculations.
+"""Metric service: statement lines -> metric snapshots (R43 bridge).
 
-Responsibilities:
-- Load financial facts for a company and period
-- Resolve metric dependencies
-- Call calculation functions
-- Handle missing data
-- Persist results
-- Return metric results with provenance
+Inputs come only from approved statement lines through ``app.statements.bridge``
+and are passed **explicitly per metric** (no signature introspection). The
+legacy FinancialFact path no longer feeds any metric.
+
+- Every ANNUAL period with lines is computed (history powers the score's
+  multi-year checks and the thesis).
+- A missing required line is INSUFFICIENT_DATA whose reason names the line;
+  a missing prior period names the absent year. Zero / negative denominators
+  keep the engine's own statuses. Nothing is zero-filled.
 """
 
+from __future__ import annotations
+
 import logging
+import uuid
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete, select
 
-from app.metrics.definitions import (
-    ALL_METRICS,
-    MetricDefinition,
-    MetricStatus,
-    PeriodRequirement,
-    get_metric,
-)
+from app.metrics.definitions import ALL_METRICS, MetricDefinition, MetricStatus
 from app.metrics.engine import METRIC_CALCULATORS
-from app.metrics.period_selector import PeriodSelector
-from app.models.financial import FinancialPeriod
-from app.repositories.financial import FinancialFactRepository, FinancialPeriodRepository
+from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
+from app.statements import bridge
+from app.statements.bridge import CompanyStatements, LineValue, PeriodLines, Resolved
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-
-class MetricCalculationInput(NamedTuple):
-    """Input for a metric calculation."""
-    metric: MetricDefinition
-    facts: dict[str, Decimal | None]
-    period: FinancialPeriod
-    previous_period: FinancialPeriod | None = None
-    previous_facts: dict[str, Decimal | None] | None = None
-    shares_outstanding: Decimal | None = None
+#: Compute-state version of the statement -> metrics mapping (each metric keeps
+#: its own ``formula_version``).
+METRICS_INPUT_VERSION = "metrics-stmt-1.1"
 
 
 class MetricCalculationOutput(NamedTuple):
     """Output of a metric calculation."""
+
     metric_code: str
     display_name: str
     value: Decimal | None
@@ -56,350 +54,326 @@ class MetricCalculationOutput(NamedTuple):
     period_type: str
     provenance: dict[str, str | None]
     calculated_at: datetime
+    inputs: tuple[tuple[str, LineValue], ...] = ()
+    source_tier: str | None = None
+    provisional: bool = False
+    period_end: date | None = None
+
+
+class _Arg(NamedTuple):
+    """One calculator kwarg: its resolved value and whether None is allowed."""
+
+    resolved: Resolved
+    optional: bool = False
+    prior_code: str | None = None  # set when the kwarg reads the prior period
+
+
+_InputMap = Callable[[CompanyStatements, PeriodLines], dict[str, _Arg]]
+
+
+def _prior(bundle: CompanyStatements, p: PeriodLines, code: str, *, optional: bool = False) -> _Arg:
+    prior = bundle.prior(p)
+    if prior is None:
+        return _Arg(
+            Resolved(
+                None, "INSUFFICIENT_DATA",
+                f"no prior period: FY{p.fiscal_year - 1} has no {code}", code,
+            ),
+            optional=optional,
+            prior_code=code,
+        )
+    resolved = bridge.line(prior, code)
+    if not resolved.available:
+        resolved = Resolved(
+            None, "INSUFFICIENT_DATA",
+            f"no prior period: FY{p.fiscal_year - 1} has no {code}", code,
+        )
+    return _Arg(resolved, optional=optional, prior_code=code)
+
+
+def _prior_eps(bundle: CompanyStatements, p: PeriodLines) -> _Arg:
+    prior = bundle.prior(p)
+    resolved = bridge.eps(prior) if prior is not None else None
+    if resolved is None or not resolved.available:
+        return _Arg(
+            Resolved(
+                None, "INSUFFICIENT_DATA",
+                f"no prior period: FY{p.fiscal_year - 1} has no eps", "eps",
+            ),
+            prior_code="eps",
+        )
+    return _Arg(resolved, prior_code="eps")
+
+
+def _ln(p: PeriodLines, code: str, *, optional: bool = False) -> _Arg:
+    return _Arg(bridge.line(p, code), optional=optional)
+
+
+#: Metric code -> explicit calculator kwargs (R43 section 1.5 table).
+METRIC_INPUTS: dict[str, _InputMap] = {
+    "revenue_growth_yoy": lambda b, p: {
+        "current_revenue": _ln(p, "revenue"),
+        "previous_revenue": _prior(b, p, "revenue"),
+    },
+    "net_income_growth_yoy": lambda b, p: {
+        "current_net_income": _ln(p, "net_income"),
+        "previous_net_income": _prior(b, p, "net_income"),
+    },
+    "eps_growth_yoy": lambda b, p: {
+        "current_eps": _Arg(bridge.eps(p)),
+        "previous_eps": _prior_eps(b, p),
+    },
+    "gross_margin": lambda b, p: {
+        "gross_profit": _ln(p, "gross_profit"),
+        "revenue": _ln(p, "revenue"),
+    },
+    "operating_margin": lambda b, p: {
+        "operating_income": _ln(p, "operating_profit"),
+        "revenue": _ln(p, "revenue"),
+    },
+    "net_margin": lambda b, p: {
+        "net_income": _ln(p, "net_income"),
+        "revenue": _ln(p, "revenue"),
+    },
+    "roe": lambda b, p: {
+        "net_income": _ln(p, "net_income"),
+        "current_equity": _ln(p, "total_equity"),
+        "previous_equity": _prior(b, p, "total_equity"),
+    },
+    "roa": lambda b, p: {
+        "net_income": _ln(p, "net_income"),
+        "current_assets": _ln(p, "total_assets"),
+        "previous_assets": _prior(b, p, "total_assets"),
+    },
+    "debt_to_equity": lambda b, p: {
+        "total_debt": _ln(p, "interest_bearing_debt"),
+        "total_equity": _ln(p, "total_equity"),
+    },
+    "debt_to_assets": lambda b, p: {
+        "total_debt": _ln(p, "interest_bearing_debt"),
+        "total_assets": _ln(p, "total_assets"),
+    },
+    "current_ratio": lambda b, p: {
+        "current_assets": _ln(p, "current_assets"),
+        "current_liabilities": _ln(p, "current_liabilities"),
+    },
+    "quick_ratio": lambda b, p: {
+        "current_assets": _ln(p, "current_assets"),
+        "current_liabilities": _ln(p, "current_liabilities"),
+        "inventory": _ln(p, "inventory"),
+    },
+    "operating_cash_flow_margin": lambda b, p: {
+        "operating_cash_flow": _ln(p, "cfo"),
+        "revenue": _ln(p, "revenue"),
+    },
+    "free_cash_flow": lambda b, p: {
+        "operating_cash_flow": _ln(p, "cfo"),
+        "capex": _Arg(bridge.capex_magnitude(p)),
+    },
+    "free_cash_flow_margin": lambda b, p: {
+        "operating_cash_flow": _ln(p, "cfo"),
+        "capex": _Arg(bridge.capex_magnitude(p)),
+        "revenue": _ln(p, "revenue"),
+    },
+    "eps": lambda b, p: {"eps_basic": _Arg(bridge.eps(p))},
+    "book_value_per_share": lambda b, p: {
+        "total_equity": _ln(p, "total_equity"),
+        "shares_outstanding": _ln(p, "shares_outstanding"),
+    },
+}
+
+
+def _status_enum(raw: MetricStatus) -> MetricStatus:
+    return raw if isinstance(raw, MetricStatus) else MetricStatus(raw)
 
 
 class MetricService:
-    """Service for calculating financial metrics."""
+    """Calculate and persist financial metrics from statement lines."""
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.period_repo = FinancialPeriodRepository(session)
-        self.fact_repo = FinancialFactRepository(session)
-        self.period_selector = PeriodSelector()
 
-    def _get_period_type_value(self, period: FinancialPeriod) -> str:
-        """Safely get period_type value whether it's an enum or string."""
-        if hasattr(period.period_type, 'value'):
-            return period.period_type.value
-        return str(period.period_type)
-
-    async def calculate_metrics_for_period(
-        self,
-        company_id: str,
-        period_id: str,
-        metric_codes: list[str] | None = None,
-        as_of_date: date | None = None,
+    def calculate_from_statements(
+        self, bundle: CompanyStatements
     ) -> list[MetricCalculationOutput]:
-        """Calculate all metrics for a specific period.
+        """Every metric for every ANNUAL period in the bundle (pure, no I/O)."""
+        out: list[MetricCalculationOutput] = []
+        for period in bundle.periods:
+            for metric in ALL_METRICS.values():
+                out.append(self._calculate(bundle, period, metric))
+        return out
 
-        Args:
-            company_id: Company UUID
-            period_id: Financial period UUID
-            metric_codes: Optional list of specific metrics to calculate
-            as_of_date: If provided, only use facts published before this date
+    def _calculate(
+        self, bundle: CompanyStatements, p: PeriodLines, metric: MetricDefinition
+    ) -> MetricCalculationOutput:
+        now = datetime.now(UTC)
 
-        Returns:
-            List of metric calculation outputs
-        """
-        # Get the target period
-        import uuid
-        period = await self.period_repo.get_by_id(uuid.UUID(period_id))
-        if not period:
-            raise ValueError(f"Period {period_id} not found")
-
-        # Get all periods for this company
-        period_type_value = self._get_period_type_value(period)
-        all_periods = await self.period_repo.list_periods(
-            company_id=uuid.UUID(company_id),
-            period_type=period_type_value,
-        )
-
-        # Select comparable periods (convert Sequence to list)
-        period_pair = self.period_selector.select_comparable_periods(
-            list(all_periods), period, as_of_date
-        )
-
-        # Get facts for current period
-        current_facts = await self._get_facts_dict(company_id, period_id)
-
-        # Get facts for previous period if available
-        previous_facts = None
-        if period_pair.previous:
-            previous_facts = await self._get_facts_dict(
-                company_id, str(period_pair.previous.id)
-            )
-
-        # Get company shares outstanding
-        shares_outstanding = await self._get_shares_outstanding(company_id)
-
-        # Determine which metrics to calculate
-        metrics_to_calculate = []
-        if metric_codes:
-            for code in metric_codes:
-                metric = get_metric(code)
-                if metric:
-                    metrics_to_calculate.append(metric)
-        else:
-            metrics_to_calculate = list(ALL_METRICS.values())
-
-        # Calculate each metric
-        results = []
-        for metric in metrics_to_calculate:
-            result = await self._calculate_single_metric(
-                metric=metric,
-                facts=current_facts,
-                period=period,
-                previous_period=period_pair.previous,
-                previous_facts=previous_facts,
-                shares_outstanding=shares_outstanding,
-            )
-            if result:
-                results.append(result)
-
-        return results
-
-    async def calculate_all_metrics_for_company(
-        self,
-        company_id: str,
-        fiscal_year: int | None = None,
-        as_of_date: date | None = None,
-    ) -> dict[str, list[MetricCalculationOutput]]:
-        """Calculate all metrics for all periods of a company.
-
-        Returns:
-            Dictionary mapping period_id to list of metric results
-        """
-        import uuid
-
-        # Get all periods
-        periods = await self.period_repo.list_periods(
-            company_id=uuid.UUID(company_id),
-        )
-
-        # Filter by fiscal year if specified
-        if fiscal_year:
-            periods = [p for p in periods if p.fiscal_year == fiscal_year]
-
-        # Calculate metrics for each period
-        results = {}
-        for period in periods:
-            period_results = await self.calculate_metrics_for_period(
-                company_id=company_id,
-                period_id=str(period.id),
-                as_of_date=as_of_date,
-            )
-            results[str(period.id)] = period_results
-
-        return results
-
-    async def _calculate_single_metric(
-        self,
-        metric: MetricDefinition,
-        facts: dict[str, Decimal | None],
-        period: FinancialPeriod,
-        previous_period: FinancialPeriod | None,
-        previous_facts: dict[str, Decimal | None] | None,
-        shares_outstanding: Decimal | None,
-    ) -> MetricCalculationOutput | None:
-        """Calculate a single metric."""
-        # Check if required facts are available
-        missing_facts = []
-        for fact_label in metric.required_fact_labels:
-            if fact_label not in facts or facts[fact_label] is None:
-                missing_facts.append(fact_label)
-
-        # For metrics requiring comparable periods, check previous facts
-        if (
-            metric.period_requirement == PeriodRequirement.COMPARABLE
-            and (previous_period is None or previous_facts is None)
-        ):
-            # Check if this metric needs previous period facts
-            needs_previous = any(
-                label in metric.required_fact_labels
-                for label in ["total_equity", "total_assets"]
-            )
-            if needs_previous and not previous_facts:
-                return MetricCalculationOutput(
-                    metric_code=metric.code,
-                    display_name=metric.display_name,
-                    value=None,
-                    unit=metric.unit,
-                    status=MetricStatus.INSUFFICIENT_DATA,
-                    reason="Previous comparable period is unavailable",
-                        warnings=None,
-                        formula_version=metric.formula_version,
-                        period_id=str(period.id),
-                        fiscal_year=period.fiscal_year,
-                        period_type=self._get_period_type_value(period),
-                        provenance={},
-                        calculated_at=datetime.now(UTC),
-                    )
-
-        # If required facts are missing, return insufficient data
-        if missing_facts:
+        def result(
+            value: Decimal | None,
+            status: MetricStatus,
+            reason: str | None,
+            warnings: list[str] | None,
+            inputs: tuple[tuple[str, LineValue], ...],
+        ) -> MetricCalculationOutput:
+            tier = bridge.tier_of(lv for _, lv in inputs)
             return MetricCalculationOutput(
                 metric_code=metric.code,
                 display_name=metric.display_name,
-                value=None,
+                value=value,
                 unit=metric.unit,
-                status=MetricStatus.INSUFFICIENT_DATA,
-                reason=f"Missing required facts: {', '.join(missing_facts)}",
-                warnings=None,
+                status=status,
+                reason=reason,
+                warnings=warnings,
                 formula_version=metric.formula_version,
-                period_id=str(period.id),
-                fiscal_year=period.fiscal_year,
-                period_type=self._get_period_type_value(period),
-                provenance={},
-                calculated_at=datetime.now(UTC),
+                period_id=str(p.period_id),
+                fiscal_year=p.fiscal_year,
+                period_type=p.period_type,
+                provenance={role: str(lv.line_id) for role, lv in inputs},
+                calculated_at=now,
+                inputs=inputs,
+                source_tier=tier,
+                provisional=tier == "vendor",
+                period_end=p.period_end,
             )
 
-        # Get the calculation function
-        calc_func = METRIC_CALCULATORS.get(metric.code)
-        if not calc_func:
-            return MetricCalculationOutput(
-                metric_code=metric.code,
-                display_name=metric.display_name,
-                value=None,
-                unit=metric.unit,
-                status=MetricStatus.NOT_APPLICABLE,
-                reason="No calculator implemented for this metric",
-                warnings=None,
-                formula_version=metric.formula_version,
-                period_id=str(period.id),
-                fiscal_year=period.fiscal_year,
-                period_type=self._get_period_type_value(period),
-                provenance={},
-                calculated_at=datetime.now(UTC),
+        mapper = METRIC_INPUTS.get(metric.code)
+        calc = METRIC_CALCULATORS.get(metric.code)
+        if mapper is None or calc is None:
+            return result(
+                None, MetricStatus.NOT_APPLICABLE,
+                "No calculator implemented for this metric", None, (),
             )
-
-        # Prepare calculation inputs
-        calc_input = self._prepare_calculation_input(
-            metric=metric,
-            facts=facts,
-            previous_facts=previous_facts,
-            shares_outstanding=shares_outstanding,
-        )
-
-        # Call the calculation function
+        args = mapper(bundle, p)
+        for arg in args.values():
+            if not arg.optional and not arg.resolved.available:
+                return result(None, MetricStatus.INSUFFICIENT_DATA, arg.resolved.reason, None, ())
+        kwargs = {name: arg.resolved.value for name, arg in args.items()}
+        inputs: list[tuple[str, LineValue]] = []
+        seen: set[tuple[str, uuid.UUID]] = set()
+        for name, arg in args.items():
+            for lv in arg.resolved.sources:
+                if (name, lv.line_id) not in seen:
+                    seen.add((name, lv.line_id))
+                    inputs.append((name, lv))
         try:
-            result = calc_func(**calc_input)
-        except Exception as e:
-            logger.error("Error calculating %s: %s", metric.code, e)
-            return MetricCalculationOutput(
-                metric_code=metric.code,
-                display_name=metric.display_name,
-                value=None,
-                unit=metric.unit,
-                status=MetricStatus.INVALID,
-                reason=f"Calculation error: {str(e)}",
-                warnings=None,
-                formula_version=metric.formula_version,
-                period_id=str(period.id),
-                fiscal_year=period.fiscal_year,
-                period_type=self._get_period_type_value(period),
-                provenance={},
-                calculated_at=datetime.now(UTC),
+            calc_result = calc(**kwargs)
+        except (ArithmeticError, TypeError, ValueError) as exc:
+            logger.error("Error calculating %s: %s", metric.code, exc)
+            return result(
+                None, MetricStatus.INVALID, f"Calculation error: {exc}", None, tuple(inputs)
             )
-
-        # Build provenance
-        provenance = self._build_provenance(metric, facts, previous_facts)
-
-        return MetricCalculationOutput(
-            metric_code=metric.code,
-            display_name=metric.display_name,
-            value=result.value,
-            unit=metric.unit,
-            status=result.status,
-            reason=result.reason,
-            warnings=result.warnings,
-            formula_version=metric.formula_version,
-            period_id=str(period.id),
-            fiscal_year=period.fiscal_year,
-            period_type=self._get_period_type_value(period),
-            provenance=provenance,
-            calculated_at=datetime.now(UTC),
+        return result(
+            calc_result.value,
+            _status_enum(calc_result.status),
+            calc_result.reason,
+            calc_result.warnings,
+            tuple(inputs),
         )
 
-    def _prepare_calculation_input(
-        self,
-        metric: MetricDefinition,
-        facts: dict[str, Decimal | None],
-        previous_facts: dict[str, Decimal | None] | None,
-        shares_outstanding: Decimal | None,
-    ) -> dict[str, Decimal | None]:
-        """Prepare inputs for the calculation function."""
-        calc_func = METRIC_CALCULATORS.get(metric.code)
-        if not calc_func:
-            return {}
-
-        import inspect
-        sig = inspect.signature(calc_func)
-        params = list(sig.parameters.keys())
-
-        inputs = {}
-        for param in params:
-            if param in facts:
-                inputs[param] = facts[param]
-            elif param.startswith("previous_") and previous_facts:
-                base_label = param[9:]  # Remove "previous_" prefix
-                inputs[param] = previous_facts.get(base_label)
-            elif param == "shares_outstanding":
-                inputs[param] = shares_outstanding
-            elif param == "current_equity":
-                inputs[param] = facts.get("total_equity")
-            elif param == "previous_equity" and previous_facts:
-                inputs[param] = previous_facts.get("total_equity")
-            elif param == "current_assets":
-                inputs[param] = facts.get("total_assets")
-            elif param == "previous_assets" and previous_facts:
-                inputs[param] = previous_facts.get("total_assets")
-            elif param == "inventory":
-                inputs[param] = facts.get("inventory")
-            elif param == "prepaid_expenses":
-                inputs[param] = facts.get("prepaid_expenses")
-
-        return inputs
-
-    def _build_provenance(
-        self,
-        metric: MetricDefinition,
-        facts: dict[str, Decimal | None],
-        previous_facts: dict[str, Decimal | None] | None,
-    ) -> dict[str, str | None]:
-        """Build provenance information for a metric."""
-        provenance: dict[str, str | None] = {}
-        for fact_label in metric.required_fact_labels:
-            if fact_label in facts:
-                provenance[fact_label] = f"value={facts[fact_label]}"
-            else:
-                provenance[fact_label] = None
-
-        return provenance
-
-    async def _get_facts_dict(
-        self,
-        company_id: str,
-        period_id: str,
-    ) -> dict[str, Decimal | None]:
-        """Get financial facts as a dictionary mapping normalized_label to value."""
-        import uuid
-
-        facts = await self.fact_repo.list_facts(
-            company_id=uuid.UUID(company_id),
+    async def replace_company_metrics(
+        self, company_id: uuid.UUID, outputs: list[MetricCalculationOutput]
+    ) -> int:
+        """Replace this company's metric rows (every formula version of these codes)."""
+        # All versions: a formula bump must not leave older-version rows behind
+        # for readers that pick "the latest" per metric.
+        await self.session.execute(
+            delete(FinancialMetric).where(
+                FinancialMetric.company_id == company_id,
+                FinancialMetric.metric_code.in_(list(ALL_METRICS)),
+            )
         )
-
-        # Filter to facts for this period and build dictionary
-        facts_dict = {}
-        for fact in facts:
-            if str(fact.period_id) == period_id:
-                label = fact.normalized_label or fact.reported_label
-                facts_dict[label] = (
-                    fact.reported_value if fact.normalized_value is None else fact.normalized_value
+        for output in outputs:
+            row = FinancialMetric(
+                company_id=company_id,
+                period_id=uuid.UUID(output.period_id),
+                metric_code=output.metric_code,
+                display_name=output.display_name,
+                value=output.value,
+                unit=output.unit,
+                status=MetricStatusDB(output.status.value),
+                reason=output.reason,
+                warnings="; ".join(output.warnings) if output.warnings else None,
+                formula_version=output.formula_version,
+                source_tier=output.source_tier,
+                provisional=output.provisional,
+                calculated_at=output.calculated_at,
+            )
+            self.session.add(row)
+            await self.session.flush()
+            for role, lv in output.inputs:
+                self.session.add(
+                    FinancialMetricInput(
+                        metric_id=row.id, statement_line_id=lv.line_id, input_role=role
+                    )
                 )
+        await self.session.flush()
+        return len(outputs)
 
-        return facts_dict
+    async def compute_and_persist(self, bundle: CompanyStatements) -> list[MetricCalculationOutput]:
+        outputs = self.calculate_from_statements(bundle)
+        await self.replace_company_metrics(bundle.company_id, outputs)
+        return outputs
 
-    async def _get_shares_outstanding(
-        self,
-        company_id: str,
-    ) -> Decimal | None:
-        """Get shares outstanding for a company."""
-        import uuid
+    async def input_provenance(
+        self, metric_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[dict[str, str | int | bool | None]]]:
+        """Provenance (section 1.4 shape + ``input_role``) of each metric's input lines."""
+        if not metric_ids:
+            return {}
+        from app.models.financial import FinancialDocument, FinancialPeriod
+        from app.models.statements import ExtractionMethod, FinancialStatementLine
 
-        from app.repositories.company import CompanyRepository
-
-        company_repo = CompanyRepository(self.session)
-        company = await company_repo.get_by_id(uuid.UUID(company_id))
-        if company:
-            return company.shares_outstanding
-        return None
+        rows = (
+            await self.session.execute(
+                select(FinancialMetricInput, FinancialStatementLine, FinancialPeriod)
+                .join(
+                    FinancialStatementLine,
+                    FinancialMetricInput.statement_line_id == FinancialStatementLine.id,
+                )
+                .join(FinancialPeriod, FinancialStatementLine.period_id == FinancialPeriod.id)
+                .where(FinancialMetricInput.metric_id.in_(metric_ids))
+                .order_by(FinancialMetricInput.input_role)
+            )
+        ).all()
+        doc_ids = {ln.source_document_id for _, ln, _ in rows if ln.source_document_id}
+        docs: dict[uuid.UUID, FinancialDocument] = {}
+        if doc_ids:
+            docs = {
+                d.id: d
+                for d in (
+                    await self.session.execute(
+                        select(FinancialDocument).where(FinancialDocument.id.in_(doc_ids))
+                    )
+                ).scalars().all()
+            }
+        out: dict[uuid.UUID, list[dict[str, str | int | bool | None]]] = {}
+        for inp, ln, period in rows:
+            doc = docs.get(ln.source_document_id) if ln.source_document_id else None
+            lv = LineValue(
+                code=ln.ontology_code,
+                value=Decimal(ln.value) if ln.value is not None else Decimal(0),
+                line_id=ln.id,
+                period_id=ln.period_id,
+                fiscal_year=int(period.fiscal_year),
+                period_end=period.end_date,
+                source_tier=(
+                    "vendor"
+                    if ln.extraction_method == ExtractionMethod.vendor_aggregator
+                    else "filing"
+                ),
+                document_id=ln.source_document_id,
+                document_type=doc.document_type if doc else None,
+                document_url=doc.document_url if doc else None,
+                source_label_reported=ln.source_label_reported,
+                source_page=ln.source_page,
+                published_date=ln.published_date,
+            )
+            item: dict[str, str | int | bool | None] = {
+                "statement_line_id": str(ln.id),
+                "input_role": inp.input_role,
+            }
+            item.update(bridge.provenance(lv))
+            if ln.value is None:
+                item["value"] = None
+            out.setdefault(inp.metric_id, []).append(item)
+        return out

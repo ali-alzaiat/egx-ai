@@ -2,8 +2,6 @@
 
 from decimal import Decimal
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.metrics.definitions import MetricStatus
 from app.metrics.engine import (
     calculate_book_value_per_share,
@@ -24,8 +22,6 @@ from app.metrics.engine import (
     calculate_roa,
     calculate_roe,
 )
-from app.metrics.service import MetricService
-from app.models.financial import FinancialFact
 
 
 class TestRevenueGrowth:
@@ -200,8 +196,7 @@ class TestROA:
         assert result.status == MetricStatus.AVAILABLE
         # Average assets = (200 + 200) / 2 = 200
         # ROA = 15 / 200 * 100 = 7.5%
-        # But due to rounding, it might be 8.0%
-        assert result.value == Decimal("7.50") or result.value == Decimal("8.00")
+        assert result.value == Decimal("7.50")
 
     def test_missing_previous_assets(self):
         result = calculate_roa(
@@ -358,9 +353,7 @@ class TestDecimalPrecision:
             revenue=Decimal("100"),
         )
         assert result.status == MetricStatus.AVAILABLE
-        # Should be around 33.33% (rounded to 2 decimal places)
-        # But due to rounding, it might be 33.00%
-        assert result.value == Decimal("33.33") or result.value == Decimal("33.00")
+        assert result.value == Decimal("33.33")
 
     def test_large_numbers(self):
         """Verify calculations handle large numbers."""
@@ -370,22 +363,4 @@ class TestDecimalPrecision:
         )
         assert result.status == MetricStatus.AVAILABLE
         # Growth = (50 - 45) / 45 * 100 = 11.11%
-        # But due to rounding, it might be 11.00%
-        assert result.value == Decimal("11.11") or result.value == Decimal("11.00")
-
-
-class TestFactsValueFallback:
-    """Value fallbacks must keep a legitimate 0 instead of falling back to reported."""
-
-    async def test_zero_value_not_replaced(
-        self,
-        db_session: AsyncSession,
-        zero_value_facts: list[FinancialFact],
-    ):
-        service = MetricService(db_session)
-        facts = await service._get_facts_dict(
-            str(zero_value_facts[0].company_id),
-            str(zero_value_facts[0].period_id),
-        )
-        assert facts["total_debt"] == Decimal("0")
-        assert facts["total_assets"] == Decimal("100")
+        assert result.value == Decimal("11.11")

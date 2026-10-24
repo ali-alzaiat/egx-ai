@@ -45,3 +45,8 @@ Variant **A "Cobalt Cards"** from `.workflow/design/ui-friendly-direction.md` §
 - `long_run_cost_of_equity` = **17.51%** (candidate B): long-run default-free EGP rate 7.34% (= 1.0423 × 1.054 / 1.0235 − 1; Damodaran July 2026 USD rate and US inflation, IMF 2031 Egypt CPI 5.4%) + Egypt default spread 5.97% + mature ERP 4.20%. No country risk premium (same structure as the explicit stage).
 - Mature ERP refreshed to **4.20%** (Damodaran July 2026): explicit-stage cost of equity = 24.128% + 4.20% = **28.33%**.
 - Both values are loaded as sourced `valuation_assumptions` rows (URLs and fetch dates from the research file), never hard-coded.
+
+## F13 (user, 2026-10-24)
+Fair-value stage-1 growth (`growth_high`) = the company's **3-year revenue CAGR**, capped at Egypt's **sourced nominal GDP growth** (IMF; new sourced assumption key). Fewer than 4 annual revenue points → INSUFFICIENT_DATA naming it. Until the cap value is loaded, the intrinsic leg is INSUFFICIENT_DATA naming the missing assumption. Router ruling (applies M5 consistently): excess-returns and DDM terminal values use `long_run_cost_of_equity` too.
+- Cap value (user): **13.59%** (G1) = geometric average of IMF nominal growth 2027–2031 ((1 + real GDP growth) × (1 + CPI) − 1 per year; sources in `.workflow/research/long-run-cost-of-equity-2026-10.md` "Nominal GDP growth cap").
+- Fade horizon (user): the explicit stage at the first-stage cost of equity lasts **5 years in every model** (FCFE, excess returns, DDM), matching the 2027–2031 growth cap; terminal value at `long_run_cost_of_equity`.

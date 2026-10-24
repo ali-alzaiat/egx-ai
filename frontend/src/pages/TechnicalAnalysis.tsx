@@ -1,179 +1,92 @@
-import "./TechnicalAnalysis.css";
+import "../components/hub/hubPages.css";
 
-import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { useCompanyByTicker, useCompanyPrices, useTechnicalIndicators, calculateIndicators } from '../api/client'
-import CompanyNotFound from '../components/CompanyNotFound'
+import { useParams } from "react-router-dom";
+import { useCompanyByTicker, useTechnicalIndicators } from "../api/client";
+import { Missing } from "../components/ui/Missing";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
+import type { CopyKey } from "../i18n";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtInt, fmtRatio, toNumber } from "../lib/format";
+import { isIndicatorType, type IndicatorType } from "../lib/stanceModel";
+import type { TechnicalIndicator } from "../types";
 
-// Indicators are calculated from the stored price history the app already
-// holds — the user never pastes prices by hand (F4).
+const INDICATOR_KEY: Record<IndicatorType, CopyKey> = {
+  sma: "px_ind_sma",
+  ema: "px_ind_ema",
+  rsi: "px_ind_rsi",
+  macd: "px_ind_macd",
+  bollinger: "px_ind_bollinger",
+  obv: "px_ind_obv",
+  vwap: "px_ind_vwap",
+  atr: "px_ind_atr",
+};
+
+/** The look-back period when the indicator carries one ("SMA 20"). */
+function periodOf(ind: TechnicalIndicator): number | null {
+  const period = ind.parameters?.["period"];
+  return typeof period === "number" && Number.isFinite(period) ? period : null;
+}
+
+function IndicatorRow({ ind }: { ind: TechnicalIndicator }) {
+  const { t, locale } = useLang();
+  const type = ind.indicator_type.toLowerCase();
+  const period = periodOf(ind);
+  const value = ind.status === "AVAILABLE" ? (type === "obv" ? fmtInt(locale, ind.value) : fmtRatio(locale, ind.value)) : null;
+  const asOf = fmtDate(locale, ind.price_as_of ?? ind.calculated_at);
+  return (
+    <tr>
+      <td className="text-cell">
+        {isIndicatorType(type) ? t(INDICATOR_KEY[type]) : <bdi dir="ltr">{type.toUpperCase()}</bdi>}
+        {period !== null && <span dir="ltr"> {period}</span>}
+      </td>
+      <td className="num" dir="ltr">
+        {value ?? <Missing reason={toNumber(ind.value) === null ? ind.reason : null} />}
+      </td>
+      <td className="num" dir="ltr">
+        {asOf ?? <Missing />}
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * Technical indicators (spec 4.4.2 item 6): read-only. The server computes
+ * them from stored prices (R43), so there is no Calculate button.
+ */
 export default function TechnicalAnalysis() {
-  const { ticker } = useParams<{ ticker: string }>()
-  const queryClient = useQueryClient()
-  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
-
-  const { data: pricesData, isLoading: pricesLoading } = useCompanyPrices(company?.id, {
-    page_size: 200,
-  })
-
-  const [isCalculating, setIsCalculating] = useState(false)
-  const [calculationResult, setCalculationResult] = useState<null | {
-    indicators: {
-      indicator: string
-      value: string | null
-      status: string
-      parameters: Record<string, unknown> | null
-      reason: string | null
-    }[]
-    calculated_at: string
-  }>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const { data: existingIndicators, isLoading: loadingIndicators } = useTechnicalIndicators(company?.id)
-
-  // Oldest-first series for the context line; the API returns newest first.
-  const series = useMemo(() => {
-    const items = [...(pricesData?.items ?? [])].reverse()
-    return {
-      closes: items.map((p) => p.close),
-      volumes: items.map((p) => String(p.volume)),
-      firstDate: items.length > 0 ? items[0]!.date : null,
-      lastDate: items.length > 0 ? items[items.length - 1]!.date : null,
-    }
-  }, [pricesData])
-
-  const handleCalculate = async (): Promise<void> => {
-    if (!company || series.closes.length === 0) return
-
-    setIsCalculating(true)
-    setError(null)
-
-    try {
-      const result = await calculateIndicators(
-        company.id,
-        series.closes.join(','),
-        series.volumes.join(','),
-      )
-      setCalculationResult(result)
-      await queryClient.invalidateQueries({ queryKey: ['technical'] })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to calculate indicators')
-    } finally {
-      setIsCalculating(false)
-    }
-  }
-
-  if (companyLoading) {
-    return <div className="loading">Loading company...</div>
-  }
-
-  if (companyError || !company) {
-    return <CompanyNotFound ticker={ticker} />
-  }
-
-  const rows = calculationResult?.indicators ?? []
+  const { ticker = "" } = useParams<{ ticker: string }>();
+  const { t } = useLang();
+  const { data: company } = useCompanyByTicker(ticker);
+  const { data, isLoading, error, refetch } = useTechnicalIndicators(company?.id);
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <h2>Technical Analysis — {company.ticker}</h2>
-          <p className="subtitle">{company.name}</p>
-        </div>
-        <button
-          className="btn btn-primary"
-          onClick={handleCalculate}
-          disabled={isCalculating || pricesLoading || series.closes.length === 0}
-        >
-          {isCalculating ? 'Calculating…' : 'Calculate indicators'}
-        </button>
-      </div>
-
-
-      {pricesLoading && <div className="loading">Loading price history...</div>}
-      {!pricesLoading && series.closes.length === 0 && (
-        <p className="muted">No price data from the configured source for {company.ticker}.</p>
-      )}
-      {series.closes.length > 0 && (
-        <p className="muted">
-          Calculated from the last {series.closes.length} trading days of stored
-          price history ({series.firstDate} – {series.lastDate}).
-        </p>
-      )}
-
-      {error && (
-        <div className="alert alert-error">
-          {error}{' '}
-          <button className="link-btn" onClick={handleCalculate}>
-            Retry
-          </button>
+    <section>
+      <h2 className="section-title">{t("px_tech_title")}</h2>
+      {isLoading && <LoadingState thing={t("px_tech_title")} />}
+      {error && <ErrorState thing={t("px_tech_title")} onRetry={() => void refetch()} />}
+      {data && data.length === 0 && <EmptyState>{t("px_tech_empty", { ticker })}</EmptyState>}
+      {data && data.length > 0 && (
+        <div className="table-wrap">
+          <table aria-label={t("px_tech_title")}>
+            <thead>
+              <tr>
+                <th scope="col">{t("px_tech_col_indicator")}</th>
+                <th scope="col" className="num" dir="ltr">
+                  {t("col_value")}
+                </th>
+                <th scope="col" className="num" dir="ltr">
+                  {t("px_tech_col_as_of")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((ind) => (
+                <IndicatorRow key={ind.id} ind={ind} />
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
-      {rows.length > 0 && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Calculated Indicators</h3>
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Indicator</th>
-                  <th>Value</th>
-                  <th>Status</th>
-                  <th>Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((ind) => (
-                  <tr key={ind.indicator}>
-                    <td>{ind.indicator.toUpperCase()}</td>
-                    <td>{ind.value || '--'}</td>
-                    <td className={ind.status === 'AVAILABLE' ? 'positive' : 'negative'}>
-                      {ind.status}
-                    </td>
-                    <td>{ind.reason || '--'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div className="card">
-        <h3 style={{ marginBottom: '1rem' }}>Previously Calculated Indicators</h3>
-        {loadingIndicators ? (
-          <div className="loading">Loading indicators...</div>
-        ) : existingIndicators && existingIndicators.length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Value</th>
-                  <th>Status</th>
-                  <th>Calculated At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {existingIndicators.map((ind) => (
-                  <tr key={ind.id}>
-                    <td>{ind.indicator_type.toUpperCase()}</td>
-                    <td>{ind.value || '--'}</td>
-                    <td className={ind.status === 'AVAILABLE' ? 'positive' : 'negative'}>
-                      {ind.status}
-                    </td>
-                    <td>{new Date(ind.calculated_at).toLocaleDateString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="muted">No indicators calculated yet.</p>
-        )}
-      </div>
-    </div>
-  )
+    </section>
+  );
 }

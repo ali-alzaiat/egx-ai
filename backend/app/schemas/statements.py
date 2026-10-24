@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -41,3 +42,5 @@ class ReviewDecisionRead(BaseModel):
     ontology_code: str
     ext_status: str
     ext_reason: str | None
+    # R43: the automatic recompute this decision triggered for the line's company.
+    recompute: dict[str, Any] | None = None

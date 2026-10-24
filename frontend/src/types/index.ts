@@ -109,6 +109,14 @@ export interface FinancialMetric {
   formula_version: number
   calculated_at: string
   created_at: string
+  // R43 (r43-computed-company-data.md 3.1): fiscal period and provenance of the inputs.
+  fiscal_year: number | null
+  period_type: string | null
+  period_end: string | null
+  source_tier: SourceTier | null
+  provisional: boolean
+  methodology_version: string | null
+  inputs: (Provenance & { input_role: string })[]
 }
 
 export interface TechnicalIndicator {
@@ -121,6 +129,9 @@ export interface TechnicalIndicator {
   reason: string | null
   calculated_at: string
   created_at: string
+  // R43: the price bar the indicator was computed on.
+  price_as_of: string | null
+  methodology_version: string | null
 }
 
 export interface CalculateIndicatorsResponse {
@@ -324,18 +335,19 @@ export interface ScreeningRuleResult {
   source_date?: string | null; // v2 provenance
 }
 
-export interface ScreeningResult {
-  id: string;
+export interface ScreeningResult extends Partial<ComputeMeta> {
+  id: string | null; // null when the computation failed and no snapshot exists
   company_id: string;
-  is_compliant: boolean;
+  is_compliant: boolean | null; // null = INSUFFICIENT_DATA ("Unknown" in the UI)
+  engine?: "statement_lines";
   status: string; // COMPLIANT | NON_COMPLIANT | INSUFFICIENT_DATA
   methodology_version: string;
   methodology_name: string;
   overall_reason: string | null;
-  screened_at: string;
+  screened_at: string | null;
   report_date: string | null;
   report_date_reason: string | null;
-  created_at: string;
+  created_at: string | null;
   rule_results: ScreeningRuleResult[];
   data_quality: Record<string, unknown> | null;
 }
@@ -407,12 +419,16 @@ export interface ScoreAssessment {
   n_checks_total: number;
   confidence: ScoreConfidence;
   buy_zone: Record<string, unknown>;
-  inputs_echo: { inputs: Record<string, string | string[] | null>; sources: Record<string, string | null> };
+  inputs_echo: {
+    inputs: Record<string, string | string[] | null>;
+    // R43: `statements` carries the provenance of every statement line used.
+    sources: Record<string, string | null | Provenance[]>;
+  };
   scale: string;
   disclaimer: string;
 }
 
-export interface ScoreResponse {
+export interface ScoreResponse extends Partial<ComputeMeta> {
   company_id: string;
   ticker: string;
   assessment: ScoreAssessment | null; // null = assessed never; never a default score
@@ -474,7 +490,7 @@ export interface FairValueScenario {
   reason: string | null;
 }
 
-export interface FairValueResponse {
+export interface FairValueResponse extends Partial<ComputeMeta> {
   company_id: string;
   ticker: string;
   as_of: string;
@@ -505,14 +521,18 @@ export interface FairValueResponse {
     methodology_version: string;
   };
   verdict: { label: string; detail: string; discount: string | null };
+  /** R43: sourced valuation assumptions behind the estimate (absent on pre-R43 servers). */
+  assumptions?: FairValueAssumptions;
 }
 
 // ─── Purification + EGX33 (GET/POST /api/screening/companies/{id}/…) ─
 
-export interface PurificationEstimate {
+export interface PurificationEstimate extends Partial<ComputeMeta> {
   id?: string;
   company_id: string;
-  status: string;
+  status: string; // OK | ESTIMATE_PARTIAL | INSUFFICIENT_DATA
+  basis?: "per_share"; // amount_egp and dividend_egp are EGP per share
+  dps_derivation?: string | null;
   branch: string;
   doctrine: string;
   amount_egp: string | null;
@@ -617,6 +637,7 @@ export interface ThesisLedgerRow {
 }
 
 export interface ThesisAssessment {
+  horizon_source?: "methodology_default";
   company_id: string;
   ticker: string;
   as_of: string;
@@ -644,7 +665,7 @@ export interface ThesisAssessment {
   disclaimer: string;
 }
 
-export interface ThesisResponse {
+export interface ThesisResponse extends Partial<ComputeMeta> {
   company_id: string;
   ticker: string;
   assessment: ThesisAssessment | null; // null = never assessed; never a default thesis
@@ -797,6 +818,8 @@ export interface StatementLineRead {
   /** "filing" = official document, "vendor" = provisional aggregator data. */
   source_tier: 'filing' | 'vendor' | null
   provisional: boolean
+  /** R43: how to format the value. Absent from older backends (treated as "currency"). */
+  unit?: 'currency' | 'shares' | 'currency_per_share'
 }
 
 export interface PeriodStatements {
@@ -955,4 +978,101 @@ export interface StanceRadarResponse {
   items: StanceRadarItem[]
   count: number
   rules_version: string
+}
+
+// ─── R43 provenance and compute meta (r43-computed-company-data.md 1.4, 3.1, 4.2) ─
+
+export type SourceTier = "filing" | "vendor";
+
+/** One statement line behind a computed number. `provisional` means vendor data. */
+export interface Provenance {
+  code: string;
+  value: string;
+  line_id: string;
+  fiscal_year: number;
+  period_end: string;
+  source_tier: SourceTier;
+  provisional: boolean;
+  document_type: string | null;
+  document_url: string | null;
+  source_label_reported: string | null;
+  source_page: string | null;
+  published_date: string | null;
+}
+
+/** Meta block merged into every GET that computes on read. */
+export interface ComputeMeta {
+  calculated_at: string;
+  methodology_version: string;
+  trigger: "statement_import" | "price_sync" | "first_view" | "assumptions" | "backfill";
+  compute_status: "ok" | "failed";
+  compute_error?: string;
+  source_tier: SourceTier | null;
+  provisional: boolean;
+  period_end: string | null;
+  price_as_of: string | null;
+}
+
+// ─── Valuation assumptions (GET /api/valuation/companies/{id}/fair-value) ─
+
+/** One sourced row of the valuation assumption record. */
+export interface ValuationAssumptionItem {
+  key: string;
+  scope: string;
+  value: string;
+  source_url: string;
+  source_title: string;
+  as_of: string;
+}
+
+export interface FairValueAssumptions {
+  methodology_version: string;
+  items: ValuationAssumptionItem[];
+  /** Stored keys with no fresh sourced row. */
+  missing: string[];
+  stale?: { key: string; reason: string }[];
+  computed?: {
+    discount_rate: string | null;
+    terminal_growth_rate: string | null;
+    formula?: string;
+  };
+}
+
+// ─── Disclosure comparison (GET /api/disclosures/comparison) ─
+
+/** A value that may be missing, with the reason it is. */
+export interface ComparisonValue {
+  value: string | null;
+  status: string; // OK | INSUFFICIENT_DATA
+  reason?: string | null;
+}
+
+export interface ComparisonYoy {
+  metric: string;
+  current_label: string;
+  prior_label: string;
+  current: string | null;
+  prior: string | null;
+  delta: string | null;
+  delta_pct: string | null;
+  status: string;
+  reason?: string | null;
+}
+
+export interface DisclosureComparison {
+  comparison: {
+    metric: string;
+    ttm: ComparisonValue;
+    yoy: ComparisonYoy;
+    quarters_used: string[];
+    accounting_bases: string[];
+    methodology_version: string;
+  };
+  ttm_margin_vs_prior_year: {
+    current: ComparisonValue;
+    prior: ComparisonValue;
+    delta: string | null;
+    status: string;
+    reason?: string | null;
+  };
 }

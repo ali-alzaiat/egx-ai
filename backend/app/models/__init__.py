@@ -1,4 +1,5 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.compute import ComputeState
 from app.models.continuous import (
     ActorType,
     AlertFamily,
@@ -62,6 +63,7 @@ from app.models.thesis import (
 )
 from app.models.valuation import (
     IndustryValuationProfile,
+    ValuationAssumption,
     ValuationFairValue,
     ValuationModelDB,
     ValuationResult,
@@ -79,6 +81,7 @@ __all__ = [
     "ChunkTypeDB",
     "Company",
     "CompanyPeerOverride",
+    "ComputeState",
     "CompanyStatus",
     "DailyPrice",
     "DataQualityAssessment",
@@ -131,6 +134,7 @@ __all__ = [
     "ThesisInvalidation",
     "ThesisLedger",
     "UniverseCoverageSnapshot",
+    "ValuationAssumption",
     "ValuationFairValue",
     "ValuationModelDB",
     "ValuationResult",

@@ -19,6 +19,8 @@ from enum import Enum
 class PurificationStatus(Enum):
     """Estimate outcome: a number or an honest gap."""
     OK = "OK"
+    #: A real number built from only part of the impure-income checklist (R44 (c)).
+    ESTIMATE_PARTIAL = "ESTIMATE_PARTIAL"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 
 
@@ -31,6 +33,17 @@ class PurificationBranch(Enum):
 
 
 PURIFICATION_DOCTRINE = "dividend-method"
+
+#: Version of the purification inputs/labelling (the DPS derivation, the partial
+#: status and the ratio sanity check); bump when any of them changes.
+PURIFICATION_VERSION = "purification-1.1"
+
+#: Wording of a partial estimate. Never "at least": vendor "interest & investment
+#: income" can include permissible items, so it is neither a lower nor an upper bound.
+PARTIAL_ESTIMATE_REASON = (
+    "Partial estimate: interest and investment income only; the other 13 lines of "
+    "the 14-line impure-income checklist are not covered."
+)
 
 NOT_ZAKAT_COPY = (
     "Purification is not zakat and earns no reward: donate the amount and "
@@ -117,6 +130,7 @@ def estimate_dividend_purification(
     ratio_provenance: str | None = None,
     dps_source: str | None = None,
     dps_date: date | None = None,
+    ratio_is_partial: bool = False,
 ) -> PurificationEstimate:
     """Estimate dividend purification in EGP (deterministic, no AI).
 
@@ -134,9 +148,12 @@ def estimate_dividend_purification(
         ratio_provenance: Filing citation behind the ratio inputs.
         dps_source: Source behind the DPS figure.
         dps_date: Date of the DPS figure.
+        ratio_is_partial: The impure-revenue numerator covers only part of the
+            checklist (interest and investment income); a ratio-branch result is
+            then ``ESTIMATE_PARTIAL`` instead of ``OK``.
 
     Returns:
-        PurificationEstimate with status OK or INSUFFICIENT_DATA.
+        PurificationEstimate with status OK, ESTIMATE_PARTIAL or INSUFFICIENT_DATA.
     """
     if normalize_ticker(ticker) in ISLAMIC_BANK_TICKERS:
         return _insufficient(
@@ -251,8 +268,28 @@ def estimate_dividend_purification(
         )
 
     ratio = non_permissible_revenue / total_revenue
+    if ratio > 1:
+        # Impure income cannot exceed total revenue; a ratio above 1 means the
+        # numerator and denominator are on different bases (e.g. gross bank
+        # interest income over net revenue). Never turn it into an amount.
+        return _insufficient(
+            branch=PurificationBranch.INSUFFICIENT_DATA,
+            dividend_egp=dividend_egp,
+            dps=dps,
+            dps_source=dps_source,
+            dps_date=dps_date,
+            ratio_provenance=ratio_provenance,
+            reason=(
+                f"Purification ratio is {ratio:.4f} (> 1): impure income "
+                f"{non_permissible_revenue} exceeds total revenue {total_revenue}, so the "
+                "two figures are not on the same basis; no amount estimated."
+            ),
+            missing_input="non_permissible_revenue, total_revenue",
+        )
     return PurificationEstimate(
-        status=PurificationStatus.OK,
+        status=(
+            PurificationStatus.ESTIMATE_PARTIAL if ratio_is_partial else PurificationStatus.OK
+        ),
         branch=PurificationBranch.RATIO,
         doctrine=PURIFICATION_DOCTRINE,
         amount_egp=dividend_egp * ratio,
@@ -262,4 +299,5 @@ def estimate_dividend_purification(
         dps=dps,
         dps_source=dps_source,
         dps_date=dps_date,
+        reason=PARTIAL_ESTIMATE_REASON if ratio_is_partial else None,
     )
