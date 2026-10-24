@@ -12,6 +12,7 @@ from app.repositories.company import CompanyRepository
 from app.repositories.price import PriceRepository
 from app.repositories.screening import ScreeningRepository
 from app.screening.status import shariah_statuses
+from app.services.recompute import Engine, RecomputeService
 from app.signals.rules import Liquidity, ReferenceLevels
 from app.signals.stance import SIGNAL_RULES_VERSION, StanceResult, StanceService
 
@@ -95,6 +96,11 @@ async def get_stance(
     except (InvalidOperation, ValueError) as exc:
         raise HTTPException(status_code=422, detail="invalid stop_pct") from exc
 
+    company = await CompanyRepository(session).get_by_ticker(ticker)
+    if company is not None:
+        # First-view hook (R43): the score pulls fair value upstream; a compute
+        # clears the stance cache so this read uses the fresh snapshots.
+        await RecomputeService(session).ensure_fresh(company.id, Engine.SCORE)
     service = StanceService(session)
     if ep is None and sp == DEFAULT_STOP_PCT:
         price_date = await PriceRepository(session).latest_price_date()

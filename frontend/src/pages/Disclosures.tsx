@@ -1,620 +1,347 @@
-import "./Disclosures.css";
-
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useState, type ReactNode } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useCompanyByTicker, useDiffs, useDisclosureComparison, useFacts, useFilings } from "../api/client";
 import {
-  parseFiling,
-  registerFiling,
-  uploadFiling,
-  useCompanyByTicker,
-  useComparison,
-  useDiffs,
-  useFacts,
-  useFilings,
-} from '../api/client'
-import { formatAsOf } from '../lib/format'
-import CompanyNotFound from '../components/CompanyNotFound'
-import type { DisclosureDiff, DisclosureFact, DisclosureFiling } from '../types'
+  COMPARISON_METRICS,
+  diffKindKey,
+  filingTypeKey,
+  metricLabelKey,
+} from "../components/research/labels";
+import { ExternalLink, ResearchSection } from "../components/research/parts";
+import { MissingReason } from "../components/research/reasons";
+import { Tag } from "../components/ui/Badges";
+import DataTable, { type Column } from "../components/ui/DataTable";
+import { Missing } from "../components/ui/Missing";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtEgpMillions, fmtPct, fmtPrice, fmtSignedPct, toNumber } from "../lib/format";
+import type { DisclosureDiff, DisclosureFact, DisclosureFiling } from "../types";
+import { ForeignText } from "./shared/ForeignText";
 
-// Company-scoped analyst surface for Phase 7 disclosures. Mounted by the
-// router at /companies/:ticker/disclosures (no CompanyTabs entry — linked
-// from the Financial Data page header). Mirrors don't crawl: register/upload
-// only point at analyst-supplied sources, and missing values stay UNKNOWN,
-// never zero.
+type Translate = ReturnType<typeof useLang>["t"];
 
-const METRIC_PRESETS = ['revenue', 'net_income', 'total_assets', 'total_equity', 'eps'] as const
+const MINUS = "−";
 
-function renderPrimitive(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-  // Never render raw JSON as text — nested detail lives behind title tooltips.
-  return 'Details'
+/** Per-share metrics are in EGP; every other disclosed amount is shown in EGP millions. */
+function amountText(locale: string, metric: string, value: string | null | undefined): string | null {
+  return metric === "eps" ? fmtPrice(locale, value) : fmtEgpMillions(locale, value);
 }
 
-function summaryOf(record: Record<string, unknown>, keys: string[]): string {
-  const parts: string[] = []
-  for (const key of keys) {
-    const value = record[key]
-    if (value !== null && value !== undefined && value !== '') {
-      parts.push(`${key}=${renderPrimitive(value)}`)
-    }
-  }
-  return parts.join(' · ')
+/** Same as `amountText` with the sign always shown (U+2212 for negatives). */
+function signedAmountText(locale: string, metric: string, value: string | null | undefined): string | null {
+  const n = toNumber(value);
+  if (n === null) return null;
+  const body = amountText(locale, metric, String(Math.abs(n)));
+  if (body === null) return null;
+  return n > 0 ? `+${body}` : n < 0 ? `${MINUS}${body}` : body;
 }
 
-function recordTitle(record: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(record, null, 2)
-  } catch {
-    return 'No detail recorded'
-  }
+function metricName(code: string, t: Translate): string {
+  const key = metricLabelKey(code);
+  return key ? t(key) : code.replace(/_/g, " ");
 }
 
-// Generic key/value renderer for the comparison + margin payloads, whose
-// exact keys vary by metric (comparison is Record<string, unknown>).
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>
-  }
-  // Some payloads arrive double-encoded (a JSON string instead of an object).
-  if (typeof value === 'string' && value.trim().startsWith('{')) {
-    try {
-      const parsed: unknown = JSON.parse(value)
-      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch {
-      return null
-    }
-  }
-  return null
-}
+function FilingsSection({ companyId, ticker }: { companyId: string; ticker: string }) {
+  const { t, locale } = useLang();
+  const { data: filings, isLoading, error, refetch } = useFilings(companyId);
+  const { data: facts } = useFacts(companyId);
 
-function RenderRecord({ record }: { record: Record<string, unknown> }) {
-  const entries = Object.entries(record ?? {})
-  if (entries.length === 0) return <span className="muted">No detail returned.</span>
-  return (
-    <dl className="disclosure-record">
-      {entries.map(([key, value]) => {
-        const nested = asRecord(value)
-        return (
-          <div key={key} className="disclosure-record-row">
-            <dt>{key}</dt>
-            <dd title={nested ? recordTitle({ [key]: nested }) : undefined}>
-              {nested ? (
-                <RenderRecord record={nested} />
-              ) : Array.isArray(value) ? (
-                value.map((item) => renderPrimitive(item)).join(', ') || '—'
-              ) : (
-                renderPrimitive(value)
-              )}
-            </dd>
-          </div>
-        )
-      })}
-    </dl>
-  )
-}
+  const parsedUrls = new Set((facts ?? []).map((f) => f.source?.filing_url).filter((u): u is string => !!u));
 
-function StatusBadge({ status }: { status: string }) {
-  const unknown = status === 'UNKNOWN'
-  return (
-    <span
-      className={unknown ? 'disclosure-badge disclosure-badge-missing' : 'disclosure-badge'}
-      title={unknown ? 'UNKNOWN — value missing, never defaulted to zero' : status}
-    >
-      {unknown ? 'UNKNOWN' : status || '—'}
-    </span>
-  )
-}
-
-function FilingRow({
-  filing,
-  parsing,
-  onParse,
-}: {
-  filing: DisclosureFiling
-  parsing: boolean
-  onParse: (filing: DisclosureFiling) => void
-}) {
-  return (
-    <tr>
-      <td>
-        <a href={filing.filing_url} target="_blank" rel="noreferrer">
-          {filing.filing_url.length > 48 ? `${filing.filing_url.slice(0, 48)}…` : filing.filing_url}
-        </a>
-        <div className="muted">{filing.bulletin_id ?? 'no bulletin id'}</div>
-      </td>
-      <td>{formatAsOf(filing.report_date)}</td>
-      <td>{filing.filing_type || '—'}</td>
-      <td>{filing.accounting_basis || '—'}</td>
-      <td>{filing.has_bytes ? 'Stored' : 'Reference only'}</td>
-      <td>{formatAsOf(filing.downloaded_at)}</td>
-      <td>
-        <button
-          type="button"
-          className="btn btn-secondary"
-          disabled={parsing}
-          onClick={() => onParse(filing)}
-        >
-          {parsing ? 'Parsing…' : 'Parse'}
-        </button>
-      </td>
-    </tr>
-  )
-}
-
-function FactRow({ fact }: { fact: DisclosureFact }) {
-  const rawValue = fact.value?.value
-  const periodBits = [
-    fact.period?.end ? formatAsOf(fact.period.end) : null,
-    fact.period?.type,
-    fact.period?.audit_state,
-  ].filter((bit) => bit !== null && bit !== undefined && bit !== '')
-  const locatorText = summaryOf(fact.locator ?? {}, ['page', 'table_id', 'table', 'row', 'col', 'bbox', 'cell'])
-  const extractionText = summaryOf(fact.extraction ?? {}, ['engine', 'method', 'accuracy', 'confidence'])
-  const provenanceText = [locatorText, extractionText].filter((s) => s !== '').join(' · ')
-  return (
-    <tr id={`fact-${fact.id}`}>
-      <td>{fact.metric}</td>
-      <td>
-        {rawValue ?? '—'} {fact.currency_unit ? <span className="muted">{fact.currency_unit}</span> : null}{' '}
-        <StatusBadge status={fact.status} />
-      </td>
-      <td>{periodBits.length > 0 ? periodBits.join(' · ') : '—'}</td>
-      <td>
-        {fact.source?.filing_url ? (
-          <a href={fact.source.filing_url} target="_blank" rel="noreferrer">
-            Filing link
-          </a>
+  const columns: Column<DisclosureFiling>[] = [
+    { id: "date", header: t("rf_col_report_date"), type: "num", cell: (f) => fmtDate(locale, f.report_date) ?? <Missing /> },
+    {
+      id: "type",
+      header: t("rf_col_type"),
+      cell: (f) => {
+        const key = filingTypeKey(f.filing_type);
+        return key ? t(key) : f.filing_type ? <ForeignText>{f.filing_type}</ForeignText> : <Missing />;
+      },
+    },
+    { id: "bulletin", header: t("rf_col_bulletin"), type: "num", cell: (f) => f.bulletin_id ?? <Missing /> },
+    {
+      id: "basis",
+      header: t("rf_col_basis"),
+      cell: (f) =>
+        f.accounting_basis ? (
+          <bdi dir="ltr" lang="en">
+            {f.accounting_basis}
+          </bdi>
         ) : (
-          '—'
-        )}
-        <div className="muted">
-          {[fact.source?.bulletin_id, fact.source?.report_date ? formatAsOf(fact.source.report_date) : null, fact.source?.filing_type]
-            .filter((bit) => bit !== null && bit !== undefined && bit !== '')
-            .join(' · ') || 'no filing detail'}
-        </div>
-        {fact.accounting_basis ? <div className="muted">Basis: {fact.accounting_basis}</div> : null}
-      </td>
-      <td title={recordTitle({ locator: fact.locator ?? {}, extraction: fact.extraction ?? {} })}>
-        {provenanceText || '—'}
-      </td>
-      <td>{fact.eas_tags && fact.eas_tags.length > 0 ? fact.eas_tags.join(', ') : '—'}</td>
-      <td>
-        {fact.is_restated ? <span className="disclosure-flag">Restated</span> : <span className="muted">—</span>}
-        {fact.supersedes ? (
-          <div>
-            <a href={`#fact-${fact.supersedes}`}>Supersedes prior fact</a>
-          </div>
-        ) : null}
-      </td>
-    </tr>
-  )
-}
+          <Missing />
+        ),
+    },
+    {
+      id: "parsed",
+      header: t("rf_col_parsed"),
+      cell: (f) => (parsedUrls.has(f.filing_url) ? t("rs_yes") : t("rs_no")),
+    },
+    {
+      id: "link",
+      header: t("rf_col_link"),
+      cell: (f) => <ExternalLink href={f.filing_url}>{t("rs_open_link")}</ExternalLink>,
+    },
+  ];
 
-function DiffRow({ diff }: { diff: DisclosureDiff }) {
   return (
-    <tr>
-      <td>{diff.metric}</td>
-      <td>{diff.kind ?? '—'}</td>
-      <td>{diff.prior_period ? formatAsOf(diff.prior_period) : '—'}</td>
-      <td>{diff.current_period ? formatAsOf(diff.current_period) : '—'}</td>
-      <td>
-        {diff.prior_value ?? '—'} → {diff.current_value ?? '—'}
-      </td>
-      <td>
-        {diff.delta ?? '—'}
-        {diff.delta_pct ? <span className="muted"> ({diff.delta_pct})</span> : null}
-      </td>
-    </tr>
-  )
+    <ResearchSection id="filings-registry" title={t("rf_title")}>
+      {error ? (
+        <ErrorState thing={t("rf_thing_filings")} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filings ?? []}
+          rowKey={(f) => f.id}
+          caption={t("rf_registry_caption")}
+          loading={isLoading}
+          loadingThing={t("rf_thing_filings")}
+          empty={
+            <div className="empty">
+              <p>{t("rf_empty", { ticker })}</p>{" "}
+              <Link className="rs-text-link" to={`/admin/disclosures?ticker=${encodeURIComponent(ticker)}`}>
+                {t("rf_admin_link")}
+              </Link>
+            </div>
+          }
+          hideDensityToggle
+        />
+      )}
+    </ResearchSection>
+  );
 }
 
+function FactsSection({ companyId, ticker }: { companyId: string; ticker: string }) {
+  const { t, locale } = useLang();
+  const { data: facts, isLoading, error, refetch } = useFacts(companyId);
+
+  const columns: Column<DisclosureFact>[] = [
+    {
+      id: "metric",
+      header: t("rs_col_metric"),
+      sticky: true,
+      cell: (f) => (
+        <span className="rs-cell-stack">
+          <span>{metricName(f.metric, t)}</span>
+          {f.is_restated && <span className="rs-cell-sub">{t("rf_restated")}</span>}
+        </span>
+      ),
+    },
+    {
+      id: "value",
+      header: t("col_value"),
+      type: "num",
+      cell: (f) =>
+        f.status === "OK" ? (amountText(locale, f.metric, f.value?.value) ?? <Missing />) : <MissingReason reason={f.value?.reason} />,
+    },
+    { id: "period", header: t("rs_col_period"), type: "num", cell: (f) => fmtDate(locale, f.period?.end) ?? <Missing /> },
+    {
+      id: "filing",
+      header: t("rf_col_filing"),
+      cell: (f) => {
+        const date = fmtDate(locale, f.source?.report_date) ?? t("rs_open_link");
+        return <ExternalLink href={f.source?.filing_url}>{date}</ExternalLink>;
+      },
+    },
+    {
+      id: "page",
+      header: t("rf_col_page"),
+      type: "num",
+      cell: (f) => {
+        const page = f.locator?.page;
+        return typeof page === "number" || typeof page === "string" ? String(page) : <Missing />;
+      },
+    },
+  ];
+
+  return (
+    <ResearchSection title={t("rf_facts_title")}>
+      {error ? (
+        <ErrorState thing={t("rf_thing_facts")} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={facts ?? []}
+          rowKey={(f) => f.id}
+          caption={t("rf_facts_caption")}
+          loading={isLoading}
+          loadingThing={t("rf_thing_facts")}
+          meta={t("rf_facts_meta")}
+          empty={<EmptyState>{t("rf_facts_empty", { ticker })}</EmptyState>}
+          hideDensityToggle
+        />
+      )}
+    </ResearchSection>
+  );
+}
+
+interface CompareRow {
+  id: "ttm" | "yoy" | "margin";
+  current: ReactNode;
+  prior: ReactNode;
+  change: ReactNode;
+  changePct: ReactNode;
+}
+
+function ComparisonSection({ companyId }: { companyId: string }) {
+  const { t, locale } = useLang();
+  const [metric, setMetric] = useState<string>("revenue");
+  const { data, isLoading, error, refetch } = useDisclosureComparison(companyId, metric);
+
+  const cmp = data?.comparison;
+  const margin = data?.ttm_margin_vs_prior_year;
+  const dash = "—";
+
+  const rows: CompareRow[] = [];
+  if (cmp && margin) {
+    const yoyOk = cmp.yoy.status === "OK";
+    rows.push(
+      {
+        id: "ttm",
+        current: amountText(locale, metric, cmp.ttm.value) ?? <MissingReason reason={cmp.ttm.reason} />,
+        prior: dash,
+        change: dash,
+        changePct: dash,
+      },
+      {
+        id: "yoy",
+        current: amountText(locale, metric, cmp.yoy.current) ?? <MissingReason reason={cmp.yoy.reason} />,
+        prior: amountText(locale, metric, cmp.yoy.prior) ?? <MissingReason reason={cmp.yoy.reason} />,
+        change: yoyOk
+          ? (signedAmountText(locale, metric, cmp.yoy.delta) ?? <MissingReason reason={cmp.yoy.reason} />)
+          : <MissingReason reason={cmp.yoy.reason} />,
+        changePct: fmtSignedPct(locale, cmp.yoy.delta_pct) ?? <MissingReason reason={cmp.yoy.reason} />,
+      },
+      {
+        id: "margin",
+        current: fmtPct(locale, margin.current.value) ?? <MissingReason reason={margin.current.reason ?? margin.reason} />,
+        prior: fmtPct(locale, margin.prior.value) ?? <MissingReason reason={margin.prior.reason ?? margin.reason} />,
+        change: fmtSignedPct(locale, margin.delta) ?? <MissingReason reason={margin.reason} />,
+        changePct: dash,
+      },
+    );
+  }
+
+  const measureKey = { ttm: "rf_m_ttm", yoy: "rf_m_yoy", margin: "rf_m_margin" } as const;
+  const columns: Column<CompareRow>[] = [
+    { id: "measure", header: t("rf_cmp_col_measure"), sticky: true, cell: (r) => t(measureKey[r.id]) },
+    { id: "current", header: t("rf_cmp_col_current"), type: "num", cell: (r) => r.current },
+    { id: "prior", header: t("rf_cmp_col_prior"), type: "num", cell: (r) => r.prior },
+    { id: "change", header: t("rf_cmp_col_change"), type: "num", cell: (r) => r.change },
+    { id: "pct", header: t("rf_cmp_col_change_pct"), type: "num", cell: (r) => r.changePct },
+  ];
+
+  const mixed = error?.message === "mixed accounting bases";
+  const bases = cmp?.accounting_bases ?? [];
+
+  return (
+    <ResearchSection
+      title={t("rf_cmp_title")}
+      aside={
+        <div className="rs-select-row">
+          <label htmlFor="rf-metric">{t("rf_cmp_metric")}</label>
+          <select id="rf-metric" className="rs-select" value={metric} onChange={(e) => setMetric(e.target.value)}>
+            {COMPARISON_METRICS.map((code) => (
+              <option key={code} value={code}>
+                {metricName(code, t)}
+              </option>
+            ))}
+          </select>
+        </div>
+      }
+    >
+      {mixed ? (
+        <EmptyState>{t("rf_cmp_mixed")}</EmptyState>
+      ) : error ? (
+        <ErrorState thing={t("rf_thing_comparison")} onRetry={() => void refetch()} />
+      ) : (
+        <div className="rs-wrap-table">
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.id}
+            caption={t("rf_cmp_caption")}
+            loading={isLoading}
+            loadingThing={t("rf_thing_comparison")}
+            meta={bases.length > 0 ? t("rf_cmp_basis", { basis: bases.join(", ") }) : undefined}
+            footnote={t("rf_cmp_note")}
+            hideDensityToggle
+          />
+        </div>
+      )}
+    </ResearchSection>
+  );
+}
+
+function ChangesSection({ companyId }: { companyId: string }) {
+  const { t, locale } = useLang();
+  const { data: diffs, isLoading, error, refetch } = useDiffs(companyId);
+
+  const line = (diff: DisclosureDiff): string => {
+    const prior = amountText(locale, diff.metric, diff.prior_value) ?? "—";
+    const current = amountText(locale, diff.metric, diff.current_value) ?? "—";
+    const delta = signedAmountText(locale, diff.metric, diff.delta);
+    const pct = fmtSignedPct(locale, diff.delta_pct);
+    const change = [delta, pct].filter((x): x is string => x !== null).join(", ") || "—";
+    return t("rf_change_line", { prior, current, delta: change });
+  };
+
+  return (
+    <ResearchSection title={t("rf_changes_title")}>
+      {isLoading ? (
+        <LoadingState thing={t("rf_thing_changes")} />
+      ) : error ? (
+        <ErrorState thing={t("rf_thing_changes")} onRetry={() => void refetch()} />
+      ) : !diffs || diffs.length === 0 ? (
+        <EmptyState>{t("rf_changes_empty")}</EmptyState>
+      ) : (
+        <ul className="rs-list">
+          {diffs.map((diff) => {
+            const kind = diffKindKey(diff.kind);
+            const period = [fmtDate(locale, diff.prior_period), fmtDate(locale, diff.current_period)]
+              .filter((x): x is string => x !== null)
+              .join(" → ");
+            return (
+              <li key={diff.id}>
+                <span>
+                  {metricName(diff.metric, t)} {kind && <Tag>{t(kind)}</Tag>}
+                </span>
+                <span className="rs-list-sub" dir="auto">
+                  {line(diff)}
+                  {period !== "" && ` · ${period}`}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </ResearchSection>
+  );
+}
+
+/**
+ * Filings section (R43 #11-#12): the registry, facts with their filing and page,
+ * a period comparison with a metric selector, and what changed. All read-only;
+ * filings are registered, uploaded and parsed in Admin.
+ */
 export default function Disclosures() {
-  const { ticker } = useParams<{ ticker: string }>()
-  const queryClient = useQueryClient()
-  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
-  const {
-    data: filings,
-    isLoading: filingsLoading,
-    error: filingsError,
-    refetch: refetchFilings,
-  } = useFilings(company?.id)
-  const {
-    data: facts,
-    isLoading: factsLoading,
-    error: factsError,
-    refetch: refetchFacts,
-  } = useFacts(company?.id)
+  const { ticker } = useParams<{ ticker: string }>();
+  const { t } = useLang();
+  const { data: company } = useCompanyByTicker(ticker);
+  const { data: facts } = useFacts(company?.id);
 
-  const [metricDraft, setMetricDraft] = useState<string>('revenue')
-  const [metric, setMetric] = useState<string>('revenue')
-  const {
-    data: comparison,
-    isLoading: comparisonLoading,
-    error: comparisonError,
-    refetch: refetchComparison,
-  } = useComparison(company?.id, metric)
-  const {
-    data: diffs,
-    isLoading: diffsLoading,
-    error: diffsError,
-    refetch: refetchDiffs,
-  } = useDiffs(company?.id)
+  if (!company) return <LoadingState thing={t("loading_company")} />;
 
-  const [regUrl, setRegUrl] = useState('')
-  const [regBulletin, setRegBulletin] = useState('')
-  const [regDate, setRegDate] = useState('')
-  const [regType, setRegType] = useState('')
-  const [regBasis, setRegBasis] = useState('')
-  const [regHash, setRegHash] = useState('')
-  const [registerBusy, setRegisterBusy] = useState(false)
-  const [registerError, setRegisterError] = useState<string | null>(null)
-  const [registerOk, setRegisterOk] = useState<string | null>(null)
-
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadDate, setUploadDate] = useState('')
-  const [uploadType, setUploadType] = useState('')
-  const [uploadBasis, setUploadBasis] = useState('')
-  const [uploadBulletin, setUploadBulletin] = useState('')
-  const [uploadBusy, setUploadBusy] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadOk, setUploadOk] = useState<string | null>(null)
-
-  const [parsingId, setParsingId] = useState<string | null>(null)
-  const [parseError, setParseError] = useState<string | null>(null)
-  const [parseOk, setParseOk] = useState<string | null>(null)
-
-  const refreshDisclosures = async (): Promise<void> => {
-    await queryClient.invalidateQueries({ queryKey: ['filings'] })
-    await queryClient.invalidateQueries({ queryKey: ['facts'] })
-    await queryClient.invalidateQueries({ queryKey: ['comparison'] })
-    await queryClient.invalidateQueries({ queryKey: ['diffs'] })
-    await refetchFilings()
-    await refetchFacts()
-    await refetchComparison()
-    await refetchDiffs()
-  }
-
-  const handleRegister = async (): Promise<void> => {
-    if (!company) return
-    setRegisterBusy(true)
-    setRegisterError(null)
-    setRegisterOk(null)
-    try {
-      const res = await registerFiling({
-        company_id: company.id,
-        filing_url: regUrl.trim(),
-        report_date: regDate,
-        ...(regBulletin.trim() !== '' ? { bulletin_id: regBulletin.trim() } : {}),
-        ...(regType.trim() !== '' ? { filing_type: regType.trim() } : {}),
-        ...(regBasis.trim() !== '' ? { accounting_basis: regBasis.trim() } : {}),
-        ...(regHash.trim() !== '' ? { content_hash: regHash.trim() } : {}),
-      })
-      await refreshDisclosures()
-      setRegisterOk(res.created ? 'Filing registered.' : 'Filing already registered — reference kept.')
-    } catch (err) {
-      setRegisterError(err instanceof Error ? err.message : 'Registration failed')
-    } finally {
-      setRegisterBusy(false)
-    }
-  }
-
-  const handleUpload = async (): Promise<void> => {
-    if (!company || !uploadFile) return
-    setUploadBusy(true)
-    setUploadError(null)
-    setUploadOk(null)
-    try {
-      const form = new FormData()
-      form.set('company_id', company.id)
-      form.set('file', uploadFile)
-      form.set('report_date', uploadDate)
-      if (uploadBulletin.trim() !== '') form.set('bulletin_id', uploadBulletin.trim())
-      if (uploadType.trim() !== '') form.set('filing_type', uploadType.trim())
-      if (uploadBasis.trim() !== '') form.set('accounting_basis', uploadBasis.trim())
-      const res = await uploadFiling(form)
-      await refreshDisclosures()
-      setUploadOk(res.created ? 'Filing uploaded.' : 'Filing already stored — reference kept.')
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploadBusy(false)
-    }
-  }
-
-  const handleParse = async (filing: DisclosureFiling): Promise<void> => {
-    setParsingId(filing.id)
-    setParseError(null)
-    setParseOk(null)
-    try {
-      await parseFiling(filing.id, {})
-      await refreshDisclosures()
-      setParseOk(`Parsed filing from ${formatAsOf(filing.report_date)} — new facts appear below.`)
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Parse failed')
-    } finally {
-      setParsingId(null)
-    }
-  }
-
-  if (companyLoading || filingsLoading || factsLoading) {
-    return <div className="loading">Loading company...</div>
-  }
-
-  if (companyError || !company) {
-    return <CompanyNotFound ticker={ticker} />
-  }
-
-  const registerReady = regUrl.trim() !== '' && regDate !== ''
-  const uploadReady = uploadFile !== null && uploadDate !== ''
-  const methodologyVersions = Array.from(
-    new Set((facts ?? []).map((fact) => fact.methodology_version).filter((v) => v !== '')),
-  )
+  const versions = Array.from(new Set((facts ?? []).map((f) => f.methodology_version).filter((v) => v !== "")));
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h2>Disclosures - {company.ticker}</h2>
-          <p className="subtitle">{company.name}</p>
-          <p className="muted">
-            Analyst surface: registry mirrors analyst-supplied sources — nothing is crawled.
-            Missing values stay UNKNOWN, never zero.
-          </p>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>Filing registry</h2>
-        {filingsError ? (
-          <div className="alert alert-error">
-            Couldn&apos;t load filings.{' '}
-            <button type="button" className="link-btn" onClick={() => refetchFilings()}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-        {(filings ?? []).length === 0 && !filingsError ? (
-          <div className="empty">No filings registered for {company.ticker} yet.</div>
-        ) : null}
-        {(filings ?? []).length > 0 ? (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Report date</th>
-                  <th>Type</th>
-                  <th>Basis</th>
-                  <th>Bytes</th>
-                  <th>Mirrored</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(filings ?? []).map((filing) => (
-                  <FilingRow
-                    key={filing.id}
-                    filing={filing}
-                    parsing={parsingId === filing.id}
-                    onParse={handleParse}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-        {parseError ? <div className="alert alert-error">{parseError}</div> : null}
-        {parseOk ? <div className="alert alert-success">{parseOk}</div> : null}
-      </div>
-
-      <div className="card">
-        <h2>Register a filing</h2>
-        <div className="disclosure-form">
-          <label>
-            Filing URL
-            <input value={regUrl} onChange={(e) => setRegUrl(e.target.value)} placeholder="https://…" />
-          </label>
-          <label>
-            Report date
-            <input type="date" value={regDate} onChange={(e) => setRegDate(e.target.value)} />
-          </label>
-          <label>
-            Bulletin ID (optional)
-            <input value={regBulletin} onChange={(e) => setRegBulletin(e.target.value)} />
-          </label>
-          <label>
-            Filing type (optional)
-            <input value={regType} onChange={(e) => setRegType(e.target.value)} placeholder="annual / quarterly" />
-          </label>
-          <label>
-            Accounting basis (optional)
-            <input value={regBasis} onChange={(e) => setRegBasis(e.target.value)} placeholder="EAS / IFRS" />
-          </label>
-          <label>
-            Content hash (optional)
-            <input value={regHash} onChange={(e) => setRegHash(e.target.value)} />
-          </label>
-        </div>
-        <button type="button" className="btn btn-primary" disabled={!registerReady || registerBusy} onClick={handleRegister}>
-          {registerBusy ? 'Registering…' : 'Register filing'}
-        </button>
-        {registerError ? <div className="alert alert-error">{registerError}</div> : null}
-        {registerOk ? <div className="alert alert-success">{registerOk}</div> : null}
-      </div>
-
-      <div className="card">
-        <h2>Upload a filing</h2>
-        <div className="disclosure-form">
-          <label>
-            File
-            <input
-              type="file"
-              onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
-          <label>
-            Report date
-            <input type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
-          </label>
-          <label>
-            Bulletin ID (optional)
-            <input value={uploadBulletin} onChange={(e) => setUploadBulletin(e.target.value)} />
-          </label>
-          <label>
-            Filing type (optional)
-            <input value={uploadType} onChange={(e) => setUploadType(e.target.value)} placeholder="annual / quarterly" />
-          </label>
-          <label>
-            Accounting basis (optional)
-            <input value={uploadBasis} onChange={(e) => setUploadBasis(e.target.value)} placeholder="EAS / IFRS" />
-          </label>
-        </div>
-        <button type="button" className="btn btn-primary" disabled={!uploadReady || uploadBusy} onClick={handleUpload}>
-          {uploadBusy ? 'Uploading…' : 'Upload filing'}
-        </button>
-        {uploadError ? <div className="alert alert-error">{uploadError}</div> : null}
-        {uploadOk ? <div className="alert alert-success">{uploadOk}</div> : null}
-      </div>
-
-      <div className="card">
-        <h2>Facts with provenance</h2>
-        {factsError ? (
-          <div className="alert alert-error">
-            Couldn&apos;t load facts.{' '}
-            <button type="button" className="link-btn" onClick={() => refetchFacts()}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-        {(facts ?? []).length === 0 && !factsError ? (
-          <div className="empty">No parsed facts for {company.ticker} yet — parse a filing above.</div>
-        ) : null}
-        {(facts ?? []).length > 0 ? (
-          <div className="table-container">
-            <table>
-              <caption className="muted">
-                Every fact links back to its filing and locator — hover the locator column for full detail.
-              </caption>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Value</th>
-                  <th>Period</th>
-                  <th>Source</th>
-                  <th>Locator / extraction</th>
-                  <th>EAS tags</th>
-                  <th>Flags</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(facts ?? []).map((fact) => (
-                  <FactRow key={fact.id} fact={fact} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="card">
-        <h2>Period comparison</h2>
-        <div className="disclosure-metric-row">
-          <label>
-            Metric
-            <input value={metricDraft} onChange={(e) => setMetricDraft(e.target.value)} placeholder="revenue" />
-          </label>
-          <div className="disclosure-presets" role="group" aria-label="Common metrics">
-            {METRIC_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setMetricDraft(preset)
-                  setMetric(preset)
-                }}
-              >
-                {preset}
-              </button>
-            ))}
-          </div>
-          <button type="button" className="btn btn-primary" onClick={() => setMetric(metricDraft.trim() || 'revenue')}>
-            Compare
-          </button>
-        </div>
-        {comparisonLoading ? <p className="muted">Loading comparison…</p> : null}
-        {comparisonError ? (
-          <div className="alert alert-error">
-            {comparisonError instanceof Error ? comparisonError.message : 'Comparison failed.'}{' '}
-            Mixed EAS/IFRS bases are never pooled — compare within one basis instead.{' '}
-            <button type="button" className="link-btn" onClick={() => refetchComparison()}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-        {!comparisonLoading && !comparisonError && comparison ? (
-          <>
-            <h3>TTM / year-on-year deltas</h3>
-            <RenderRecord record={comparison.comparison ?? {}} />
-            <h3>Margin vs prior year</h3>
-            <RenderRecord record={comparison.ttm_margin_vs_prior_year ?? {}} />
-            <p className="muted">
-              Differences are context for further review under these assumptions — not advice.
-            </p>
-          </>
-        ) : null}
-      </div>
-
-      <div className="card">
-        <h2>What changed</h2>
-        {diffsLoading ? <p className="muted">Loading diffs…</p> : null}
-        {diffsError ? (
-          <div className="alert alert-error">
-            Couldn&apos;t load diffs.{' '}
-            <button type="button" className="link-btn" onClick={() => refetchDiffs()}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-        {!diffsLoading && !diffsError && (diffs ?? []).length === 0 ? (
-          <div className="empty">No changes recorded for {company.ticker} yet.</div>
-        ) : null}
-        {(diffs ?? []).length > 0 ? (
-          <div className="table-container">
-            <table>
-              <caption className="muted">Newest first, old value → new value with delta.</caption>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Kind</th>
-                  <th>Prior period</th>
-                  <th>Current period</th>
-                  <th>Old → new</th>
-                  <th>Delta</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(diffs ?? []).map((diff) => (
-                  <DiffRow key={diff.id} diff={diff} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </div>
-
-      <p className="muted">
-        {methodologyVersions.length > 0
-          ? `Fact methodology ${methodologyVersions.map((v) => `v${v}`).join(', ')}.`
-          : 'No fact methodology recorded yet.'}{' '}
-        Sources are mirrored filings listed above; report dates are the as-of for each figure.
-      </p>
+      <FilingsSection companyId={company.id} ticker={company.ticker} />
+      <FactsSection companyId={company.id} ticker={company.ticker} />
+      <ComparisonSection companyId={company.id} />
+      <ChangesSection companyId={company.id} />
+      {versions.length > 0 && (
+        <p className="rs-note">{t("rf_footer", { version: versions.join(", ") })}</p>
+      )}
     </div>
-  )
+  );
 }

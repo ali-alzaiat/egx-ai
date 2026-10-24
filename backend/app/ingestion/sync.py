@@ -49,6 +49,7 @@ class PriceSyncSummary:
     companies_fetched: int
     records_written: int
     failures: tuple[tuple[str, str], ...]
+    fetched_tickers: tuple[str, ...] = ()
 
 
 async def fetch_and_write_prices(
@@ -124,6 +125,7 @@ async def fetch_and_write_prices(
         companies_fetched=len(fetched),
         records_written=total,
         failures=tuple(failures),
+        fetched_tickers=tuple(sorted(fetched)),
     )
 
 
@@ -161,6 +163,7 @@ async def sync_prices(
     start_date: date | None,
     history_days: int,
     concurrency: int,
+    recompute: bool = True,
 ) -> None:
     async with async_session_factory() as session:
         universe_service = UniverseService(session)
@@ -174,8 +177,17 @@ async def sync_prices(
         end = date.today()
         start = start_date or (end - timedelta(days=history_days))
 
-        await fetch_and_write_prices(session, provider, targets, start, end, concurrency)
+        summary = await fetch_and_write_prices(
+            session, provider, targets, start, end, concurrency
+        )
         _log_coverage(await universe_service.coverage())
+        await session.commit()
+        from app.services.recompute import after_price_sync, company_ids_for_tickers
+
+        ids = await company_ids_for_tickers(session, summary.fetched_tickers)
+    if recompute and ids:
+        result = await after_price_sync(ids)
+        logger.info("Recompute after price sync: %s", result.as_dict())
 
 
 async def show_coverage() -> None:
@@ -192,6 +204,9 @@ def main() -> None:
     parser.add_argument("--universe-only", action="store_true", help="Only refresh companies")
     parser.add_argument("--coverage", action="store_true", help="Report coverage and exit")
     parser.add_argument("--offline", action="store_true", help="Use the cached universe snapshot")
+    parser.add_argument(
+        "--no-recompute", action="store_true", help="Skip the automatic snapshot recompute"
+    )
     args = parser.parse_args()
 
     tickers = [t.strip() for t in args.tickers.split(",")] if args.tickers else None
@@ -203,7 +218,11 @@ def main() -> None:
             await sync_universe()
         else:
             await sync_prices(
-                tickers, args.start_date, args.history_days, args.concurrency
+                tickers,
+                args.start_date,
+                args.history_days,
+                args.concurrency,
+                recompute=not args.no_recompute,
             )
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")

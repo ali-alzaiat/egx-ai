@@ -139,28 +139,36 @@ class IndustryRepository:
     async def latest_metric_values(
         self, company_ids: list[uuid.UUID], metric_key: str
     ) -> dict[uuid.UUID, tuple[str | None, str | None]]:
-        """Latest AVAILABLE metric value per company as (value_str, unit).
+        """Value of the newest reporting period per company as (value_str, unit).
 
-        Missing data stays absent from the dict — never zero-filled.
+        "Latest" means the newest reporting period (``end_date``), then the
+        newest calculation (R43: a batch write must not make it arbitrary).
+        When that newest period is not AVAILABLE the company is absent: an
+        older period's value is never borrowed (R43 analyst F9). Missing data
+        stays absent from the dict — never zero-filled.
         """
+        from app.models.financial import FinancialPeriod
         from app.models.metrics import FinancialMetric, MetricStatusDB
 
         if not company_ids:
             return {}
         result = await self.session.execute(
             select(FinancialMetric)
+            .join(FinancialPeriod, FinancialMetric.period_id == FinancialPeriod.id)
             .where(FinancialMetric.company_id.in_(company_ids))
             .where(FinancialMetric.metric_code == metric_key)
-            .where(FinancialMetric.status == MetricStatusDB.AVAILABLE)
             .order_by(
-                FinancialMetric.company_id, desc(FinancialMetric.calculated_at)
+                FinancialMetric.company_id,
+                desc(FinancialPeriod.end_date),
+                desc(FinancialMetric.calculated_at),
             )
         )
         out: dict[uuid.UUID, tuple[str | None, str | None]] = {}
+        seen: set[uuid.UUID] = set()
         for m in result.scalars().all():
-            if m.company_id not in out:
-                out[m.company_id] = (
-                    str(m.value) if m.value is not None else None,
-                    m.unit,
-                )
+            if m.company_id in seen:
+                continue
+            seen.add(m.company_id)
+            if m.status == MetricStatusDB.AVAILABLE and m.value is not None:
+                out[m.company_id] = (str(m.value), m.unit)
         return out

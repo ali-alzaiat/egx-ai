@@ -43,7 +43,7 @@ from app.signals.rules import (
     technical_view,
     valuation_subscore,
 )
-from app.valuation.service import FairValueInput, FairValueService
+from app.valuation.service import FairValueService
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +294,7 @@ class StanceService:
     ) -> tuple[dict[str, TargetLevel], Decimal | None, Decimal | None, Decimal | None]:
         """Valuation scenarios as targets; an inverted set is INSUFFICIENT_DATA."""
         try:
-            payload = await self.valuation.fair_value(company_id, FairValueInput())
+            payload = await self.valuation.latest_payload(company_id)
         except Exception:
             logger.warning("fair value unavailable for %s", company_id, exc_info=True)
             payload = None

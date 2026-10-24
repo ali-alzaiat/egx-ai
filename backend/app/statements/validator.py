@@ -1,9 +1,11 @@
 """StatementValidator: deterministic identity gates before anything is shown.
 
-Version stmt-validator-1.0 (tolerance 1% relative). v1 identities:
+Version stmt-validator-1.1 (tolerance 1% relative). Identities:
 - assets = liabilities + equity (+ minority_interests when present)
 - gross_profit = revenue - cost_of_revenue
 - currency uniformity per candidate set; sign rules; null values rejected.
+1.1 (R43): interest_income, weighted_avg_shares_basic and shares_outstanding
+get the non-negative sign rule; nothing else changes.
 v1 limitation (R41): the CFO+CFI+CFF net-movement identity cannot run —
 the ontology v1 code list has no net-cash-movement code; lines pass without it.
 """
@@ -14,7 +16,7 @@ from decimal import Decimal
 from app.models.statements import ExtStatus
 from app.statements.extractor import LineCandidate
 
-VALIDATOR_VERSION = "stmt-validator-1.0"
+VALIDATOR_VERSION = "stmt-validator-1.1"
 VALIDATION_TOLERANCE = Decimal("0.01")
 
 _PASSTHRU_CODES = frozenset(
@@ -94,6 +96,9 @@ class StatementValidator:
             "cost_of_revenue": ("cost_of_revenue", True),
             "finance_costs": ("finance_costs", True),
             "income_tax": ("income_tax", True),
+            "interest_income": ("interest_income", True),
+            "weighted_avg_shares_basic": ("weighted_avg_shares_basic", True),
+            "shares_outstanding": ("shares_outstanding", True),
         }
 
         # Gate 2: balance identity.

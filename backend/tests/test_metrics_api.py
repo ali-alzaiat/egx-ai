@@ -172,66 +172,16 @@ class TestMetricsAPI:
         )
         assert response.status_code == 404
 
-    async def test_calculate_metrics_for_company(
+    async def test_calculate_routes_removed(
         self,
         client: AsyncClient,
         sample_company: Company,
         sample_period: FinancialPeriod,
-        sample_facts: list[FinancialFact],
     ):
-        """Test calculating metrics for a company."""
-        response = await client.post(
-            f"/api/metrics/companies/{sample_company.id}/calculate"
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["company_id"] == str(sample_company.id)
-        assert data["periods_calculated"] >= 1
-        assert data["metrics_persisted"] >= 1
-
-    async def test_calculate_metrics_for_period(
-        self,
-        client: AsyncClient,
-        sample_company: Company,
-        sample_period: FinancialPeriod,
-        sample_facts: list[FinancialFact],
-    ):
-        """Test calculating metrics for a specific period."""
-        response = await client.post(
+        """R43: metrics are computed on read from statement lines; no POST path remains."""
+        company = await client.post(f"/api/metrics/companies/{sample_company.id}/calculate")
+        period = await client.post(
             f"/api/metrics/companies/{sample_company.id}/periods/{sample_period.id}/calculate"
         )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["company_id"] == str(sample_company.id)
-        assert data["period_id"] == str(sample_period.id)
-        assert data["metrics_persisted"] >= 1
-
-    async def test_calculate_and_retrieve_metrics(
-        self,
-        client: AsyncClient,
-        sample_company: Company,
-        sample_period: FinancialPeriod,
-        sample_facts: list[FinancialFact],
-    ):
-        """Test calculating metrics then retrieving them."""
-        # Calculate
-        calc_response = await client.post(
-            f"/api/metrics/companies/{sample_company.id}/calculate"
-        )
-        assert calc_response.status_code == 200
-
-        # Retrieve
-        list_response = await client.get(
-            f"/api/metrics/companies/{sample_company.id}"
-        )
-        assert list_response.status_code == 200
-        metrics = list_response.json()
-        assert len(metrics) > 0
-
-        # Check metric structure
-        metric = metrics[0]
-        assert "id" in metric
-        assert "metric_code" in metric
-        assert "display_name" in metric
-        assert "status" in metric
-        assert "formula_version" in metric
+        assert company.status_code in (404, 405)
+        assert period.status_code in (404, 405)

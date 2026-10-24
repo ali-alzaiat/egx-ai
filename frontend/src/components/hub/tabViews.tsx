@@ -2,13 +2,14 @@ import { useEffect } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useCompanyByTicker } from "../../api/client";
 import InvestmentScore from "../../pages/InvestmentScore";
-import Signals from "../../pages/Signals";
+import Signals, { ScenarioValues, StanceFooter } from "../../pages/Signals";
 import TechnicalAnalysis from "../../pages/TechnicalAnalysis";
 import Thesis from "../../pages/Thesis";
 import Valuation from "../../pages/Valuation";
 import Disclosures from "../../pages/Disclosures";
 import DataQualityCard from "../DataQualityCard";
 import { LoadingState } from "../ui/States";
+import DailyPrices from "./DailyPrices";
 import { useLang } from "../../i18n/useLang";
 
 /**
@@ -25,11 +26,15 @@ function useScrollToHash(): void {
   }, [hash]);
 }
 
+/** Price & signals (spec 4.4.2): stance, why, limitations, levels, liquidity, indicators, scenarios, prices, footer. */
 export function PriceTab() {
   return (
     <div className="page">
       <Signals />
       <TechnicalAnalysis />
+      <ScenarioValues />
+      <DailyPrices />
+      <StanceFooter />
     </div>
   );
 }

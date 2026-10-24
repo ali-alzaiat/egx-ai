@@ -162,3 +162,34 @@ class ValuationFairValue(Base):
         ),
         Index("ix_valuation_fair_values_company_id", "company_id"),
     )
+
+
+class ValuationAssumption(Base):
+    """One sourced valuation assumption (R43 section 1.6): versioned, never a code constant.
+
+    Rates are fractions (0.25 = 25%), targets are plain multiples. The table is
+    empty by default: until a sourced row exists the legs that need it are
+    INSUFFICIENT_DATA. Written only by ``python -m app.valuation.assumptions``.
+    """
+
+    __tablename__ = "valuation_assumptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    methodology_version: Mapped[str] = mapped_column(String(20), nullable=False)
+    key: Mapped[str] = mapped_column(String(40), nullable=False)
+    scope: Mapped[str] = mapped_column(String(50), nullable=False)
+    value: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "methodology_version", "key", "scope", "as_of", name="uq_valuation_assumption"
+        ),
+        Index("ix_valuation_assumptions_key", "key"),
+    )

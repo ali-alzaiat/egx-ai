@@ -1,115 +1,165 @@
-import { useParams } from "react-router-dom";
+import "../components/hub/hubPages.css";
+
+import { useMemo } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useStatements } from "../api/client";
-import { useLang } from "../i18n/useLang";
+import { Missing } from "../components/ui/Missing";
+import { Notice } from "../components/ui/Notice";
+import { Segmented } from "../components/ui/Segmented";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
+import { Tag } from "../components/ui/Badges";
+import { ExternalLinkIcon } from "../components/ui/icons";
 import type { CopyKey } from "../i18n";
-import { fmtNum } from "../lib/format";
-import type { PeriodStatements, StatementLineRead } from "../types";
+import { useLang } from "../i18n/useLang";
+import { fmtEgpMillions, fmtInt, fmtPrice } from "../lib/format";
+import {
+  STATEMENT_FIELDS,
+  allAnnual,
+  anyVendor,
+  buildMatrix,
+  lineUnit,
+  type MatrixColumn,
+  type StatementField,
+} from "../lib/statementMatrix";
+import type { StatementLineRead } from "../types";
 
-const SECTIONS: { field: "income" | "balance" | "cash_flow"; key: CopyKey }[] = [
-  { field: "income", key: "section_income" },
-  { field: "balance", key: "section_balance" },
-  { field: "cash_flow", key: "section_cash_flow" },
-];
+const FIELD_KEY: Record<StatementField, CopyKey> = {
+  income: "section_income",
+  balance: "section_balance",
+  cash_flow: "section_cash_flow",
+};
 
-function SectionTable({ title, lines }: { title: string; lines: StatementLineRead[] }) {
-  const { lang, t, locale } = useLang();
-  return (
-    <table className="statements-table">
-      <caption>{title}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{t("col_line")}</th>
-          <th scope="col">{t("col_value")}</th>
-          <th scope="col">{t("col_source")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {lines.map((l) => {
-          // Backend already ships the real bilingual label; pick by language.
-          const label = lang === "ar" ? (l.label_ar || l.label_en) : l.label_en;
-          return (
-            <tr key={l.ontology_code} title={l.source_label_reported ?? undefined}>
-              <td>{label}</td>
-              <td className="num" dir="ltr">
-                {l.value === null
-                  ? t("no_value")
-                  : fmtNum(locale, l.value, { maximumFractionDigits: 4 })}
-              </td>
-              <td>
-                <SourceCell line={l} />
-              </td>
-            </tr>
-          );
-        })}
-        {lines.length === 0 && (
-          <tr>
-            <td colSpan={3}>{t("insufficient_data")}</td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  );
+function isField(value: string | null): value is StatementField {
+  return STATEMENT_FIELDS.some((f) => f === value);
 }
 
-/** Where a value came from: an official filing (with page) or provisional vendor data. */
-function SourceCell({ line }: { line: StatementLineRead }) {
-  const { t } = useLang();
-  if (line.source_tier === "vendor") {
-    return (
-      <span className="source-provisional" title={t("source_provisional_title")}>
-        {t("source_provisional")}
-      </span>
-    );
+/** Money lines in EGP millions; share counts as whole numbers; per-share lines to 2 dp. */
+function formatLine(locale: string, line: StatementLineRead): string | null {
+  switch (lineUnit(line)) {
+    case "shares":
+      return fmtInt(locale, line.value);
+    case "currency_per_share":
+      return fmtPrice(locale, line.value);
+    default:
+      return fmtEgpMillions(locale, line.value);
   }
-  if (line.source_tier === "filing") {
-    const label = `${t("source_filing")}${line.source_page ? ` · ${t("source_page")} ${line.source_page}` : ""}`;
-    return line.document_url ? (
-      <a href={line.document_url} target="_blank" rel="noreferrer">
-        {label}
+}
+
+function PeriodHeader({ column }: { column: MatrixColumn }) {
+  const { t } = useLang();
+  const annual = column.periodType === "ANNUAL";
+  const typeKey = `period_${column.periodType}` as CopyKey;
+  return <>{annual ? column.fiscalYear : `${t(typeKey)} ${column.fiscalYear}`}</>;
+}
+
+function SourceHeader({ column }: { column: MatrixColumn }) {
+  const { t } = useLang();
+  if (column.source === "vendor") return <Tag title={t("source_provisional_title")}>{t("source_provisional")}</Tag>;
+  if (column.source === "filing") {
+    return column.documentUrl ? (
+      <a href={column.documentUrl} target="_blank" rel="noreferrer" className="source-link">
+        {t("source_filing")}
+        <ExternalLinkIcon size={12} />
       </a>
     ) : (
-      <span>{label}</span>
+      <Tag>{t("source_filing")}</Tag>
     );
   }
-  return null;
+  return <Missing localized={t("fn_not_reported_in_source")} />;
 }
 
-function PeriodBlock({ p }: { p: PeriodStatements }) {
-  const { t } = useLang();
-  const typeKey = ("period_" + p.period_type) as CopyKey;
-  return (
-    <section className="period-block">
-      <h2>
-        {t(typeKey)} {p.fiscal_year}
-        {p.published_date && (
-          <span className="published-date">
-            {" · "}
-            {t("published_on")} {p.published_date}
-          </span>
-        )}
-      </h2>
-      {SECTIONS.map((s) => (
-        <SectionTable key={s.field} title={t(s.key)} lines={p[s.field]} />
-      ))}
-    </section>
-  );
+function Cell({ line }: { line: StatementLineRead | null }) {
+  const { t, locale } = useLang();
+  const text = line ? formatLine(locale, line) : null;
+  if (!line || text === null) return <Missing localized={t("fn_not_reported_in_source")} />;
+  const title =
+    line.source_tier === "filing" && line.source_page
+      ? `${t("source_filing")} ${t("source_page")} ${line.source_page}`
+      : (line.source_label_reported ?? undefined);
+  return <span title={title}>{text}</span>;
 }
 
+/** Financials › Statements (spec 4.4.3): one statement at a time, lines by fiscal year, source under each year. */
 export default function Statements() {
-  const { ticker } = useParams();
-  const tk = ticker ?? "";
-  const { data, isLoading, error } = useStatements(tk);
-  const { t } = useLang();
+  const { ticker = "" } = useParams<{ ticker: string }>();
+  const { t, lang } = useLang();
+  const { data, isLoading, error, refetch } = useStatements(ticker);
+  const [params, setParams] = useSearchParams();
+  const stmtParam = params.get("statement");
+  const field: StatementField = isField(stmtParam) ? stmtParam : "income";
+
+  const matrix = useMemo(() => buildMatrix(data?.periods ?? [], field), [data, field]);
+
+  if (isLoading) return <LoadingState thing={t("statements_title")} />;
+  if (error || !data) return <ErrorState thing={t("statements_title")} onRetry={() => void refetch()} />;
+  if (data.periods.length === 0) return <EmptyState>{t("statements_empty")}</EmptyState>;
+
+  const setField = (next: StatementField): void =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === "income") p.delete("statement");
+        else p.set("statement", next);
+        return p;
+      },
+      { replace: true },
+    );
 
   return (
     <div className="page">
-      <h2>{t("statements_title")}</h2>
-      {isLoading && <p>{t("loading")}</p>}
-      {error && <p>{t("load_error")}</p>}
-      {data && data.periods.length === 0 && <p>{t("statements_empty")}</p>}
-      {data?.periods.map((p: PeriodStatements) => (
-        <PeriodBlock key={p.period_id} p={p} />
-      ))}
+      <div className="statements-controls">
+        <Segmented
+          label={t("fn_statements_view_aria")}
+          value={field}
+          onChange={setField}
+          options={STATEMENT_FIELDS.map((f) => ({ value: f, label: t(FIELD_KEY[f]) }))}
+        />
+        <p className="table-meta">{t(allAnnual(matrix.columns) ? "fn_statements_meta_annual" : "fn_statements_meta")}</p>
+      </div>
+      {anyVendor(data.periods) && <Notice>{t("fn_statements_provisional_notice")}</Notice>}
+      <div className="table-wrap">
+        <table className="matrix-table" aria-label={t(FIELD_KEY[field])}>
+          <thead>
+            <tr>
+              <th scope="col" className="col-sticky">
+                {t("col_line")}
+              </th>
+              {matrix.columns.map((c) => (
+                <th key={c.periodId} scope="col" className="num" dir="ltr">
+                  <PeriodHeader column={c} />
+                </th>
+              ))}
+            </tr>
+            <tr className="source-row">
+              <th scope="row" className="col-sticky">
+                {t("col_source")}
+              </th>
+              {matrix.columns.map((c) => (
+                <td key={c.periodId} className="num" dir="ltr">
+                  <SourceHeader column={c} />
+                </td>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => {
+              const label = lang === "ar" ? row.labelAr || row.labelEn : row.labelEn;
+              return (
+                <tr key={row.code}>
+                  <th scope="row" className="col-sticky">
+                    {label}
+                  </th>
+                  {row.cells.map((cell, i) => (
+                    <td key={matrix.columns[i]?.periodId ?? i} className="num" dir="ltr">
+                      <Cell line={cell} />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

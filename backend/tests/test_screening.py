@@ -7,7 +7,6 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.financial import FinancialFact
 from app.models.market import Company, CompanyStatus
 from app.models.screening import ScreeningStatusDB, ShariahScreeningResult
 from app.screening.methodology import DEFAULT_METHODOLOGY
@@ -18,6 +17,7 @@ from app.screening.rules import (
     screen_industry,
     screen_interest_income,
 )
+from statement_seed import seed_year
 
 
 class TestDebtRatioScreening:
@@ -158,9 +158,10 @@ class TestScreeningPersistence:
         test_company: Company,
     ):
         # No facts → ratio rules are INSUFFICIENT_DATA; permitted industry passes.
-        response = await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        response = await client.get(f"/api/screening/companies/{test_company.id}")
         assert response.status_code == 200
         assert response.json()["is_compliant"] is None
+        assert response.json()["overall_reason"] == "no approved statement lines"
 
         row = (
             await db_session.execute(
@@ -191,7 +192,7 @@ class TestScreeningPersistence:
         await db_session.flush()
 
         # Prohibited industry FAILs while every ratio rule lacks data.
-        response = await client.post(f"/api/screening/companies/{company.id}/screen")
+        response = await client.get(f"/api/screening/companies/{company.id}")
         assert response.status_code == 200
         assert response.json()["is_compliant"] is False
 
@@ -208,11 +209,15 @@ class TestScreeningPersistence:
     async def test_zero_value_not_replaced(
         self,
         client: AsyncClient,
+        db_session: AsyncSession,
         test_company: Company,
-        zero_value_facts: list[FinancialFact],
     ):
-        # normalized total_debt is 0; falling back to the reported 999 would flip the rule.
-        response = await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        # A legitimate zero debt line is a real 0 (PASS), never treated as missing.
+        await seed_year(
+            db_session, test_company, 2024,
+            {"interest_bearing_debt": Decimal("0"), "total_assets": Decimal("100")},
+        )
+        response = await client.get(f"/api/screening/companies/{test_company.id}")
         assert response.status_code == 200
         rules = {r["rule_name"]: r for r in response.json()["rule_results"]}
         assert rules["debt_ratio"]["verdict"] == "PASS"

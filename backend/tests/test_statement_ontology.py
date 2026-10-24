@@ -1,4 +1,4 @@
-"""Tests for the statement ontology (stmt-ontology-1.0)."""
+"""Tests for the statement ontology (stmt-ontology-1.1)."""
 
 import pytest
 
@@ -22,6 +22,8 @@ EXPECTED_INCOME = [
     "income_tax",
     "net_income",
     "eps",
+    "interest_income",
+    "weighted_avg_shares_basic",
 ]
 
 EXPECTED_BALANCE = [
@@ -36,6 +38,7 @@ EXPECTED_BALANCE = [
     "interest_bearing_debt",
     "total_equity",
     "minority_interests",
+    "shares_outstanding",
 ]
 
 EXPECTED_CASH = [
@@ -49,7 +52,7 @@ EXPECTED_CASH = [
 
 
 def test_ontology_version_constant() -> None:
-    assert STATEMENT_ONTOLOGY_VERSION == "stmt-ontology-1.0"
+    assert STATEMENT_ONTOLOGY_VERSION == "stmt-ontology-1.1"
 
 
 def test_income_codes_present() -> None:
@@ -86,3 +89,12 @@ def test_line_lookup_sections() -> None:
 def test_unknown_code_raises() -> None:
     with pytest.raises(KeyError):
         line("no_such_line")
+
+
+def test_units_ontology_1_1() -> None:
+    """Share counts and per-share lines carry their unit; everything else is currency."""
+    assert line("shares_outstanding").unit == "shares"
+    assert line("weighted_avg_shares_basic").unit == "shares"
+    assert line("eps").unit == "currency_per_share"
+    assert line("interest_income").unit == "currency"
+    assert line("revenue").unit == "currency"

@@ -15,7 +15,9 @@ Changing any value below requires bumping SCORE_METHODOLOGY_VERSION.
 
 from decimal import Decimal
 
-SCORE_METHODOLOGY_VERSION = "1.0"
+# 1.1 (R45 M4): dividend_stability / dividend_growing are NOT_RUN until a declared-DPS
+# source exists; dividend_earnings_coverage is cash paid / EPS.
+SCORE_METHODOLOGY_VERSION = "1.1"
 
 DEFAULT_SCORE_PROFILE_KEY = "default"
 

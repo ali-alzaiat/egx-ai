@@ -271,18 +271,37 @@ async def test_gics_fallback_when_no_egx_sector(
 async def test_latest_metric_value_wins(
     client: AsyncClient, bank_universe: list[Company], db_session: AsyncSession
 ) -> None:
+    """"Latest" is the newest reporting period, not the newest calculation (R43)."""
     target = bank_universe[0]
+    url = f"/api/industry/companies/{target.id}"
+    before = (await client.get(url)).json()
+    baseline = next(m for m in before["percentiles"] if m["metric_key"] == "roe")["value"]
+
+    # An older fiscal year recalculated later must not displace FY2024.
     await _add_metric(
         db_session,
         target,
         "roe",
         Decimal("99"),
-        calculated_at=datetime(2026, 9, 1, tzinfo=UTC),
+        calculated_at=datetime(2030, 9, 1, tzinfo=UTC),
         fiscal_year=2023,
     )
     await db_session.flush()
+    data = (await client.get(url)).json()
+    roe = next(m for m in data["percentiles"] if m["metric_key"] == "roe")
+    assert roe["value"] == baseline
 
-    data = (await client.get(f"/api/industry/companies/{target.id}")).json()
+    # A newer fiscal year wins even when it was calculated earlier.
+    await _add_metric(
+        db_session,
+        target,
+        "roe",
+        Decimal("99"),
+        calculated_at=datetime(2020, 1, 1, tzinfo=UTC),
+        fiscal_year=2025,
+    )
+    await db_session.flush()
+    data = (await client.get(url)).json()
     roe = next(m for m in data["percentiles"] if m["metric_key"] == "roe")
     assert roe["value"] == "100.00"
 

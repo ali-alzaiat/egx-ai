@@ -119,9 +119,8 @@ class EngineWorld:
             ]
             return rows, len(rows)
 
-        async def fair_value(
-            _self: Any, _company_id: UUID, _inp: Any = None
-        ) -> dict[str, Any]:
+        async def fv_latest(_self: Any, _company_id: UUID) -> dict[str, Any]:
+            # R43: stance reads the stored fair-value snapshot, never recomputes.
             if world.valuation_raises:
                 raise RuntimeError("valuation engine down (simulated)")
             return {"scenarios": world.scenarios}
@@ -144,7 +143,7 @@ class EngineWorld:
             return world.stmt_lines
 
         monkeypatch.setattr(PriceRepository, "get_prices", get_prices)
-        monkeypatch.setattr(FairValueService, "fair_value", fair_value)
+        monkeypatch.setattr(FairValueService, "latest_payload", fv_latest)
         monkeypatch.setattr(ScoreService, "latest_payload", latest_payload)
         monkeypatch.setattr(StatementLineRepository, "latest_approved", stmt_approved)
 

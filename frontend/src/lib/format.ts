@@ -25,8 +25,13 @@ function nf(locale: string, opts: Intl.NumberFormatOptions): Intl.NumberFormat {
   return new Intl.NumberFormat(locale, opts);
 }
 
+/** Intl writes negatives with a hyphen (and a direction mark in Arabic); the UI uses U+2212. */
+function unicodeMinus(text: string): string {
+  return text.replace(/^[‎‏]?-/, MINUS);
+}
+
 function fixed(locale: string, n: number, digits: number): string {
-  return nf(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+  return unicodeMinus(nf(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n));
 }
 
 /** Sign always shown (plus or U+2212 minus); zero carries no sign. */
@@ -83,7 +88,7 @@ export function fmtRatio(locale: string, value: Numeric): string | null {
 /** Grouped integer: 4,461,086. */
 export function fmtInt(locale: string, value: Numeric): string | null {
   const n = toNumber(value);
-  return n === null ? null : nf(locale, { maximumFractionDigits: 0 }).format(n);
+  return n === null ? null : unicodeMinus(nf(locale, { maximumFractionDigits: 0 }).format(n));
 }
 
 /** Full EGP units divided by 1e6, 1 dp, grouped: 106,672.9. */

@@ -1,0 +1,7 @@
+# Inbox: analyst
+
+From: router · 2026-10-24
+Task: financial-correctness review of the R43 bridge and engines (uncommitted): `backend/app/statements/bridge.py`, `metrics/` (service + engine), `valuation/assumptions.py` and fair-value inputs, `screening/` purification (DPS, interest-income numerator), `scores/service.py` input map. Design: `.workflow/design/r43-computed-company-data.md` §1.3–1.6, D-6; R44 `.workflow/decisions/R44-sectors-and-valuation-assumptions.md`.
+Check every formula against its standard definition (units, sign, period alignment, average vs spot, annual-only, no borrowing from older periods, no look-ahead). Staff-backend flagged: (a) ROA shows 11.00 where the exact value is 10.53 — find the rounding cause; (b) ROE/ROA with no prior period stay INSUFFICIENT_DATA rather than falling back to spot equity/assets — this is a methodology choice: write 2–3 options with trade-offs and one recommendation (the user decides; do not pick); (c) D-6 DPS = abs(dividends_paid)/shares_outstanding and interest-only purification numerator: rule accept/reject with reasons.
+Hand-check on real data: pick COMI and one non-bank (e.g. SWDY) from the dev DB (read-only SELECTs via the venv python; no writes) and recompute 6–8 key numbers by hand from their statement lines; compare with what the pure functions return.
+Deliverable: `.workflow/research/analyst-r43-2026-10-24.md` — findings table (formula, expected, actual, severity, file:line) + the (b) options. No code edits. End NEXT: staff-backend (findings) | ASK USER: <(b) question> | DONE.

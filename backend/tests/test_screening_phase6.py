@@ -7,11 +7,11 @@ from decimal import Decimal
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
-from app.models.market import Company, CompanyStatus, DataSource
+from app.models.market import Company, CompanyStatus
 from app.screening.methodology import DEFAULT_METHODOLOGY, ShariahMethodologyVersion
 from app.screening.purification import (
     NOT_ZAKAT_COPY,
+    PARTIAL_ESTIMATE_REASON,
     PURIFICATION_DOCTRINE,
     PurificationBranch,
     PurificationStatus,
@@ -19,6 +19,7 @@ from app.screening.purification import (
     normalize_ticker,
 )
 from app.screening.service import RuleProvenance, ScreeningInput, ShariahScreeningService
+from statement_seed import make_company, seed_year
 
 
 def _input(**overrides: object) -> ScreeningInput:
@@ -135,6 +136,59 @@ class TestDividendPurification:
         assert est.amount_egp == Decimal("6.00")
         assert est.note == NOT_ZAKAT_COPY
 
+    def test_partial_ratio_numerator_gives_estimate_partial(self) -> None:
+        est = estimate_dividend_purification(
+            ticker="TMGH",
+            is_compliant=True,
+            dividend_egp=Decimal("300"),
+            non_permissible_revenue=Decimal("2"),
+            total_revenue=Decimal("100"),
+            ratio_is_partial=True,
+        )
+        assert est.status == PurificationStatus.ESTIMATE_PARTIAL
+        assert est.amount_egp == Decimal("6.00")
+        assert est.reason == PARTIAL_ESTIMATE_REASON
+        assert "at least" not in PARTIAL_ESTIMATE_REASON.lower()
+
+    def test_ratio_above_one_is_insufficient_with_reason(self) -> None:
+        """Bank gross interest income over net revenue (COMI FY2025: 1.648)."""
+        est = estimate_dividend_purification(
+            ticker="COMI",
+            is_compliant=None,
+            dividend_egp=Decimal("100"),
+            non_permissible_revenue=Decimal("211816450000"),
+            total_revenue=Decimal("128541616000"),
+            ratio_is_partial=True,
+        )
+        assert est.status == PurificationStatus.INSUFFICIENT_DATA
+        assert est.amount_egp is None
+        assert est.ratio is None
+        assert est.reason is not None and "(> 1)" in est.reason
+        assert est.missing_input == "non_permissible_revenue, total_revenue"
+
+    def test_ratio_of_exactly_one_is_allowed(self) -> None:
+        est = estimate_dividend_purification(
+            ticker="TMGH",
+            is_compliant=True,
+            dividend_egp=Decimal("10"),
+            non_permissible_revenue=Decimal("100"),
+            total_revenue=Decimal("100"),
+        )
+        assert est.status == PurificationStatus.OK
+        assert est.amount_egp == Decimal("10")
+
+    def test_fail_holding_unaffected_by_ratio_above_one(self) -> None:
+        est = estimate_dividend_purification(
+            ticker="COMI",
+            is_compliant=False,
+            dividend_egp=Decimal("100"),
+            non_permissible_revenue=Decimal("200"),
+            total_revenue=Decimal("100"),
+            ratio_is_partial=True,
+        )
+        assert est.branch == PurificationBranch.FAIL_HOLDING
+        assert est.amount_egp == Decimal("100")
+
     def test_zero_dividend_is_real_zero(self) -> None:
         est = estimate_dividend_purification(
             ticker="TMGH",
@@ -234,115 +288,77 @@ class TestDividendPurification:
         assert normalize_ticker(" TMGH ") == "TMGH"
 
 
-async def _make_fact_backed_company(
-    db_session: AsyncSession, *, filing_date: date | None
+async def _make_line_backed_company(
+    db_session: AsyncSession,
+    *,
+    tier: str = "filing",
+    published: date | None = None,
+    extra: dict[str, Decimal] | None = None,
+    industry: str = "Software",
 ) -> Company:
-    company = Company(
-        id=uuid.uuid4(),
-        ticker=f"RPT_{uuid.uuid4().hex[:8].upper()}",
-        isin=f"EG{uuid.uuid4().hex[:10].upper()}",
-        name="Report Dated Co",
-        sector="Technology",
-        industry="Software",
-        currency="EGP",
-        status=CompanyStatus.ACTIVE,
-    )
-    db_session.add(company)
-    await db_session.flush()
-    period = FinancialPeriod(
-        id=uuid.uuid4(),
-        company_id=company.id,
-        period_type="ANNUAL",
-        fiscal_year=2024,
-        start_date=date(2024, 1, 1),
-        end_date=date(2024, 12, 31),
-    )
-    db_session.add(period)
-    await db_session.flush()
-    source = DataSource(
-        id=uuid.uuid4(),
-        name=f"Phase6 Source {uuid.uuid4().hex[:8]}",
-        source_type="SYNTHETIC",
-    )
-    db_session.add(source)
-    await db_session.flush()
-    document = FinancialDocument(
-        id=uuid.uuid4(),
-        period_id=period.id,
-        source_id=source.id,
-        document_type="ANNUAL_REPORT",
-        document_status="ORIGINAL",
-        filing_date=filing_date,
-    )
-    db_session.add(document)
-    await db_session.flush()
-    for label, value, fact_type in (
-        ("total_debt", Decimal("10"), "BALANCE_SHEET"),
-        ("total_assets", Decimal("100"), "BALANCE_SHEET"),
-        ("cash_and_equivalents", Decimal("10"), "BALANCE_SHEET"),
-        ("interest_income", Decimal("1"), "INCOME_STATEMENT"),
-        ("revenue", Decimal("100"), "INCOME_STATEMENT"),
-    ):
-        db_session.add(
-            FinancialFact(
-                id=uuid.uuid4(),
-                period_id=period.id,
-                document_id=document.id,
-                company_id=company.id,
-                fact_type=fact_type,
-                reported_label=label,
-                normalized_label=label,
-                reported_value=value,
-                normalized_value=value,
-                currency="EGP",
-            )
-        )
-    await db_session.flush()
+    company = await make_company(db_session, industry=industry)
+    values = {
+        "interest_bearing_debt": Decimal("10"),
+        "total_assets": Decimal("100"),
+        "cash_and_equivalents": Decimal("10"),
+        "interest_income": Decimal("1"),
+        "revenue": Decimal("100"),
+    }
+    values.update(extra or {})
+    await seed_year(db_session, company, 2024, values, tier=tier, published=published, page="12")
     return company
 
 
 class TestScreeningProvenanceApi:
-    async def test_screen_persists_report_date_and_rule_sources(
+    async def test_get_computes_report_date_and_rule_sources(
         self, client: AsyncClient, test_company: Company
     ) -> None:
-        response = await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        response = await client.get(f"/api/screening/companies/{test_company.id}")
         assert response.status_code == 200
         body = response.json()
         assert body["methodology_version"] == "aaoifi-assets-spot/33-33-5"
-        # No facts: report_date unknown with reason; every ratio rule cites
-        # its missing inputs; industry rule cites the company record.
+        assert body["engine"] == "statement_lines"
+        assert body["compute_status"] == "ok"
+        # No statement lines: report_date unknown with reason; every ratio rule
+        # names its missing statement lines; industry rule cites the company record.
         assert body["report_date"] is None
         assert body["report_date_reason"] is not None
         rules = {r["rule_name"]: r for r in body["rule_results"]}
-        assert rules["debt_ratio"]["missing_input"] == "total_debt, total_assets"
+        assert rules["debt_ratio"]["missing_input"] == "interest_bearing_debt, total_assets"
         assert rules["debt_ratio"]["source"] is None
         assert rules["industry_screen"]["source"] == "company record"
 
-        get = await client.get(f"/api/screening/companies/{test_company.id}")
-        assert get.status_code == 200
-        assert get.json()["report_date"] is None
-        assert get.json()["report_date_reason"] == body["report_date_reason"]
-
-    async def test_screen_with_filings_reports_filing_date(
+    async def test_filing_lines_report_publication_date(
         self, client: AsyncClient, db_session: AsyncSession
     ) -> None:
-        company = await _make_fact_backed_company(
-            db_session, filing_date=date(2024, 3, 15)
-        )
-        response = await client.post(f"/api/screening/companies/{company.id}/screen")
-        assert response.status_code == 200
-        body = response.json()
-        assert body["report_date"] == "2024-03-15"
+        company = await _make_line_backed_company(db_session, published=date(2025, 3, 15))
+        body = (await client.get(f"/api/screening/companies/{company.id}")).json()
+        assert body["report_date"] == "2025-03-15"
         assert body["report_date_reason"] is None
         assert body["is_compliant"] is True
+        assert body["provisional"] is False
         rules = {r["rule_name"]: r for r in body["rule_results"]}
-        assert rules["debt_ratio"]["source"] == "ANNUAL_REPORT filing 2024-03-15"
-        assert rules["debt_ratio"]["source_date"] == "2024-03-15"
+        assert rules["debt_ratio"]["source"] == (
+            "filing: ANNUAL_FILING FY2024 (period end 2024-12-31), p.12"
+        )
+        assert rules["debt_ratio"]["source_date"] == "2025-03-15"
+
+    async def test_vendor_lines_are_provisional_and_undated(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        company = await _make_line_backed_company(db_session, tier="vendor")
+        body = (await client.get(f"/api/screening/companies/{company.id}")).json()
+        assert body["provisional"] is True
+        assert body["source_tier"] == "vendor"
+        assert body["report_date"] is None
+        assert body["report_date_reason"] == (
+            "vendor data has no publication date; period end 2024-12-31"
+        )
 
     async def test_old_version_rows_stay_readable(
         self, client: AsyncClient, test_company: Company
     ) -> None:
-        await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        await client.get(f"/api/screening/companies/{test_company.id}")
         listed = await client.get(
             "/api/screening/companies",
             params={"methodology_version": "aaoifi-assets-spot/33-33-5"},
@@ -355,76 +371,93 @@ class TestScreeningProvenanceApi:
         assert listed_old.status_code == 200
         assert all(r["methodology_version"] == "1.0" for r in listed_old.json())
 
-
-class TestPurificationApi:
-    async def test_honest_degradation_by_default(
+    async def test_screen_routes_removed(
         self, client: AsyncClient, test_company: Company
     ) -> None:
-        await client.post(f"/api/screening/companies/{test_company.id}/screen")
-        response = await client.post(
-            f"/api/screening/companies/{test_company.id}/purification",
-            json={"dividend_egp": 300.0, "dps": 0.30, "dps_source": "EGX disclosure"},
+        for path in ("screen", "screen-statements"):
+            r = await client.post(f"/api/screening/companies/{test_company.id}/{path}")
+            assert r.status_code in (404, 405)
+        r = await client.post(
+            f"/api/screening/companies/{test_company.id}/purification", json={}
         )
+        assert r.status_code == 405
+
+
+class TestPurificationApi:
+    async def test_missing_dividend_line_names_it(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        company = await _make_line_backed_company(db_session)
+        response = await client.get(f"/api/screening/companies/{company.id}/purification")
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "INSUFFICIENT_DATA"
         assert body["amount_egp"] is None
+        assert body["missing_input"] == "dividends_paid"
+        assert body["reason"] == "missing statement line: dividends_paid (FY2024)"
+        assert body["basis"] == "per_share"
         assert body["doctrine"] == "dividend-method"
-        assert body["dps_source"] == "EGX disclosure"
         assert body["note"] == NOT_ZAKAT_COPY
-        assert "money-market" in (body["reason"] or "")
 
-        get = await client.get(f"/api/screening/companies/{test_company.id}/purification")
-        assert get.status_code == 200
-        assert get.json()["status"] == "INSUFFICIENT_DATA"
-        assert get.json()["amount_egp"] is None
-
-    async def test_ratio_estimate_round_trip(
-        self, client: AsyncClient, test_company: Company
+    async def test_per_share_ratio_estimate(
+        self, client: AsyncClient, db_session: AsyncSession
     ) -> None:
-        await client.post(f"/api/screening/companies/{test_company.id}/screen")
-        response = await client.post(
-            f"/api/screening/companies/{test_company.id}/purification",
-            json={
-                "dividend_egp": 300.0,
-                "non_permissible_revenue": 2.0,
-                "total_revenue": 100.0,
-                "ratio_provenance": "FY2024 annual report",
-                "dps_source": "EGX disclosure",
-                "dps_date": "2026-05-21",
+        company = await _make_line_backed_company(
+            db_session,
+            extra={"dividends_paid": Decimal("-30"), "shares_outstanding": Decimal("100")},
+        )
+        body = (
+            await client.get(f"/api/screening/companies/{company.id}/purification")
+        ).json()
+        # Interest-only numerator: a partial estimate, never presented as final (F3).
+        assert body["status"] == "ESTIMATE_PARTIAL"
+        assert body["branch"] == "ratio"
+        assert "interest and investment income only" in body["reason"]
+        assert "at least" not in body["reason"].lower()
+        assert "13" in body["reason"]
+        assert body["dps_label"] == "cash dividends paid per share (derived)"
+        assert body["dps_source"].startswith("cash dividends paid per share (derived)")
+        # DPS = 30 / 100 = 0.30 EGP per share; ratio = 1 / 100 = 0.01.
+        assert Decimal(body["dps"]) == Decimal("0.3")
+        assert Decimal(body["ratio"]) == Decimal("0.01")
+        assert Decimal(body["amount_egp"]) == Decimal("0.003")
+        assert body["dps_derivation"] == "abs(dividends_paid) / shares_outstanding"
+        assert "interest and investment income only" in body["ratio_provenance"]
+        assert body["methodology_version"] == "aaoifi-assets-spot/33-33-5"
+
+    async def test_missing_interest_income_names_line(
+        self, client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        company = await make_company(db_session, industry="Software")
+        await seed_year(
+            db_session, company, 2024,
+            {
+                "revenue": Decimal("100"),
+                "dividends_paid": Decimal("-30"),
+                "shares_outstanding": Decimal("100"),
             },
         )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["status"] == "OK"
-        assert body["branch"] == "ratio"
-        assert Decimal(body["ratio"]) == Decimal("0.02")
-        assert Decimal(body["amount_egp"]) == Decimal("6")
-        assert body["methodology_version"] == "aaoifi-assets-spot/33-33-5"
+        body = (
+            await client.get(f"/api/screening/companies/{company.id}/purification")
+        ).json()
+        assert body["status"] == "INSUFFICIENT_DATA"
+        assert body["missing_input"] == "interest_income"
+        assert body["reason"] == "missing statement line: interest_income (FY2024)"
+        assert body["amount_egp"] is None
 
     async def test_fail_holding_purifies_all(
         self, client: AsyncClient, db_session: AsyncSession
     ) -> None:
-        company = Company(
-            id=uuid.uuid4(),
-            ticker=f"ALC_{uuid.uuid4().hex[:8].upper()}",
-            isin=f"EG{uuid.uuid4().hex[:10].upper()}",
-            name="Alcohol Producer",
-            sector="Beverages",
+        company = await _make_line_backed_company(
+            db_session,
             industry="Alcohol Production",
-            currency="EGP",
-            status=CompanyStatus.ACTIVE,
+            extra={"dividends_paid": Decimal("-50"), "shares_outstanding": Decimal("100")},
         )
-        db_session.add(company)
-        await db_session.flush()
-        await client.post(f"/api/screening/companies/{company.id}/screen")
-        response = await client.post(
-            f"/api/screening/companies/{company.id}/purification",
-            json={"dividend_egp": 100.0},
-        )
-        assert response.status_code == 200
-        assert response.json()["branch"] == "fail-holding"
-        assert Decimal(response.json()["amount_egp"]) == Decimal("100")
+        body = (
+            await client.get(f"/api/screening/companies/{company.id}/purification")
+        ).json()
+        assert body["branch"] == "fail-holding"
+        assert Decimal(body["amount_egp"]) == Decimal("0.5")
 
     async def test_bank_carve_out_never_silent_zero(
         self, client: AsyncClient, db_session: AsyncSession
@@ -447,17 +480,9 @@ class TestPurificationApi:
             )
             db_session.add(company)
             await db_session.flush()
-        await client.post(f"/api/screening/companies/{company.id}/screen")
-        response = await client.post(
-            f"/api/screening/companies/{company.id}/purification",
-            json={
-                "dividend_egp": 100.0,
-                "non_permissible_revenue": 0.0,
-                "total_revenue": 100.0,
-            },
-        )
-        assert response.status_code == 200
-        body = response.json()
+        body = (
+            await client.get(f"/api/screening/companies/{company.id}/purification")
+        ).json()
         assert body["branch"] == "islamic-bank-carve-out"
         assert body["amount_egp"] is None
 
@@ -478,7 +503,7 @@ class TestEgxMembershipApi:
         )
         db_session.add(company)
         await db_session.flush()
-        screen = await client.post(f"/api/screening/companies/{company.id}/screen")
+        screen = await client.get(f"/api/screening/companies/{company.id}")
         assert screen.json()["is_compliant"] is False
 
         record = await client.post(
@@ -506,7 +531,7 @@ class TestEgxMembershipApi:
     async def test_agreement_not_flagged_and_rejects_bad_cycle(
         self, client: AsyncClient, test_company: Company
     ) -> None:
-        await client.post(f"/api/screening/companies/{test_company.id}/screen")
+        await client.get(f"/api/screening/companies/{test_company.id}")
         bad = await client.post(
             f"/api/screening/companies/{test_company.id}/egx-membership",
             json={"member": True, "review_cycle": "2026-05", "source": "x"},

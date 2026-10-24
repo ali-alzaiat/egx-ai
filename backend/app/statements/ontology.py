@@ -1,12 +1,18 @@
-"""Statement line ontology v1 (stmt-ontology-1.0).
+"""Statement line ontology (stmt-ontology-1.1).
 
 Canonical codes for income / balance / cash-flow lines extracted from published
 filings. Labels are shipped here as the single source of truth and mirrored in
 the REST contract and frontend types.
+
+1.1 (R43, additive): ``interest_income``, ``weighted_avg_shares_basic`` and
+``shares_outstanding``, plus a per-line ``unit`` so readers format share
+counts and per-share values correctly (never from the ``currency`` column).
 """
 
 from enum import StrEnum
-from typing import NamedTuple
+from typing import Literal, NamedTuple
+
+LineUnit = Literal["currency", "shares", "currency_per_share"]
 
 
 class LineSection(StrEnum):
@@ -24,9 +30,10 @@ class StatementLine(NamedTuple):
     section: LineSection
     label_en: str
     label_ar: str
+    unit: LineUnit = "currency"
 
 
-STATEMENT_ONTOLOGY_VERSION = "stmt-ontology-1.0"
+STATEMENT_ONTOLOGY_VERSION = "stmt-ontology-1.1"
 
 _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
     # --- Income statement ---
@@ -46,7 +53,17 @@ _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
     StatementLine("finance_costs", LineSection.INCOME, "Finance costs", "التكاليف التمويلية"),
     StatementLine("income_tax", LineSection.INCOME, "Income tax", "ضريبة الدخل"),
     StatementLine("net_income", LineSection.INCOME, "Net income", "صافي الربح"),
-    StatementLine("eps", LineSection.INCOME, "Earnings per share", "ربحية السهم"),
+    StatementLine(
+        "eps", LineSection.INCOME, "Earnings per share", "ربحية السهم", "currency_per_share"
+    ),
+    StatementLine("interest_income", LineSection.INCOME, "Interest income", "إيرادات الفوائد"),
+    StatementLine(
+        "weighted_avg_shares_basic",
+        LineSection.INCOME,
+        "Weighted average shares (basic)",
+        "المتوسط المرجح لعدد الأسهم",
+        "shares",
+    ),
     # --- Balance sheet ---
     StatementLine("total_assets", LineSection.BALANCE, "Total assets", "إجمالي الأصول"),
     StatementLine("current_assets", LineSection.BALANCE, "Current assets", "الأصول المتداولة"),
@@ -72,6 +89,13 @@ _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
     ),
     StatementLine("total_equity", LineSection.BALANCE, "Total equity", "إجمالي حقوق الملكية"),
     StatementLine("minority_interests", LineSection.BALANCE, "Minority interests", "حقوق الأقلية"),
+    StatementLine(
+        "shares_outstanding",
+        LineSection.BALANCE,
+        "Shares outstanding",
+        "عدد الأسهم القائمة",
+        "shares",
+    ),
     # --- Cash flow statement ---
     StatementLine(
         "cfo", LineSection.CASH_FLOW, "Cash flow from operations", "التدفق النقدي التشغيلي"

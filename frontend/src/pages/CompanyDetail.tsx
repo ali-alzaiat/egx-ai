@@ -1,133 +1,210 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useCompanyByTicker, useCompanyPrices, useLatestPrice } from '../api/client'
-import { formatAsOf, formatPrice, formatVolume } from '../lib/format'
+import "../components/hub/hubPages.css";
 
-/**
- * Hub Overview (interim). The hub layout route owns the header, tabs, company
- * validation and the data-quality card (now under Financials); "Refresh market
- * data" moved to Admin. The Overview rebuild comes with the hub-tabs lane.
- */
+import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useCompanyByTicker, useDataQuality, useFairValue, useStance } from "../api/client";
+import { fiftyTwoWeekRange, useYearPrices } from "../components/hub/priceData";
+import { ReasonMissing } from "../components/hub/Reason";
+import SectionLink from "../components/hub/SectionLink";
+import { Egx33Note, ShariahBadge, StanceBadge, Tag } from "../components/ui/Badges";
+import { BackendText } from "../components/ui/BackendText";
+import { Missing } from "../components/ui/Missing";
+import PriceChart from "../components/ui/PriceChart";
+import { StatStrip, type StatItem } from "../components/ui/StatStrip";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtEgpCompact, fmtInt, fmtPct, fmtPrice, toNumber } from "../lib/format";
+import type { ChartRange } from "../lib/priceChart";
+import { visibleReasons } from "../lib/stanceModel";
+import type { Company, ComputeMeta, DataQualityScore } from "../types";
+
+const DQ_SCOPES = ["price_history", "company_profile", "financial_statements"] as const;
+const DQ_SHORT = {
+  price_history: "ov_dq_prices",
+  company_profile: "ov_dq_profile",
+  financial_statements: "ov_dq_statements",
+} as const;
+
+function Skeleton() {
+  return <span className="skeleton-bar" style={{ width: "6ch" }} />;
+}
+
+/** Free float arrives as a fraction (0.25) or already a percent (25); show a percent either way. */
+function freeFloatText(locale: string, value: string | null): string | null {
+  const n = toNumber(value);
+  if (n === null) return null;
+  return fmtPct(locale, n <= 1 ? n : n / 100);
+}
+
+function DataQualityLine({ items, to }: { items: readonly DataQualityScore[]; to: string }) {
+  const { t } = useLang();
+  const parts = DQ_SCOPES.map((scope) => {
+    const item = items.find((i) => i.scope === scope);
+    const name = t(DQ_SHORT[scope]);
+    return !item || item.status === "MISSING"
+      ? t("ov_dq_not_scored", { scope: name })
+      : t("ov_dq_score", { scope: name, score: Math.round(item.score) });
+  });
+  return (
+    <p className="ov-dq-line">
+      <span>{parts.join(" · ")}</span> <SectionLink to={to}>{t("ov_dq_link")}</SectionLink>
+    </p>
+  );
+}
+
+function Profile({ company }: { company: Company }) {
+  const { t, locale } = useLang();
+  const rows: { id: string; label: string; value: string | null; ltr?: boolean }[] = [
+    { id: "isin", label: t("ov_isin"), value: company.isin, ltr: true },
+    { id: "sector", label: t("ov_sector"), value: company.sector },
+    { id: "listing", label: t("ov_listing_date"), value: fmtDate(locale, company.listing_date) },
+    { id: "shares", label: t("ov_shares"), value: fmtInt(locale, company.shares_outstanding), ltr: true },
+    { id: "float", label: t("ov_free_float"), value: freeFloatText(locale, company.free_float), ltr: true },
+  ];
+  if (rows.every((r) => r.value === null)) {
+    return <p className="empty">{t("ov_profile_empty")}</p>;
+  }
+  return (
+    <dl className="profile-list card-surface">
+      {rows.map((r) => (
+        <div key={r.id} className="profile-row">
+          <dt>{r.label}</dt>
+          <dd {...(r.ltr ? { dir: "ltr" } : {})}>{r.value ?? <Missing localized={t("ov_not_in_data")} />}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Hub Overview (spec 4.4.1): day stats, 1Y chart, at a glance, data quality, profile. Read-only. */
 export default function CompanyDetail() {
-  const { ticker } = useParams<{ ticker: string }>()
-  const { data: company } = useCompanyByTicker(ticker)
-  const { data: latestPrice, isLoading: loadingLatest } = useLatestPrice(company?.id)
+  const { ticker = "" } = useParams<{ ticker: string }>();
+  const { t, locale } = useLang();
+  const { data: company } = useCompanyByTicker(ticker);
+  const { query, bars, series, latest, source } = useYearPrices(company?.id);
+  const stance = useStance(ticker);
+  const fairValue = useFairValue(company?.id);
+  const quality = useDataQuality(company?.id);
+  const [range, setRange] = useState<ChartRange>("1Y");
 
-  const oneYearAgo = new Date()
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-  const startDate = oneYearAgo.toISOString().split('T')[0]!
+  if (!company) return null;
 
-  const [pricePage, setPricePage] = useState(1)
-  useEffect(() => {
-    setPricePage(1)
-  }, [ticker])
+  const base = `/companies/${encodeURIComponent(company.ticker)}`;
+  const week52 = fiftyTwoWeekRange(bars);
+  const s = stance.data;
+  const loading = query.isLoading;
+  const num = (text: string | null) => (loading ? <Skeleton /> : (text ?? <Missing localized={t("ov_not_in_data")} />));
 
-  const { data: pricesData, isLoading: loadingPrices } = useCompanyPrices(company?.id, {
-    start_date: startDate,
-    page_size: 50,
-    page: pricePage,
-  })
+  const items: StatItem[] = [
+    { id: "open", label: t("ov_open"), numeric: true, value: num(latest ? fmtPrice(locale, latest.open) : null) },
+    { id: "high", label: t("ov_high"), numeric: true, value: num(latest ? fmtPrice(locale, latest.high) : null) },
+    { id: "low", label: t("ov_low"), numeric: true, value: num(latest ? fmtPrice(locale, latest.low) : null) },
+    { id: "volume", label: t("ov_volume"), numeric: true, value: num(latest ? fmtInt(locale, latest.volume) : null) },
+    { id: "value", label: t("ov_value_traded"), numeric: true, value: num(latest ? fmtEgpCompact(locale, latest.value_traded) : null) },
+    {
+      id: "range",
+      label: t("ov_range_52w"),
+      numeric: true,
+      value: num(week52 ? `${fmtPrice(locale, week52.low)} – ${fmtPrice(locale, week52.high)}` : null),
+    },
+    {
+      id: "liquidity",
+      label: t("ov_avg_value", { n: s?.liquidity.window ?? 20 }),
+      numeric: true,
+      value: stance.isLoading ? (
+        <Skeleton />
+      ) : (
+        (fmtEgpCompact(locale, s?.liquidity.avg_value_traded) ?? <Missing localized={t("ov_not_in_data")} />)
+      ),
+    },
+  ];
 
-  if (!company) return null
-
-  const prices = pricesData?.items ?? []
-  const visiblePrices = prices.filter(
-    (p) => !(p.open === p.high && p.high === p.low && p.low === p.close && p.volume === 0),
-  )
-  const hiddenCount = prices.length - visiblePrices.length
+  const reason = s ? visibleReasons(s.reasons)[0] : undefined;
+  const fv = fairValue.data;
+  const fvMeta: Partial<ComputeMeta> = fv ?? {};
+  const fvValue = fv ? fmtPrice(locale, fv.fair_value.value) : null;
 
   return (
     <div className="page">
-      <div className="card-grid">
-        <div className="card">
-          <div className="card-label">Latest Close</div>
-          <div className="card-value">{formatPrice(latestPrice?.close)}</div>
-          {latestPrice && (
-            <div className="card-subtitle">As of {formatAsOf(latestPrice.date)} · end-of-day</div>
-          )}
-        </div>
-        <div className="card">
-          <div className="card-label">Open</div>
-          <div className="card-value">{formatPrice(latestPrice?.open)}</div>
-        </div>
-        <div className="card">
-          <div className="card-label">High</div>
-          <div className="card-value">{formatPrice(latestPrice?.high)}</div>
-        </div>
-        <div className="card">
-          <div className="card-label">Low</div>
-          <div className="card-value">{formatPrice(latestPrice?.low)}</div>
-        </div>
-        <div className="card">
-          <div className="card-label">Volume</div>
-          <div className="card-value">
-            {latestPrice ? formatVolume(latestPrice.volume) : '—'}
-          </div>
-        </div>
-      </div>
-      {!loadingLatest && !latestPrice && (
-        <p className="muted">No price data from the configured source for {company.ticker}.</p>
-      )}
+      <StatStrip items={items} label={t("ov_stats_aria")} />
 
-      <div>
-        <h2 className="section-title">Historical Prices</h2>
-        {loadingPrices && <div className="loading">Loading prices...</div>}
-        {!loadingPrices && visiblePrices.length > 0 && (
-          <div className="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th className="num">Open</th>
-                  <th className="num">High</th>
-                  <th className="num">Low</th>
-                  <th className="num">Close</th>
-                  <th className="num">Volume</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visiblePrices.map((price) => (
-                  <tr key={price.id}>
-                    <td>{price.date}</td>
-                    <td className="num" dir="ltr">{formatPrice(price.open)}</td>
-                    <td className="num" dir="ltr">{formatPrice(price.high)}</td>
-                    <td className="num" dir="ltr">{formatPrice(price.low)}</td>
-                    <td className="num" dir="ltr">{formatPrice(price.close)}</td>
-                    <td className="num" dir="ltr">{formatVolume(price.volume)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <section className="card-surface" aria-label={t("ov_chart_aria")}>
+        <PriceChart bars={series} range={range} onRangeChange={setRange} source={source} />
+      </section>
+
+      <section>
+        <h2 className="section-title">{t("ov_glance")}</h2>
+        <div className="glance-grid">
+          <article className="glance-item card-surface">
+            <h3>{t("ov_glance_stance")}</h3>
+            {stance.isLoading ? (
+              <Skeleton />
+            ) : s ? (
+              <>
+                <p className="glance-main">
+                  <StanceBadge stance={s.stance} confidence={s.confidence} reasonsCount={s.reasons.length} rules={s.rules_version} />
+                  {s.confidence > 0 && <span className="text-note">{t("stance_confidence", { c: s.confidence })}</span>}
+                </p>
+                <p className="glance-text">{reason ? <BackendText>{reason}</BackendText> : t("stance_not_assessed_tooltip")}</p>
+              </>
+            ) : (
+              <Missing localized={t("load_error_thing", { thing: t("ov_glance_stance") })} />
+            )}
+            <SectionLink to={`${base}/price`}>{t("tab_price")}</SectionLink>
+          </article>
+
+          <article className="glance-item card-surface">
+            <h3>{t("ov_glance_shariah")}</h3>
+            {stance.isLoading ? (
+              <Skeleton />
+            ) : s ? (
+              <div className="shariah-full">
+                <ShariahBadge verdict={s.shariah.verdict} />
+                <Egx33Note shariah={s.shariah} />
+              </div>
+            ) : (
+              <Missing localized={t("load_error_thing", { thing: t("ov_glance_shariah") })} />
+            )}
+            <SectionLink to={`${base}/shariah`}>{t("tab_shariah")}</SectionLink>
+          </article>
+
+          <article className="glance-item card-surface">
+            <h3>{t("ov_glance_fair_value")}</h3>
+            {fairValue.isLoading ? (
+              <Skeleton />
+            ) : fv ? (
+              <>
+                <p className="glance-text">
+                  {fvValue ? t("ov_fair_value_line", { value: fvValue }) : <ReasonMissing ticker={ticker} reason={fv.fair_value.reason} />}
+                </p>
+                {fvMeta.provisional && (
+                  <p>
+                    <Tag title={t("source_provisional_title")}>{t("ov_provisional_vendor")}</Tag>
+                  </p>
+                )}
+              </>
+            ) : (
+              <Missing localized={t("load_error_thing", { thing: t("ov_glance_fair_value") })} />
+            )}
+            <SectionLink to={`${base}/valuation`}>{t("tab_valuation")}</SectionLink>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="section-title">{t("ov_data_quality")}</h2>
+        {quality.isLoading ? (
+          <Skeleton />
+        ) : quality.data ? (
+          <DataQualityLine items={quality.data.items} to={`${base}/financials/quality`} />
+        ) : (
+          <Missing localized={t("load_error_thing", { thing: t("ov_data_quality") })} />
         )}
-        {!loadingPrices && visiblePrices.length === 0 && (
-          <div className="loading">No price data available</div>
-        )}
-        {hiddenCount > 0 && (
-          <p className="muted">Non-trading days are hidden.</p>
-        )}
-        {pricesData && pricesData.total_pages > 1 && (
-          <div className="pagination">
-            <button
-              onClick={() => setPricePage((p) => Math.max(1, p - 1))}
-              disabled={pricePage === 1}
-              className="pagination-btn"
-            >
-              Previous
-            </button>
-            <span className="pagination-info">
-              Page {pricePage} of {pricesData.total_pages} ({pricesData.total} trading days)
-            </span>
-            <button
-              onClick={() => setPricePage((p) => Math.min(pricesData.total_pages, p + 1))}
-              disabled={pricePage === pricesData.total_pages}
-              className="pagination-btn"
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </div>
+      </section>
+
+      <section>
+        <h2 className="section-title">{t("ov_profile")}</h2>
+        <Profile company={company} />
+      </section>
     </div>
-  )
+  );
 }

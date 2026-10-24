@@ -3,6 +3,7 @@
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
 
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -16,8 +17,11 @@ from app.models.industry import EgxSector
 from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
 from app.models.metrics import FinancialMetric, MetricStatusDB
 from app.models.valuation import ValuationFairValue
+from app.valuation.assumptions import record_assumption
 from app.valuation.constants import VALUATION_METHODOLOGY_VERSION
 from app.valuation.seed import seed_valuation_profiles
+from app.valuation.service import FairValueInput, FairValueService
+from statement_seed import FULL_YEAR, seed_year
 
 AS_OF = date(2026, 10, 10)
 
@@ -26,6 +30,7 @@ BANK_PARAMS = {
     "stable_roe": "0.098",
     "discount_rate": "0.0761",
     "terminal_growth_rate": "0.02",
+    "long_run_cost_of_equity": "0.0761",
     "expected_dps": "2",
     "earnings_per_share": "5",
     "pe_ratio": "10",
@@ -155,6 +160,14 @@ async def _add_metric(
     await db_session.flush()
 
 
+async def _fv(
+    db_session: AsyncSession, company: Company, params: dict[str, str]
+) -> dict[str, Any]:
+    """Engine call with explicit inputs (R43: the API no longer takes caller inputs)."""
+    inputs = FairValueInput(**{k: Decimal(v) for k, v in params.items()})
+    return await FairValueService(db_session).compute(company.id, inputs)
+
+
 async def _good_dq(db_session: AsyncSession, company: Company) -> None:
     await _add_assessment(
         db_session, company, "financial_statements", Decimal("85"), DataQualityStatusDB.OK
@@ -177,11 +190,7 @@ async def test_bank_happy_path(
     await _good_dq(db_session, company)
     await _add_price(db_session, company, Decimal("30"))
 
-    response = await client.get(
-        f"/api/valuation/companies/{company.id}/fair-value", params=BANK_PARAMS
-    )
-    assert response.status_code == 200
-    data = response.json()
+    data = await _fv(db_session, company, BANK_PARAMS)
 
     assert data["company_id"] == str(company.id)
     assert data["ticker"] == "BANKFV"
@@ -224,14 +233,13 @@ async def test_bank_happy_path(
     assert "under these assumptions" in data["verdict"]["detail"]
     assert data["current_price"] == {"value": "30.0000", "as_of": "2026-10-10"}
 
-    # Snapshot persisted.
-    row = (
+    # compute() never persists (R43: thesis/stance reruns must not overwrite it).
+    rows = (
         await db_session.execute(
             select(ValuationFairValue).where(ValuationFairValue.company_id == company.id)
         )
-    ).scalar_one()
-    assert row.profile_key == "banks"
-    assert row.fair_value is not None
+    ).scalars().all()
+    assert rows == []
 
 
 async def test_missing_dq_degrades_honestly(
@@ -247,11 +255,7 @@ async def test_missing_dq_degrades_honestly(
     )
     await _add_price(db_session, company, Decimal("30"))
 
-    data = (
-        await client.get(
-            f"/api/valuation/companies/{company.id}/fair-value", params=BANK_PARAMS
-        )
-    ).json()
+    data = await _fv(db_session, company, BANK_PARAMS)
 
     assert data["fair_value"] == {
         "value": None,
@@ -278,11 +282,7 @@ async def test_no_dq_row_caps_confidence_poor(
     company = await _make_company(db_session, "BANKNODQ")
     await _add_price(db_session, company, Decimal("30"))
 
-    data = (
-        await client.get(
-            f"/api/valuation/companies/{company.id}/fair-value", params=BANK_PARAMS
-        )
-    ).json()
+    data = await _fv(db_session, company, BANK_PARAMS)
 
     # Computation proceeds (inputs supplied) but confidence is capped.
     assert data["fair_value"]["status"] == "AVAILABLE"
@@ -304,6 +304,7 @@ async def test_default_profile_routing(
         "stable_growth": "0.03",
         "discount_rate": "0.12",
         "terminal_growth_rate": "0.02",
+        "long_run_cost_of_equity": "0.10",
         "shares_outstanding": "50",
         "earnings_per_share": "5",
         "pe_ratio": "10",
@@ -311,9 +312,7 @@ async def test_default_profile_routing(
         "operating_margin": "0.15",
         "exit_multiple": "12",
     }
-    data = (
-        await client.get(f"/api/valuation/companies/{company.id}/fair-value", params=params)
-    ).json()
+    data = await _fv(db_session, company, params)
 
     assert data["profile"]["profile_id"] == "default"
     assert data["profile"]["primary_model"] == "fcfe_two_stage"
@@ -336,98 +335,83 @@ async def test_metric_prefill_for_growth_and_margin(
         "stable_growth": "0.03",
         "discount_rate": "0.12",
         "terminal_growth_rate": "0.02",
+        "long_run_cost_of_equity": "0.10",
+        "revenue_growth": "0.08",
         "shares_outstanding": "50",
         "exit_multiple": "12",
     }
-    data = (
-        await client.get(f"/api/valuation/companies/{company.id}/fair-value", params=params)
-    ).json()
+    data = await _fv(db_session, company, params)
 
-    assert data["input_sources"]["revenue_growth"] == "metric:revenue_growth_yoy"
-    assert data["input_sources"]["operating_margin"] == "metric:operating_margin"
+    # F13: stage-1 growth is never the single-year metric; it comes from the caller
+    # here (the snapshot path supplies the capped 3-year CAGR).
+    assert data["input_sources"]["revenue_growth"] == "input:revenue_growth"
+    assert data["input_sources"]["operating_margin"] == "metric:operating_margin FY2024"
     assert Decimal(data["inputs"]["resolved_growth_high"]) == Decimal("0.08")
     assert data["legs"]["intrinsic"]["status"] == "AVAILABLE"
     # Scenarios resolve: growth + margin pre-filled, exit caller-supplied.
     assert data["scenarios"]["base"]["status"] == "AVAILABLE"
 
 
-async def test_snapshot_pinning_determinism_last_writer_wins(
+async def test_get_computes_snapshot_once_and_names_missing_assumptions(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """Pin the fair-value snapshot cache: determinism, one-row-per-key, latest-wins."""
-    from app.models.valuation import IndustryValuationProfile, ValuationResult
-
+    """R43: GET computes from statement lines; no sourced assumption -> legs name it."""
     await _seed(db_session)
-    company = await _make_company(db_session, "BANKPIN")
-    await _good_dq(db_session, company)
+    company = await _make_company(db_session, "GENSNAP", egx_name=None)
+    await seed_year(db_session, company, 2023, FULL_YEAR)
+    await seed_year(db_session, company, 2024, FULL_YEAR)
     await _add_price(db_session, company, Decimal("30"))
     url = f"/api/valuation/companies/{company.id}/fair-value"
-    profiles_before = (
-        await db_session.execute(select(IndustryValuationProfile))
-    ).scalars().all()
 
-    first = (await client.get(url, params=BANK_PARAMS)).json()
-    second = (await client.get(url, params=BANK_PARAMS)).json()
-    assert first["fair_value"] == second["fair_value"]
-    assert first["fair_value"]["status"] == "AVAILABLE"
+    first = (await client.get(url)).json()
+    assert first["compute_status"] == "ok"
+    assert first["trigger"] == "first_view"
+    assert first["provisional"] is True
+    assert first["period_end"] == "2024-12-31"
+    assert first["fair_value"]["value"] is None
+    assert first["fair_value"]["status"] == "INSUFFICIENT_DATA"
+    assert "no sourced risk_free_rate" in first["fair_value"]["reason"]
+    assert first["legs"]["intrinsic"]["reason"] == (
+        "no sourced risk_free_rate, equity_risk_premium, long_run_inflation, "
+        "long_run_cost_of_equity, nominal_gdp_growth "
+        f"in valuation assumptions {VALUATION_METHODOLOGY_VERSION}"
+    )
+    assert first["assumptions"]["items"] == []
+    assert "target_pe" in first["assumptions"]["missing"]
+    # Statement-derived inputs carry provenance strings.
+    assert first["inputs"]["earnings_per_share"] == "2"
+    assert first["input_sources"]["earnings_per_share"] == (
+        "statement:net_income,weighted_avg_shares_basic FY2024 (vendor)"
+    )
+
+    second = (await client.get(url)).json()
+    assert second["calculated_at"] == first["calculated_at"]
     rows = (
         await db_session.execute(
-            select(ValuationFairValue)
-            .where(ValuationFairValue.company_id == company.id)
-            .where(
-                ValuationFairValue.methodology_version
-                == VALUATION_METHODOLOGY_VERSION
-            )
+            select(ValuationFairValue).where(ValuationFairValue.company_id == company.id)
         )
     ).scalars().all()
     assert len(rows) == 1
 
-    altered = dict(BANK_PARAMS)
-    altered["exit_multiple"] = "20"
-    third = (await client.get(url, params=altered)).json()
-    assert third["fair_value"]["status"] == "AVAILABLE"
-    assert third["fair_value"]["value"] != first["fair_value"]["value"]
-    rows_after = (
-        await db_session.execute(
-            select(ValuationFairValue)
-            .where(ValuationFairValue.company_id == company.id)
-            .where(
-                ValuationFairValue.methodology_version
-                == VALUATION_METHODOLOGY_VERSION
-            )
-            .execution_options(populate_existing=True)
-        )
-    ).scalars().all()
-    assert len(rows_after) == 1
-    row = rows_after[0]
-    # Numeric(20, 4) rounds the payload value; compare within rounding.
-    assert row.fair_value is not None
-    assert abs(Decimal(str(row.fair_value)) - Decimal(third["fair_value"]["value"])) < Decimal(
-        "0.0001"
+    # A sourced assumption changes the fingerprint: the next GET recomputes.
+    await record_assumption(
+        db_session, key="target_pe", scope="market", value=Decimal("10"),
+        source_url="https://example.test/pe", source_title="Synthetic test source",
+        as_of=date(2026, 1, 1),
     )
-    assert row.legs == third["legs"]
-    assert row.weights == third["weights"]
-    assert Decimal(row.inputs_echo["inputs"]["exit_multiple"]) == Decimal("20")
-
-    # GET writes only its own domain table: no legacy rows, profiles untouched.
-    legacy = (
-        await db_session.execute(
-            select(ValuationResult).where(ValuationResult.company_id == company.id)
-        )
-    ).scalars().all()
-    assert legacy == []
-    profiles_after = (
-        await db_session.execute(select(IndustryValuationProfile))
-    ).scalars().all()
-    assert len(profiles_after) == len(profiles_before)
+    third = (await client.get(url)).json()
+    assert third["calculated_at"] != first["calculated_at"]
+    assert Decimal(third["legs"]["relative"]["value"]) == Decimal("20")
+    assert third["assumptions"]["items"][0]["key"] == "target_pe"
+    assert third["input_sources"]["pe_target"] == "assumption:target_pe market as_of 2026-01-01"
 
 
-async def test_existing_get_contract_unchanged(
+async def test_caller_input_routes_removed(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """The live-frontend GET keeps its list shape alongside the sub-resource."""
+    """The legacy per-model list and the 12-field calculate POST are gone (R43 #1)."""
     await _seed(db_session)
     company = await _make_company(db_session, "BANKOLD")
-    response = await client.get(f"/api/valuation/companies/{company.id}")
-    assert response.status_code == 200
-    assert response.json() == []
+    assert (await client.get(f"/api/valuation/companies/{company.id}")).status_code == 404
+    calc = await client.post(f"/api/valuation/companies/{company.id}/calculate")
+    assert calc.status_code in (404, 405)

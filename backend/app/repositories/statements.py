@@ -59,6 +59,36 @@ class StatementLineLike(Protocol):
     def published_date(self) -> object | None: ...
 
 
+def _enum_text(raw: object) -> str:
+    return str(getattr(raw, "value", raw))
+
+
+def _value_key(raw: object) -> Decimal | None:
+    if raw is None:
+        return None
+    return Decimal(str(raw)).quantize(Decimal("0.0001"))  # the column is Numeric(20, 4)
+
+
+def _row_key(row: FinancialStatementLine) -> tuple[object, ...]:
+    return (
+        row.company_id, row.period_id, row.ontology_code, row.ontology_version,
+        _value_key(row.value), row.currency, row.source_label_reported, row.source_label_en,
+        row.source_label_ar, row.source_page, _enum_text(row.extraction_method),
+        _enum_text(row.ext_status), row.ext_reason, row.published_date,
+    )
+
+
+def _line_key(
+    company_id: uuid.UUID, period_id: uuid.UUID, line: StatementLineLike
+) -> tuple[object, ...]:
+    return (
+        company_id, period_id, line.ontology_code, line.ontology_version,
+        _value_key(line.value), line.currency, line.source_label_reported, line.source_label_en,
+        line.source_label_ar, line.source_page, _enum_text(line.extraction_method),
+        _enum_text(line.ext_status), line.ext_reason, line.published_date,
+    )
+
+
 class StatementLineRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -74,15 +104,36 @@ class StatementLineRepository:
 
         Re-running the pipeline on the same document hash replaces everything
         except rows already ``approved`` by Ops — those are never touched.
+        A re-run that produces a row identical to a stored one keeps that row
+        (same id, ``created_at``), so an identical re-import changes no input
+        fingerprint and triggers no recompute (QA F4). Returns rows created.
         """
-        await self.session.execute(
-            delete(FinancialStatementLine).where(
-                FinancialStatementLine.source_document_id == document_id,
-                FinancialStatementLine.ext_status != ExtStatus.approved,
+        existing = (
+            await self.session.execute(
+                select(FinancialStatementLine).where(
+                    FinancialStatementLine.source_document_id == document_id,
+                    FinancialStatementLine.ext_status != ExtStatus.approved,
+                )
             )
-        )
-        created = 0
+        ).scalars().all()
+        unmatched: dict[tuple[object, ...], list[FinancialStatementLine]] = {}
+        for row in existing:
+            unmatched.setdefault(_row_key(row), []).append(row)
+        to_insert: list[StatementLineLike] = []
         for line in lines:
+            kept = unmatched.get(_line_key(company_id, period_id, line))
+            if kept:
+                kept.pop()
+            else:
+                to_insert.append(line)
+        stale_ids = [row.id for rows in unmatched.values() for row in rows]
+        if stale_ids:  # delete first: ``uq_stmt_line`` would reject a changed twin
+            await self.session.execute(
+                delete(FinancialStatementLine).where(FinancialStatementLine.id.in_(stale_ids))
+            )
+            await self.session.flush()
+        created = 0
+        for line in to_insert:
             self.session.add(
                 FinancialStatementLine(
                     company_id=company_id,

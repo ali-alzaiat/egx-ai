@@ -9,6 +9,7 @@ LLM output (rule 6); triggers force documented reassessment, never a sale
 (rules 9/10); copy stays hedged (rule 10).
 """
 
+import dataclasses
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -33,6 +34,7 @@ from app.thesis import thesis as engine
 from app.thesis.constants import (
     CATALYST_LABELS,
     CATALYST_OUTCOMES,
+    DEFAULT_HORIZON_YEARS,
     INVALIDATION_DIRECTIONS,
     LEDGER_CLASSIFICATIONS,
     MANDATED_EVIDENCE_SOURCES,
@@ -44,9 +46,20 @@ from app.thesis.constants import (
     THESIS_METHODOLOGY_VERSION,
 )
 from app.valuation.constants import RANGE_NOTE, VALUATION_METHODOLOGY_VERSION
-from app.valuation.service import FairValueInput, FairValueService
+from app.valuation.service import FairValueService, ResolvedFairValueInputs
 
 _SCENARIO_NAMES = ("bear", "base", "bull")
+
+# Served when no fair-value snapshot exists (compute failed): honest gaps only.
+_NO_FAIR_VALUE: dict[str, Any] = {
+    "fair_value": {
+        "value": None,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "No fair-value snapshot available.",
+    },
+    "scenarios": {},
+    "input_sources": {},
+}
 
 
 @dataclass
@@ -88,16 +101,14 @@ class CatalystInput:
 
 @dataclass
 class AssessInput:
-    """Thesis assess input: Phase-3 leg inputs plus thesis rows.
+    """Thesis assess input: horizon plus the thesis rows (R43: no caller FV inputs).
 
-    Leg inputs left out resolve inside Phase-3 (historical metrics, never
-    consensus) or degrade to INSUFFICIENT_DATA; the three TIKR inputs double
-    as the scenario anchors.
+    The fair value comes from the stored Phase-3 snapshot; per-scenario
+    sensitivity reruns use ``FairValueService.compute`` and never persist.
     """
 
     horizon_years: int
     is_shareholder: bool | None
-    fv: FairValueInput
     assumptions: list[AssumptionInput]
     bulls: list[str]
     bears: list[str]
@@ -230,8 +241,78 @@ class ThesisService:
         except ValueError as exc:
             raise _fail(400, str(exc)) from exc
 
+    async def auto_assess(self, company_id: uuid.UUID, trigger: str) -> dict[str, Any]:
+        """Automatic re-assess (R43): methodology-default horizon, rows carried over.
+
+        Assumptions, bulls, bears, invalidations and caller catalysts come from
+        the stored thesis, so an automatic run never erases a documented update.
+        """
+        previous = await self.theses.get_thesis(company_id)
+        assumptions: list[AssumptionInput] = []
+        bulls: list[str] = []
+        bears: list[str] = []
+        invalidations: list[InvalidationInput] = []
+        catalysts: list[CatalystInput] = []
+        if previous is not None:
+            for raw in previous.assumptions if isinstance(previous.assumptions, list) else []:
+                if isinstance(raw, dict):
+                    assumptions.append(
+                        AssumptionInput(
+                            metric=str(raw.get("metric", "")),
+                            value=raw.get("value"),
+                            horizon=raw.get("horizon"),
+                            source=str(raw.get("source", "")),
+                            author=str(raw.get("author", "caller")),
+                        )
+                    )
+            bulls = [str(b) for b in previous.bulls or [] if b]
+            bears = [str(b) for b in previous.bears or [] if b]
+            for row in await self.theses.list_invalidations(previous.id):
+                invalidations.append(
+                    InvalidationInput(
+                        metric=row.metric,
+                        threshold=Decimal(row.threshold),
+                        direction=row.direction,
+                        period=row.period,
+                        evidence_source=row.evidence_source,
+                    )
+                )
+            skeleton = {c.event for c in engine.skeleton_catalysts()}
+            for cat in await self.theses.list_catalysts(previous.id):
+                if cat.event in skeleton:
+                    continue
+                catalysts.append(
+                    CatalystInput(
+                        event=cat.event,
+                        date_from=cat.date_from,
+                        date_to=cat.date_to,
+                        window=cat.window,
+                        variable=cat.variable,
+                        expectation=cat.expectation,
+                        outcome=cat.outcome,
+                        provenance=cat.provenance,
+                        label=cat.label,
+                    )
+                )
+        body = AssessInput(
+            horizon_years=DEFAULT_HORIZON_YEARS,
+            is_shareholder=None,
+            assumptions=assumptions,
+            bulls=bulls,
+            bears=bears,
+            invalidations=invalidations,
+            catalysts=catalysts,
+        )
+        return await self.assess(
+            company_id, body, ledger_prefix=f"Automatic recompute ({trigger})"
+        )
+
     async def assess(
-        self, company_id: uuid.UUID, body: AssessInput
+        self,
+        company_id: uuid.UUID,
+        body: AssessInput,
+        *,
+        ledger_prefix: str | None = None,
     ) -> dict[str, Any]:
         """Compute, snapshot, and hand-serialize the investment thesis."""
         company = await self.companies.get_by_id(company_id)
@@ -240,8 +321,9 @@ class ThesisService:
         specs = self._validate_assess(body)
         as_of = datetime.now(UTC)
 
-        fair = await self.fair_values.fair_value(company_id, body.fv)
-        sensitivity = await self._per_scenario_sensitivity(company_id, fair, body.fv)
+        fair = await self.fair_values.latest_payload(company_id) or _NO_FAIR_VALUE
+        resolved = await self.fair_values.resolve_inputs(company_id)
+        sensitivity = await self._per_scenario_sensitivity(company_id, fair, resolved)
 
         dq_fs = await self.data_quality.latest(company_id, "financial_statements")
         dq_ph = await self.data_quality.latest(company_id, "price_history")
@@ -255,9 +337,17 @@ class ThesisService:
 
         previous = await self.theses.get_thesis(company_id)
         previous_by_metric: dict[str, ThesisInvalidation] = {}
+        previous_outcomes: dict[str, str] = {}
         if previous is not None:
             for row in await self.theses.list_invalidations(previous.id):
                 previous_by_metric[row.metric] = row
+            for cat in await self.theses.list_catalysts(previous.id):
+                previous_outcomes[cat.event] = cat.outcome
+        # Skeleton catalysts keep any outcome a documented update recorded (R43).
+        skeleton = [
+            dataclasses.replace(c, outcome=previous_outcomes.get(c.event, c.outcome))
+            for c in engine.skeleton_catalysts()
+        ]
 
         evaluated: list[tuple[engine.InvalidationSpec, str, str, int, bool, bool]] = []
         for spec in specs:
@@ -359,7 +449,7 @@ class ThesisService:
                 for spec, status, _note, _version, _tr, _am in evaluated
             ],
             catalysts=[
-                *engine.skeleton_catalysts(),
+                *skeleton,
                 *(
                     engine.CatalystView(
                         event=c.event,
@@ -424,7 +514,7 @@ class ThesisService:
                     "provenance": c.provenance,
                     "label": c.label,
                 }
-                for c in engine.skeleton_catalysts()
+                for c in skeleton
             ]
             + [
                 {
@@ -448,7 +538,8 @@ class ThesisService:
             variable="thesis",
             action="assessed",
             rationale=(
-                f"Thesis assessed for {company.ticker}: "
+                (f"{ledger_prefix}: " if ledger_prefix else "")
+                + f"Thesis assessed for {company.ticker}: "
                 f"{len(evaluated)} invalidation conditions "
                 f"({n_triggered} triggered), "
                 f"{len(body.catalysts)} caller catalysts plus skeleton."
@@ -507,17 +598,18 @@ class ThesisService:
         self,
         company_id: uuid.UUID,
         base_fair: dict[str, Any],
-        base_inputs: FairValueInput,
+        resolved: ResolvedFairValueInputs,
     ) -> dict[str, Any]:
         """1-D sensitivity per scenario by re-centering the Phase-3 run.
 
         Each scenario's labelled TIKR inputs become the base of a fresh
         Phase-3 computation whose own ±discount/±growth sensitivity rows then
         describe that scenario. Missing scenario inputs degrade to
-        INSUFFICIENT_DATA instead of guessed curves. These extra runs refresh
-        the Phase-3 snapshot (last-writer-wins); the thesis stores only the
-        per-scenario rows.
+        INSUFFICIENT_DATA instead of guessed curves. These reruns use
+        ``compute`` and never touch the stored Phase-3 snapshot (R43); the
+        thesis stores only the per-scenario rows.
         """
+        base_inputs = resolved.inputs
         out: dict[str, Any] = {"methodology_version": THESIS_METHODOLOGY_VERSION}
         scenarios = base_fair.get("scenarios")
         if not isinstance(scenarios, dict):
@@ -545,7 +637,12 @@ class ThesisService:
                     "rows": [],
                 }
                 continue
-            rerun = await self.fair_values.fair_value(company_id, centered)
+            rerun = await self.fair_values.compute(
+                company_id,
+                centered,
+                input_sources=resolved.sources,
+                missing_assumptions=resolved.assumptions.missing,
+            )
             rows = rerun.get("sensitivity")
             rows = rows if isinstance(rows, list) else []
             if not rows:
@@ -794,6 +891,7 @@ class ThesisService:
                 "horizon_years": thesis.horizon_years,
                 "is_shareholder": thesis.is_shareholder,
             },
+            "horizon_source": "methodology_default",
             "narrative": thesis.narrative,
             "assumptions": thesis.assumptions if isinstance(thesis.assumptions, list) else [],
             "bulls": thesis.bulls if isinstance(thesis.bulls, list) else [],

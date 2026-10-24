@@ -595,7 +595,11 @@ def check_dividend_stability(i: ScoreInputs) -> CheckResult:
     cited = {"dps_history": "[" + ",".join(str(d) for d in i.dps_history) + "]"
              if i.dps_history else None}
     if len(i.dps_history) < 2:
-        return _not_run(key, comp, threshold, cited, "Fewer than 2 DPS; check not run.")
+        return _not_run(
+            key, comp, threshold, cited,
+            "Fewer than 2 declared DPS values; no declared-DPS source yet (derived cash-paid "
+            "DPS is timing-noisy and is not used for this check); check not run.",
+        )
     pairs = zip(i.dps_history, i.dps_history[1:], strict=False)
     for prev, now in pairs:
         if prev <= 0:
@@ -611,14 +615,21 @@ def check_dividend_stability(i: ScoreInputs) -> CheckResult:
 def check_dividend_earnings_coverage(i: ScoreInputs) -> CheckResult:
     key, comp = "dividend_earnings_coverage", "dividend"
     threshold = f"earnings payout in {DIVIDEND_PAYOUT_MIN:.0f}-{DIVIDEND_PAYOUT_MAX * 100:.0f}%"
-    cited = {"earnings_payout": _opt(i.earnings_payout)}
+    cited = {
+        "earnings_payout": _opt(i.earnings_payout),
+        "basis": "cash dividends paid / EPS (same fiscal year)",
+    }
     if i.earnings_payout is None:
-        return _not_run(key, comp, threshold, cited, "No earnings payout ratio; check not run.")
+        return _not_run(
+            key, comp, threshold, cited,
+            "No cash paid / EPS payout ratio; check not run.",
+        )
     covered = DIVIDEND_PAYOUT_MIN <= i.earnings_payout <= DIVIDEND_PAYOUT_MAX
     return _verdict(
         key, comp, covered, threshold, cited,
-        f"Earnings payout {i.earnings_payout} is within 0-90%.",
-        f"Earnings payout {i.earnings_payout} is outside 0-90% (uncovered or over-distributed).",
+        f"Cash paid / EPS payout {i.earnings_payout} is within 0-90%.",
+        f"Cash paid / EPS payout {i.earnings_payout} is outside 0-90% "
+        "(uncovered or over-distributed).",
     )
 
 
@@ -630,7 +641,11 @@ def check_dividend_growing(i: ScoreInputs) -> CheckResult:
              "dps_last": _opt(i.dps_history[-1]) if i.dps_history else None,
              "dividend_years": str(years)}
     if len(i.dps_history) < 2:
-        return _not_run(key, comp, threshold, cited, "No DPS history; check not run.")
+        return _not_run(
+            key, comp, threshold, cited,
+            "No declared-DPS history (no declared-DPS source yet; derived cash-paid DPS is "
+            "not used for this check); check not run.",
+        )
     if years < DIVIDEND_GROWING_MIN_HISTORY_YEARS:
         # Fails open: short pay-history is not evidence against growth.
         return _not_run(

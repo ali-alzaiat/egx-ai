@@ -69,7 +69,7 @@ REVENUE_GROWTH_YOY = MetricDefinition(
     display_name="Revenue Growth (YoY)",
     description="Year-over-year revenue growth percentage",
     category=MetricCategory.GROWTH,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("revenue",),
     period_requirement=PeriodRequirement.COMPARABLE,
     unit="%",
@@ -81,7 +81,7 @@ NET_INCOME_GROWTH_YOY = MetricDefinition(
     display_name="Net Income Growth (YoY)",
     description="Year-over-year net income growth percentage",
     category=MetricCategory.GROWTH,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("net_income",),
     period_requirement=PeriodRequirement.COMPARABLE,
     unit="%",
@@ -93,7 +93,7 @@ EPS_GROWTH_YOY = MetricDefinition(
     display_name="EPS Growth (YoY)",
     description="Year-over-year earnings per share growth percentage",
     category=MetricCategory.GROWTH,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("eps_basic",),
     period_requirement=PeriodRequirement.COMPARABLE,
     unit="%",
@@ -106,7 +106,7 @@ GROSS_MARGIN = MetricDefinition(
     display_name="Gross Margin",
     description="Gross profit as a percentage of revenue",
     category=MetricCategory.MARGIN,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("gross_profit", "revenue"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="%",
@@ -117,7 +117,7 @@ OPERATING_MARGIN = MetricDefinition(
     display_name="Operating Margin",
     description="Operating income as a percentage of revenue",
     category=MetricCategory.MARGIN,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("operating_income", "revenue"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="%",
@@ -128,7 +128,7 @@ NET_MARGIN = MetricDefinition(
     display_name="Net Profit Margin",
     description="Net income as a percentage of revenue",
     category=MetricCategory.MARGIN,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("net_income", "revenue"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="%",
@@ -140,11 +140,15 @@ ROE = MetricDefinition(
     display_name="Return on Equity",
     description="Net income divided by average shareholders' equity",
     category=MetricCategory.PROFITABILITY,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("net_income", "total_equity"),
     period_requirement=PeriodRequirement.COMPARABLE,
     unit="%",
-    notes="Uses average of current and previous comparable equity",
+    notes=(
+        "Strict average of current and previous comparable equity; no prior period or "
+        "negative average equity is INSUFFICIENT_DATA (no spot-equity fallback). v2: "
+        "percent rounded after x100"
+    ),
 )
 
 ROA = MetricDefinition(
@@ -152,11 +156,14 @@ ROA = MetricDefinition(
     display_name="Return on Assets",
     description="Net income divided by average total assets",
     category=MetricCategory.PROFITABILITY,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("net_income", "total_assets"),
     period_requirement=PeriodRequirement.COMPARABLE,
     unit="%",
-    notes="Uses average of current and previous comparable total assets",
+    notes=(
+        "Strict average of current and previous comparable total assets; no prior period "
+        "is INSUFFICIENT_DATA (no spot fallback). v2: percent rounded after x100"
+    ),
 )
 
 # Leverage Metrics
@@ -165,11 +172,14 @@ DEBT_TO_EQUITY = MetricDefinition(
     display_name="Debt-to-Equity Ratio",
     description="Total debt divided by shareholders' equity",
     category=MetricCategory.LEVERAGE,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("total_debt", "total_equity"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="ratio",
-    notes="Requires explicit debt fact, not total liabilities",
+    notes=(
+        "Requires explicit debt fact, not total liabilities; negative equity is "
+        "INSUFFICIENT_DATA (v2)"
+    ),
 )
 
 DEBT_TO_ASSETS = MetricDefinition(
@@ -201,11 +211,14 @@ QUICK_RATIO = MetricDefinition(
     display_name="Quick Ratio",
     description="Quick assets divided by current liabilities",
     category=MetricCategory.LIQUIDITY,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("current_assets", "current_liabilities"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="ratio",
-    notes="Subtracts inventory and prepaid expenses if available",
+    notes=(
+        "Current assets minus inventory over current liabilities; a missing inventory "
+        "line is INSUFFICIENT_DATA (v2, was silently the current ratio)"
+    ),
 )
 
 # Cash Flow Metrics
@@ -214,7 +227,7 @@ OPERATING_CASH_FLOW_MARGIN = MetricDefinition(
     display_name="Operating Cash Flow Margin",
     description="Operating cash flow as a percentage of revenue",
     category=MetricCategory.CASH_FLOW,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("operating_cash_flow", "revenue"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="%",
@@ -237,7 +250,7 @@ FREE_CASH_FLOW_MARGIN = MetricDefinition(
     display_name="Free Cash Flow Margin",
     description="Free cash flow as a percentage of revenue",
     category=MetricCategory.CASH_FLOW,
-    formula_version=1,
+    formula_version=2,
     required_fact_labels=("operating_cash_flow", "capex", "revenue"),
     period_requirement=PeriodRequirement.SINGLE,
     unit="%",

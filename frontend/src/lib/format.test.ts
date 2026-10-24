@@ -68,6 +68,9 @@ describe("formatting rules", () => {
     expect(fmtRatio(EN, 1.1823)).toBe("1.18");
     expect(fmtInt(EN, 4461086)).toBe("4,461,086");
     expect(fmtEgpMillions(EN, 106672946000)).toBe("106,672.9");
+    expect(fmtEgpMillions(EN, -2765201000)).toBe("−2,765.2");
+    expect(fmtEgpMillions(AR, -2765201000)).toBe("−2,765.2");
+    expect(fmtInt(EN, -1500)).toBe("−1,500");
   });
   it("compact EGP in both languages with Western digits", () => {
     expect(fmtEgpCompact(EN, 237_900_000)).toBe("EGP 237.9m");

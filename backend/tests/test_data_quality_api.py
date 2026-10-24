@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dataquality.service import DataQualityService
 from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
-from app.models.financial import FinancialDocument, FinancialFact, FinancialPeriod
 from app.models.market import Company, DailyPrice, DataSource, DataSourceType
+from app.models.statements import ExtStatus
+from statement_seed import seed_year
 
 
 def _assessment(company_id: uuid.UUID, source_id: uuid.UUID) -> DataQualityAssessment:
@@ -220,24 +221,10 @@ async def test_different_methodology_version_is_separate_row(
 async def test_screening_embeds_data_quality(
     client: AsyncClient, test_company: Company
 ) -> None:
-    # A screening result must exist before the embedded field is served.
-    screened = await client.post(
-        f"/api/screening/companies/{test_company.id}/screen"
-    )
-    assert screened.status_code == 200
-
-    before = await client.get(f"/api/screening/companies/{test_company.id}")
-    assert before.status_code == 200
-    assert before.json()["data_quality"] is None
-
-    assessed = await client.post(
-        f"/api/data-quality/companies/{test_company.id}/assess"
-        "?scope=financial_statements&as_of=2026-10-08"
-    )
-    assert assessed.status_code == 200
-
-    after = await client.get(f"/api/screening/companies/{test_company.id}")
-    embedded = after.json()["data_quality"]
+    # R43: the GET computes the verdict (and the DQ it depends on) on first view.
+    first = await client.get(f"/api/screening/companies/{test_company.id}")
+    assert first.status_code == 200
+    embedded = first.json()["data_quality"]
     assert embedded is not None
     assert embedded["scope"] == "financial_statements"
     assert "status" in embedded
@@ -249,143 +236,69 @@ async def test_screening_embeds_data_quality(
 async def test_financial_statements_freshness_reason_has_date(
     client: AsyncClient, db_session: AsyncSession, test_company: Company
 ) -> None:
-    source = DataSource(
-        id=uuid.uuid4(),
-        name=f"Filing Source {uuid.uuid4().hex[:8]}",
-        source_type=DataSourceType.COMPANY,
+    await seed_year(
+        db_session, test_company, 2024, {"revenue": Decimal("100")},
+        tier="filing", published=date(2025, 4, 12),
     )
-    db_session.add(source)
-    await db_session.flush()
-
-    period = FinancialPeriod(
-        id=uuid.uuid4(),
-        company_id=test_company.id,
-        period_type="ANNUAL",
-        fiscal_year=2024,
-        start_date=date(2024, 1, 1),
-        end_date=date(2024, 12, 31),
-    )
-    db_session.add(period)
-    await db_session.flush()
-
-    document = FinancialDocument(
-        id=uuid.uuid4(),
-        period_id=period.id,
-        source_id=source.id,
-        document_type="ANNUAL_REPORT",
-        document_status="ORIGINAL",
-        publication_date=date(2025, 4, 12),
-    )
-    db_session.add(document)
-    await db_session.flush()
-
-    fact = FinancialFact(
-        id=uuid.uuid4(),
-        period_id=period.id,
-        document_id=document.id,
-        company_id=test_company.id,
-        fact_type="INCOME_STATEMENT",
-        reported_label="revenue",
-        normalized_label="revenue",
-        reported_value=Decimal("100"),
-        currency="EGP",
-    )
-    db_session.add(fact)
-    await db_session.flush()
-
     response = await client.post(
         f"/api/data-quality/companies/{test_company.id}/assess"
         "?scope=financial_statements&as_of=2026-10-08"
     )
     assert response.status_code == 200
-    body = response.json()
-    components = {c["key"]: c for c in body["components"]}
+    components = {c["key"]: c for c in response.json()["components"]}
     # R12.3: freshness reason carries the concrete publication date.
     assert "2025-04-12" in components["freshness"]["reason"]
 
 
-async def test_financial_statements_as_of_bounds_fact_loading(
+async def test_financial_statements_vendor_freshness_from_period_end(
     client: AsyncClient, db_session: AsyncSession, test_company: Company
 ) -> None:
-    """R14: as_of bounds facts/periods by their own document's publication_date."""
-    source = DataSource(
-        id=uuid.uuid4(),
-        name=f"Filing Source {uuid.uuid4().hex[:8]}",
-        source_type=DataSourceType.COMPANY,
+    """Vendor lines carry no publication date: freshness is measured from period end."""
+    await seed_year(db_session, test_company, 2024, {"revenue": Decimal("100")})
+    response = await client.post(
+        f"/api/data-quality/companies/{test_company.id}/assess"
+        "?scope=financial_statements&as_of=2025-12-31"
     )
-    db_session.add(source)
-    await db_session.flush()
+    components = {c["key"]: c for c in response.json()["components"]}
+    assert components["freshness"]["reason"] == (
+        "no publication date (vendor data); measured from period end 2024-12-31"
+    )
+    assert components["source_reliability"]["score"] == 75.0
 
-    async def add_filing(
-        fiscal_year: int, publication_date: date | None, label: str
-    ) -> None:
-        period = FinancialPeriod(
-            id=uuid.uuid4(),
-            company_id=test_company.id,
-            period_type="ANNUAL",
-            fiscal_year=fiscal_year,
-            start_date=date(fiscal_year, 1, 1),
-            end_date=date(fiscal_year, 12, 31),
-        )
-        db_session.add(period)
-        await db_session.flush()
-        document = FinancialDocument(
-            id=uuid.uuid4(),
-            period_id=period.id,
-            source_id=source.id,
-            document_type="ANNUAL_REPORT",
-            document_status="ORIGINAL",
-            publication_date=publication_date,
-        )
-        db_session.add(document)
-        await db_session.flush()
-        db_session.add(
-            FinancialFact(
-                id=uuid.uuid4(),
-                period_id=period.id,
-                document_id=document.id,
-                company_id=test_company.id,
-                fact_type="INCOME_STATEMENT",
-                reported_label=label,
-                normalized_label=label,
-                reported_value=None if label == "net_income" else Decimal("100"),
-                currency="EGP",
-            )
-        )
-        await db_session.flush()
 
-    # Published before the past as_of: counts.
-    await add_filing(2023, date(2024, 3, 1), "revenue")
-    # Published after the past as_of (and the source of the only validation
-    # warning): must be invisible at 2025-01-01, visible at 2026-06-01.
-    await add_filing(2024, date(2026, 3, 1), "net_income")
-    # NULL publication_date: never qualifies at any as_of (R14 pin 4).
-    await add_filing(2022, None, "total_assets")
+async def test_financial_statements_as_of_bounds_line_loading(
+    client: AsyncClient, db_session: AsyncSession, test_company: Company
+) -> None:
+    """R14: lines published after as_of are excluded; completeness counts the latest period."""
+    await seed_year(
+        db_session, test_company, 2023,
+        {"revenue": Decimal("100"), "net_income": Decimal("10")},
+        tier="filing", published=date(2024, 3, 1),
+    )
+    await seed_year(
+        db_session, test_company, 2024,
+        {"revenue": Decimal("120"), "net_income": Decimal("12"), "cfo": Decimal("5")},
+        tier="filing", published=date(2026, 3, 1),
+    )
+    await seed_year(
+        db_session, test_company, 2024, {"total_assets": Decimal("50")},
+        tier="filing", status=ExtStatus.extraction_candidate, published=date(2026, 3, 1),
+    )
 
     base = f"/api/data-quality/companies/{test_company.id}/assess"
     past = await client.post(f"{base}?scope=financial_statements&as_of=2025-01-01")
     later = await client.post(f"{base}?scope=financial_statements&as_of=2026-06-01")
-    assert past.status_code == 200
-    assert later.status_code == 200
+    past_c = {c["key"]: c for c in past.json()["components"]}
+    later_c = {c["key"]: c for c in later.json()["components"]}
 
-    past_components = {c["key"]: c for c in past.json()["components"]}
-    later_components = {c["key"]: c for c in later.json()["components"]}
-
-    # Only revenue is present at the past date; total_assets (NULL date) and
-    # net_income (future filing) are excluded -> 1/5, not 2/5 or 3/5.
-    assert past_components["completeness"]["score"] == 20.0
-    assert past_components["historical_depth"]["reason"] == (
-        "1 of 8 expected periods present"
-    )
-    # The future filing's missing reported_value warning must not be counted.
-    assert past_components["validation"]["reason"] == "0 errors, 0 warnings"
-
-    # At the later as_of the future filing counts; the NULL-dated one never does.
-    assert later_components["completeness"]["score"] == 40.0
-    assert later_components["historical_depth"]["reason"] == (
-        "2 of 8 expected periods present"
-    )
-    assert later_components["validation"]["reason"] == "0 errors, 1 warnings"
+    # Past: only FY2023 is visible (2 of 5 critical lines), one period of depth.
+    assert past_c["completeness"]["score"] == 40.0
+    assert past_c["historical_depth"]["reason"] == "1 of 8 expected periods present"
+    assert past_c["validation"]["reason"] == "0 errors, 0 warnings"
+    # Later: FY2024 is the latest period (3 of 5), two periods, one held candidate.
+    assert later_c["completeness"]["score"] == 60.0
+    assert later_c["historical_depth"]["reason"] == "2 of 8 expected periods present"
+    assert later_c["validation"]["reason"] == "0 errors, 1 warnings"
 
 
 async def test_price_history_depth_uses_expected_trading_days(

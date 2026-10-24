@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dataquality.service import DataQualityService
 from app.models.market import DailyPrice
+from app.models.metrics import FinancialMetric, MetricStatusDB
 from app.models.scores import InvestmentScore
 from app.repositories.company import CompanyRepository
 from app.repositories.industry import IndustryRepository
@@ -26,6 +27,8 @@ from app.scores.constants import (
     SCORE_METHODOLOGY_VERSION,
     SCORE_SCALE,
 )
+from app.statements import bridge
+from app.statements.bridge import LineValue, Resolved, load_company_statements
 from app.valuation.constants import VALUATION_METHODOLOGY_VERSION
 
 # Metric codes read from the latest AVAILABLE rows; stored 0-100 % values
@@ -119,10 +122,24 @@ class ScoreService:
             return (None, None)
         return (row.close, row.date)
 
+    async def _metric_by_period(
+        self, company_id: uuid.UUID, code: str
+    ) -> dict[uuid.UUID, str]:
+        """AVAILABLE metric values keyed by period id (stored text)."""
+        rows = (
+            await self.session.execute(
+                select(FinancialMetric.period_id, FinancialMetric.value)
+                .where(FinancialMetric.company_id == company_id)
+                .where(FinancialMetric.metric_code == code)
+                .where(FinancialMetric.status == MetricStatusDB.AVAILABLE)
+            )
+        ).all()
+        return {pid: str(value) for pid, value in rows if value is not None}
+
     async def _resolve_inputs(
-        self, company_id: uuid.UUID, overrides: ScoreInputs
+        self, company_id: uuid.UUID
     ) -> tuple[ScoreInputs, dict[str, Any]]:
-        """DB values fill gaps; caller overrides win. Sources cited, never guessed."""
+        """Inputs from statement lines, metrics and the FV snapshot (R43). Never invented."""
         pct: dict[str, tuple[Decimal | None, str | None]] = {}
         for code in _PCT_METRICS:
             pct[code] = await self._metric(company_id, code, percent=True)
@@ -137,24 +154,90 @@ class ScoreService:
         roe, _ = pct["roe"]
         roa, _ = pct["roa"]
 
-        def pick(override: Decimal | None, db: Decimal | None) -> Decimal | None:
-            return override if override is not None else db
+        statements = await load_company_statements(self.session, company_id)
+        latest = statements.latest()
+        used: list[LineValue] = []
 
-        merged = dataclasses.replace(
-            overrides,
+        def val(resolved: Resolved) -> Decimal | None:
+            if not resolved.available:
+                return None
+            used.extend(resolved.sources)
+            return resolved.value
+
+        eps_now = val(bridge.eps(latest))
+        five_back = statements.years_back(latest, 5) if latest is not None else None
+        eps_5y = val(bridge.eps(five_back)) if five_back is not None else None
+        bvps = val(bridge.book_value_per_share(latest))
+
+        # Five-year average EPS growth: mean of the yearly values over the last
+        # five periods, only with at least three of them (else unknown).
+        eps_growth_by_period = await self._metric_by_period(company_id, "eps_growth_yoy")
+        recent = statements.periods[:5]
+        yearly = [
+            Decimal(eps_growth_by_period[p.period_id]) / Decimal("100")
+            for p in recent
+            if p.period_id in eps_growth_by_period
+        ]
+        eps_growth_5y_avg = (
+            sum(yearly, Decimal("0")) / Decimal(len(yearly)) if len(yearly) >= 3 else None
+        )
+        de_by_period = await self._metric_by_period(company_id, "debt_to_equity")
+        de_5y = (
+            Decimal(de_by_period[five_back.period_id])
+            if five_back is not None and five_back.period_id in de_by_period
+            else None
+        )
+
+        # R45 M4: the derived "cash dividends paid per share" is timing-noisy and
+        # skips non-paying years, so it never feeds the dividend history checks
+        # (dividend_stability / dividend_growing stay NOT_RUN until a declared-DPS
+        # source exists). It is used once, as cash paid / EPS of the same year.
+        dps_latest = bridge.dps(latest)
+        earnings_payout = (
+            dps_latest.value / eps_now
+            if dps_latest.available
+            and dps_latest.value is not None
+            and eps_now is not None
+            and eps_now > 0
+            else None
+        )
+
+        pe_ratio = (
+            price / eps_now
+            if price is not None and eps_now is not None and eps_now > 0
+            else None
+        )
+        pb_ratio = price / bvps if price is not None and bvps is not None and bvps > 0 else None
+
+        merged = ScoreInputs(
             current_price=price,
             fair_value=fair_value,
-            eps_growth_1y=pick(overrides.eps_growth_1y, eps_g),
-            eps_growth_now=pick(overrides.eps_growth_now, eps_g),
-            roe_now=pick(overrides.roe_now, roe),
-            roa_now=pick(overrides.roa_now, roa),
-            de_ratio_now=pick(overrides.de_ratio_now, de_now),
-            hist_earnings_growth=pick(overrides.hist_earnings_growth, eps_g),
-            hist_revenue_growth=pick(overrides.hist_revenue_growth, rev_g),
+            pe_ratio=pe_ratio,
+            pb_ratio=pb_ratio,
+            eps_growth_1y=eps_g,
+            eps_now=eps_now,
+            eps_5y_ago=eps_5y,
+            eps_growth_now=eps_g,
+            eps_growth_5y_avg=eps_growth_5y_avg,
+            roe_now=roe,
+            roa_now=roa,
+            st_assets=val(bridge.line(latest, "current_assets")),
+            st_liabilities=val(bridge.line(latest, "current_liabilities")),
+            lt_liabilities=val(bridge.long_term_liabilities(latest)),
+            de_ratio_now=de_now,
+            de_ratio_5y_ago=de_5y,
+            operating_cash_flow=val(bridge.line(latest, "cfo")),
+            total_debt=val(bridge.line(latest, "interest_bearing_debt")),
+            total_assets=val(bridge.line(latest, "total_assets")),
+            total_equity=val(bridge.line(latest, "total_equity")),
+            earnings_payout=earnings_payout,
+            hist_earnings_growth=eps_g,
+            hist_revenue_growth=rev_g,
         )
         metrics_used = {code: raw for code, (_v, raw) in pct.items() if raw is not None}
         if de_raw is not None:
             metrics_used["debt_to_equity"] = de_raw
+        statement_lines = bridge.unique_sources(used)
         sources: dict[str, Any] = {
             "current_price": str(price) if price is not None else None,
             "price_as_of": price_as_of.isoformat() if price_as_of is not None else None,
@@ -166,16 +249,34 @@ class ScoreService:
                 fv_row.computed_at.isoformat() if fv_row is not None else None
             ),
             "metrics_used": metrics_used,
+            "statements": [bridge.provenance(lv) for lv in statement_lines],
+            "dps_derivation": bridge.DPS_DERIVATION,
+            "dps_label": bridge.DPS_LABEL,
+            "earnings_payout_basis": "cash dividends paid / EPS (same fiscal year)",
+            "dps_history_checks": (
+                "dividend_stability and dividend_growing not run: no declared-DPS source"
+            ),
+            "pe_pb_basis": (
+                "price / latest annual EPS and BVPS (period-end shares); the price is "
+                "current, the statement period is the age shown"
+            ),
+            "statement_period_end": (
+                latest.period_end.isoformat() if latest is not None else None
+            ),
+            "statement_age_days": (
+                (datetime.now(UTC).date() - latest.period_end).days
+                if latest is not None
+                else None
+            ),
         }
         return (merged, sources)
 
     async def assess(
         self,
         company_id: uuid.UUID,
-        overrides: ScoreInputs,
         margin_of_safety: Decimal = DEFAULT_MARGIN_OF_SAFETY,
     ) -> dict[str, Any]:
-        """Compute, snapshot, and hand-serialize the investment score."""
+        """Resolve inputs (no caller overrides), compute, snapshot, serialize."""
         company = await self.companies.get_by_id(company_id)
         if company is None:
             raise HTTPException(status_code=404, detail="Company not found")
@@ -198,7 +299,7 @@ class ScoreService:
         dq_fs = await self.data_quality.latest(company_id, "financial_statements")
         dq_ph = await self.data_quality.latest(company_id, "price_history")
 
-        merged, sources = await self._resolve_inputs(company_id, overrides)
+        merged, sources = await self._resolve_inputs(company_id)
         sources["dq_financial_statements"] = (
             {
                 "score": dq_fs.score,

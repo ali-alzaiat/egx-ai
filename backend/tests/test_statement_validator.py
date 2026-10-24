@@ -44,7 +44,7 @@ def _full_balance() -> list[LineCandidate]:
 
 class TestValidatorGates:
     def test_version_and_tolerance_shape(self) -> None:
-        assert VALIDATOR_VERSION == "stmt-validator-1.0"
+        assert VALIDATOR_VERSION == "stmt-validator-1.1"
         assert Decimal("0.01") == VALIDATION_TOLERANCE
 
     def test_balanced_set_auto_validates(self) -> None:

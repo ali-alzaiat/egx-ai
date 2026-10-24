@@ -1,254 +1,165 @@
-import "./FinancialMetrics.css";
+import "../components/hub/hubPages.css";
 
-import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { calculateMetrics, useCompanyByTicker, useCompanyMetrics } from '../api/client'
-import CompanyNotFound from '../components/CompanyNotFound'
-import type { FinancialMetric } from '../types'
+import type { ReactNode } from "react";
+import { useParams } from "react-router-dom";
+import { useCompanyByTicker, useCompanyMetrics } from "../api/client";
+import { ReasonText, useLineLabel } from "../components/hub/Reason";
+import { Tag } from "../components/ui/Badges";
+import { InfoPopover } from "../components/ui/InfoPopover";
+import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
+import type { CopyKey } from "../i18n";
+import { SHORT_COPY } from "../i18n/dict";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtEgpMillions, fmtInt, fmtPct, fmtPrice, fmtRatio } from "../lib/format";
+import { groupByFiscalYear, metricValueKind, type MetricYear } from "../lib/metricsView";
+import { lineFallback } from "../lib/reasons";
+import { unitForCode } from "../lib/statementMatrix";
+import type { FinancialMetric } from "../types";
 
-function MetricValue({ metric }: { metric: FinancialMetric }) {
-  if (metric.status === 'INSUFFICIENT_DATA') {
-    return <span className="metric-na">Insufficient Data</span>
-  }
-  if (metric.status === 'NOT_APPLICABLE') {
-    return <span className="metric-na">N/A</span>
-  }
-  if (metric.status === 'INVALID') {
-    return <span className="metric-invalid">Invalid</span>
-  }
-  if (metric.value === null) {
-    return <span className="metric-na">--</span>
-  }
-
-  const value = parseFloat(metric.value)
-  let displayValue: string
-
-  if (metric.unit === '%') {
-    displayValue = `${value.toFixed(2)}%`
-  } else if (metric.unit === 'ratio') {
-    displayValue = value.toFixed(4)
-  } else if (metric.unit === 'currency per share') {
-    displayValue = `EGP ${value.toFixed(4)}`
-  } else {
-    displayValue = value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-  }
-
-  return (
-    <span className="metric-value" title={metric.reason || undefined}>
-      {displayValue}
-    </span>
-  )
+function metricLabel(code: string, t: (key: CopyKey) => string): string {
+  const key = `fn_metric_${code}`;
+  return key in SHORT_COPY ? t(key as CopyKey) : lineFallback(code);
 }
 
-function MetricCard({ metric }: { metric: FinancialMetric }) {
-  return (
-    <div className="metric-card">
-      <div className="metric-header">
-        <span className="metric-name">{metric.display_name}</span>
-        <span className={`metric-status status-${metric.status.toLowerCase()}`}>
-          {metric.status}
-        </span>
-      </div>
-      <div className="metric-body">
-        <MetricValue metric={metric} />
-      </div>
-      {metric.reason && (
-        <div className="metric-footer">
-          <span className="metric-reason">{metric.reason}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default function FinancialMetrics() {
-  const { ticker } = useParams<{ ticker: string }>()
-  const queryClient = useQueryClient()
-  const { data: company, isLoading: companyLoading, error: companyError } = useCompanyByTicker(ticker)
-
-  const {
-    data: metrics,
-    isLoading: metricsLoading,
-    error: metricsError,
-    refetch,
-  } = useCompanyMetrics(company?.id)
-
-  const [running, setRunning] = useState(false)
-  const [runError, setRunError] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-
-  const handleCalculate = async (): Promise<void> => {
-    if (!company) return
-    setRunning(true)
-    setRunError(null)
-    setToast(null)
-    try {
-      const res = await calculateMetrics(company.id)
-      await queryClient.invalidateQueries({ queryKey: ['metrics'] })
-      await refetch()
-      if (res.metrics_persisted === 0) {
-        setToast('No metrics calculated — no financial statements recorded.')
-      } else {
-        setToast(`Calculated ${res.metrics_persisted} metrics across ${res.periods_calculated} periods.`)
-      }
-    } catch (err) {
-      setRunError(err instanceof Error ? err.message : 'Failed to calculate metrics')
-    } finally {
-      setRunning(false)
+function formatMetric(locale: string, m: FinancialMetric): string | null {
+  const n = m.value;
+  switch (metricValueKind(m.unit)) {
+    case "pct": {
+      const v = Number(n);
+      return n === null || !Number.isFinite(v) ? null : fmtPct(locale, v / 100);
     }
+    case "ratio": {
+      const text = fmtRatio(locale, n);
+      return text === null ? null : `${text}×`;
+    }
+    case "perShare":
+      return fmtPrice(locale, n);
+    case "currency":
+      return fmtEgpMillions(locale, n);
+    default:
+      return fmtRatio(locale, n);
   }
+}
 
-  if (companyLoading || metricsLoading) {
-    return <div className="loading">Loading financial metrics...</div>
+function SourceCell({ m }: { m: FinancialMetric }) {
+  const { t } = useLang();
+  if (m.provisional) return <Tag title={t("source_provisional_title")}>{t("source_provisional")}</Tag>;
+  if (m.source_tier === "filing") return <Tag>{t("source_filing")}</Tag>;
+  return null;
+}
+
+/** Which statement lines fed the number, in a popover. */
+function Inputs({ m, ticker }: { m: FinancialMetric; ticker: string }) {
+  const { t, locale } = useLang();
+  const label = useLineLabel(ticker);
+  if (m.inputs.length === 0) return null;
+  return (
+    <InfoPopover label={t("fn_metrics_inputs_label", { metric: metricLabel(m.metric_code, t) })}>
+      <p>{t("fn_metrics_inputs_intro")}</p>
+      <ul>
+        {m.inputs.map((input) => {
+          const unit = unitForCode(input.code);
+          const value = unit === "shares" ? fmtInt(locale, input.value) : unit === "currency_per_share" ? fmtPrice(locale, input.value) : fmtEgpMillions(locale, input.value);
+          return (
+            <li key={`${input.input_role}-${input.line_id}`}>
+              {label(input.code)} · {input.fiscal_year} · <bdi dir="ltr">{value}</bdi>
+              {input.provisional ? ` · ${t("source_provisional")}` : ""}
+            </li>
+          );
+        })}
+      </ul>
+    </InfoPopover>
+  );
+}
+
+function MetricRow({ m, ticker }: { m: FinancialMetric; ticker: string }) {
+  const { t, locale } = useLang();
+  const text = m.status === "AVAILABLE" ? formatMetric(locale, m) : null;
+  let note: ReactNode = null;
+  let value: ReactNode;
+  if (text !== null) {
+    value = text;
+    note = m.warnings ? <ReasonText ticker={ticker} reason={m.warnings} /> : null;
+  } else if (m.status === "NOT_APPLICABLE") {
+    value = <span className="missing">—</span>;
+    note = (
+      <>
+        {t("fn_metric_not_applicable")} <ReasonText ticker={ticker} reason={m.reason} />
+      </>
+    );
+  } else {
+    value = <span className="missing">—</span>;
+    note = <ReasonText ticker={ticker} reason={m.reason} />;
   }
+  return (
+    <tr>
+      <th scope="row">{metricLabel(m.metric_code, t)}</th>
+      <td className="num" dir="ltr">
+        {value}
+      </td>
+      <td>
+        <SourceCell m={m} />
+      </td>
+      <td className="note-cell">
+        {note} <Inputs m={m} ticker={ticker} />
+      </td>
+    </tr>
+  );
+}
 
-  if (companyError || !company) {
-    return <CompanyNotFound ticker={ticker} />
-  }
-
-  if (metricsError) {
-    return (
-      <div className="page">
-        <div className="page-header">
-          <div>
-            <h2>Financial Metrics - {company.ticker}</h2>
-            <p className="subtitle">{company.name}</p>
-          </div>
-        </div>
-        <div className="alert alert-error">
-          Couldn't load metrics.{' '}
-          <button className="link-btn" onClick={() => refetch()}>
-            Retry
-          </button>
-        </div>
+function YearSection({ group, ticker }: { group: MetricYear; ticker: string }) {
+  const { t, locale } = useLang();
+  const end = fmtDate(locale, group.periodEnd);
+  return (
+    <section>
+      <h2 className="section-title">
+        {group.fiscalYear === null ? t("fn_metrics_year_unknown") : t("fn_metrics_year_heading", { year: group.fiscalYear })}
+        {end && <span className="text-note"> · {t("fn_metrics_period_end", { date: end })}</span>}
+      </h2>
+      <div className="table-wrap">
+        <table aria-label={group.fiscalYear === null ? t("fn_metrics_year_unknown") : t("fn_metrics_year_heading", { year: group.fiscalYear })}>
+          <thead>
+            <tr>
+              <th scope="col">{t("fn_col_metric")}</th>
+              <th scope="col" className="num" dir="ltr">
+                {t("col_value")}
+              </th>
+              <th scope="col">{t("col_source")}</th>
+              <th scope="col">{t("fn_col_note")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {group.rows.map((m) => (
+              <MetricRow key={m.id} m={m} ticker={ticker} />
+            ))}
+          </tbody>
+        </table>
       </div>
-    )
-  }
+    </section>
+  );
+}
 
-  // Group metrics by category
-  const categories = {
-    growth: (metrics ?? []).filter(m => m.metric_code.includes('growth')),
-    margins: (metrics ?? []).filter(m => m.metric_code.includes('margin')),
-    profitability: (metrics ?? []).filter(m => ['roe', 'roa'].includes(m.metric_code)),
-    leverage: (metrics ?? []).filter(m => m.metric_code.includes('debt')),
-    liquidity: (metrics ?? []).filter(m => ['current_ratio', 'quick_ratio'].includes(m.metric_code)),
-    cashFlow: (metrics ?? []).filter(m => m.metric_code.includes('cash_flow') || m.metric_code === 'free_cash_flow'),
-    perShare: (metrics ?? []).filter(m => m.metric_code === 'eps' || m.metric_code === 'book_value_per_share'),
-  }
+/**
+ * Financials › Metrics (spec 4.4.3, R43 4.3): read-only. The server computes
+ * the metrics from statement lines, grouped here by fiscal year.
+ */
+export default function FinancialMetrics() {
+  const { ticker = "" } = useParams<{ ticker: string }>();
+  const { t } = useLang();
+  const { data: company } = useCompanyByTicker(ticker);
+  const { data, isLoading, error, refetch } = useCompanyMetrics(company?.id);
 
+  if (isLoading) return <LoadingState thing={t("fn_metrics_title")} />;
+  if (error) return <ErrorState thing={t("fn_metrics_title")} onRetry={() => void refetch()} />;
+  if (!data || data.length === 0) return <EmptyState>{t("fn_metrics_empty", { ticker })}</EmptyState>;
+
+  const groups = groupByFiscalYear(data);
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h2>Financial Metrics - {company.ticker}</h2>
-          <p className="subtitle">{company.name}</p>
-        </div>
-        <button className="btn btn-primary" onClick={handleCalculate} disabled={running}>
-          {running ? 'Calculating…' : 'Calculate metrics'}
-        </button>
-      </div>
-
-
-      {toast && (
-        <p role="status" className="muted">{toast}</p>
-      )}
-      {runError && (
-        <div className="alert alert-error">
-          {runError}{' '}
-          <button className="link-btn" onClick={handleCalculate}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {(!metrics || metrics.length === 0) && (
-        <div className="empty">
-          No metrics calculated for {company.ticker}. Metrics are derived from
-          recorded financial statements — calculate them to populate this view.
-        </div>
-      )}
-
-      {metrics && metrics.length > 0 && (
-        <div className="metrics-grid">
-          {categories.growth.length > 0 && (
-            <section className="metrics-section">
-              <h3>Growth</h3>
-              <div className="metrics-list">
-                {categories.growth.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.margins.length > 0 && (
-            <section className="metrics-section">
-              <h3>Margins</h3>
-              <div className="metrics-list">
-                {categories.margins.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.profitability.length > 0 && (
-            <section className="metrics-section">
-              <h3>Profitability</h3>
-              <div className="metrics-list">
-                {categories.profitability.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.leverage.length > 0 && (
-            <section className="metrics-section">
-              <h3>Leverage</h3>
-              <div className="metrics-list">
-                {categories.leverage.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.liquidity.length > 0 && (
-            <section className="metrics-section">
-              <h3>Liquidity</h3>
-              <div className="metrics-list">
-                {categories.liquidity.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.cashFlow.length > 0 && (
-            <section className="metrics-section">
-              <h3>Cash Flow</h3>
-              <div className="metrics-list">
-                {categories.cashFlow.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {categories.perShare.length > 0 && (
-            <section className="metrics-section">
-              <h3>Per Share</h3>
-              <div className="metrics-list">
-                {categories.perShare.map(metric => (
-                  <MetricCard key={metric.metric_code} metric={metric} />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
-      )}
+      <p className="table-meta">{t("fn_metrics_meta")}</p>
+      {groups.map((g) => (
+        <YearSection key={`${g.fiscalYear}-${g.periodType}`} group={g} ticker={ticker} />
+      ))}
     </div>
-  )
+  );
 }

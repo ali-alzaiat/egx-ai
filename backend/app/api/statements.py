@@ -19,11 +19,27 @@ from app.schemas.statements import (
     ReviewDecisionRequest,
     ReviewQueueItemRead,
 )
+from app.services.recompute import STATEMENT_ENGINES, RecomputeService, Trigger
 from app.statements.intake import ManualLine, intake_checklist, record_manual_filing
 from app.statements.ontology import STATEMENT_LINES
 from app.statements.service import StatementService
 
 router = APIRouter(prefix="/api/statements", tags=["statements"])
+
+
+async def _recompute(session: AsyncSession, company_id: uuid.UUID) -> dict[str, Any]:
+    """Statement-import hook (R43): refresh this company's statement-fed snapshots.
+
+    Runs in the request transaction before commit; only stale engines run and a
+    compute error is recorded as a failed state, never a failed request.
+    """
+    from app.signals import stance_cache
+
+    report = await RecomputeService(session).recompute_company(
+        company_id, Trigger.STATEMENT_IMPORT, STATEMENT_ENGINES
+    )
+    stance_cache.clear()
+    return report.as_dict()
 
 
 def _queue_item(line_row: Any, document: Any) -> ReviewQueueItemRead:
@@ -82,12 +98,14 @@ async def approve_line(
             content={"detail": "line already approved"},
         )
     approved = await repo.set_status(line_row, ExtStatus.approved, None)
+    recompute = await _recompute(session, approved.company_id)
     await session.commit()
     return ReviewDecisionRead(
         id=approved.id,
         ontology_code=approved.ontology_code,
         ext_status=approved.ext_status.value,
         ext_reason=approved.ext_reason,
+        recompute=recompute,
     )
 
 
@@ -102,12 +120,14 @@ async def reject_line(
     if line_row is None:
         return JSONResponse(status_code=404, content={"detail": "line not found"})
     rejected = await repo.set_status(line_row, ExtStatus.rejected, body.reason)
+    recompute = await _recompute(session, rejected.company_id)
     await session.commit()
     return ReviewDecisionRead(
         id=rejected.id,
         ontology_code=rejected.ontology_code,
         ext_status=rejected.ext_status.value,
         ext_reason=rejected.ext_reason,
+        recompute=recompute,
     )
 
 
@@ -173,7 +193,13 @@ async def filings_intake(session: AsyncSession = Depends(get_session)) -> dict[s
             for r in rows
         ],
         "lines": [
-            {"code": code, "label_en": sl.label_en, "label_ar": sl.label_ar, "section": sl.section}
+            {
+                "code": code,
+                "label_en": sl.label_en,
+                "label_ar": sl.label_ar,
+                "section": sl.section,
+                "unit": sl.unit,
+            }
             for code, sl in STATEMENT_LINES.items()
         ],
     }
@@ -199,9 +225,13 @@ async def record_filing(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    recompute = (
+        await _recompute(session, result.company_id) if result.company_id is not None else None
+    )
     await session.commit()
     return {
         "document_id": str(result.document_id),
         "period_id": str(result.period_id),
         "lines": result.lines,
+        "recompute": recompute,
     }

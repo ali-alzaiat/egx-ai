@@ -14,6 +14,7 @@ from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, Da
 from app.models.scores import InvestmentScore
 from app.models.screening import ShariahScreeningResult
 from app.models.thesis import InvestmentThesis
+from app.scores.constants import SCORE_METHODOLOGY_VERSION
 from app.thesis.constants import THESIS_METHODOLOGY_VERSION
 
 pytestmark = pytest.mark.asyncio
@@ -67,7 +68,7 @@ async def _add_score(db_session: AsyncSession, company: Company, headline: Decim
             id=uuid.uuid4(),
             company_id=company.id,
             profile_key="default",
-            methodology_version="1.0",
+            methodology_version=SCORE_METHODOLOGY_VERSION,
             headline=headline,
             headline_status="AVAILABLE",
             components={},

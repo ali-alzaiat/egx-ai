@@ -1,215 +1,220 @@
-import "./PeersTab.css";
-
-import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { putPeerOverride, useIndustrySnapshot } from "../api/client";
-import { formatAsOf } from "../lib/format";
-import type { IndustryPercentile } from "../types";
+import { Link } from "react-router-dom";
+import { useCompanyMetrics, useIndustrySnapshot, usePeersMetrics } from "../api/client";
+import { useLang } from "../i18n/useLang";
+import { fmtDate, fmtNum, fmtPct, fmtPrice, fmtRatio, plural } from "../lib/format";
+import { metricValueKind } from "../lib/metricsView";
+import { ForeignText } from "../pages/shared/ForeignText";
+import type { FinancialMetric, IndustryPercentile, IndustryPeer, IndustrySnapshot } from "../types";
+import { metricLabelKey, peerBasisKey } from "./research/labels";
+import { ResearchSection, TechnicalDetails } from "./research/parts";
+import { MissingReason } from "./research/reasons";
+import DataTable, { StockCell, type Column } from "./ui/DataTable";
+import { CompanyName } from "./ui/CompanyName";
+import { ErrorState, LoadingState } from "./ui/States";
 
 interface PeersTabProps {
   companyId: string;
   ticker?: string;
 }
 
-const BASIS_LABELS: Record<string, string> = {
-  override: "Custom override",
-  egx_sector: "EGX sector",
-  gics_sub_industry: "GICS sub-industry",
-  none: "No peer basis found",
-};
+/** The newest stored value of each metric code, by period end. */
+function latestByCode(metrics: readonly FinancialMetric[] | undefined): Map<string, FinancialMetric> {
+  const out = new Map<string, FinancialMetric>();
+  for (const m of metrics ?? []) {
+    if (m.value === null) continue;
+    const seen = out.get(m.metric_code);
+    if (!seen || (m.period_end ?? "") > (seen.period_end ?? "")) out.set(m.metric_code, m);
+  }
+  return out;
+}
 
-function PercentileRow({ row }: { row: IndustryPercentile }) {
-  const insufficient =
-    row.status === "INSUFFICIENT_DATA" || row.value === null;
-  const pct = insufficient ? 0 : Math.min(100, Math.max(0, Number(row.value)));
+function formatMetricValue(locale: string, m: FinancialMetric | undefined): string | null {
+  if (!m || m.value === null) return null;
+  switch (metricValueKind(m.unit)) {
+    case "pct": {
+      const n = Number(m.value);
+      return Number.isFinite(n) ? fmtPct(locale, n / 100) : null;
+    }
+    case "perShare":
+      return fmtPrice(locale, m.value);
+    default: {
+      const text = fmtRatio(locale, m.value);
+      return text === null ? null : m.unit === "ratio" ? `${text}×` : text;
+    }
+  }
+}
+
+function BasisLine({ data }: { data: IndustrySnapshot }) {
+  const { t, locale } = useLang();
+  const key = peerBasisKey(data.peers.basis);
+  const basis = key ? t(key) : data.peers.basis.replace(/_/g, " ");
+  const count = plural(locale, data.n_peers, {
+    zero: t("rp_count_zero"),
+    one: t("rp_count_one"),
+    two: t("rp_count_two"),
+    few: t("rp_count_few"),
+    many: t("rp_count_many"),
+    other: t("rp_count_other"),
+  });
+  const date = fmtDate(locale, data.as_of);
   return (
-    <div className="peers-metric" key={row.metric_key}>
-      <div className="peers-metric-head">
-        <span>{row.display_name}</span>
-        {insufficient ? (
-          <span className="status-badge unknown">Not enough data</span>
-        ) : (
-          <span>{Number(row.value).toFixed(2)}th percentile</span>
-        )}
-      </div>
-      {insufficient ? (
-        <p className="muted">{row.explanation}</p>
-      ) : (
-        <>
-          <div
-            className="peers-bar"
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${row.display_name}: ${Number(row.value).toFixed(2)}th percentile among ${row.n_with_data} companies with data`}
-          >
-            <div className="peers-bar-fill" style={{ width: `${pct}%` }} />
-          </div>
-          <p className="muted">{row.explanation}</p>
-        </>
-      )}
-    </div>
+    <p className="rs-lead">
+      {t("rp_basis_line", { basis, count, asof: date !== null ? t("rs_as_of", { date }) : t("rs_no_data_reason") })}
+    </p>
   );
 }
 
-export default function PeersTab({ companyId, ticker }: PeersTabProps) {
-  const queryClient = useQueryClient();
-  const { data, isLoading, error, refetch } = useIndustrySnapshot(companyId);
+function PeersTable({
+  peers,
+  metricKeys,
+  metricsByPeer,
+  loading,
+}: {
+  peers: IndustryPeer[];
+  metricKeys: string[];
+  metricsByPeer: Record<string, FinancialMetric[]> | undefined;
+  loading: boolean;
+}) {
+  const { t, locale } = useLang();
+  const columns: Column<IndustryPeer>[] = [
+    {
+      id: "stock",
+      header: t("rp_col_stock"),
+      sticky: true,
+      cell: (peer) => (
+        <StockCell
+          ticker={peer.ticker}
+          name={<CompanyName name={peer.name} />}
+          href={`/companies/${encodeURIComponent(peer.ticker)}`}
+        />
+      ),
+    },
+    ...metricKeys.map((key) => ({
+      id: key,
+      header: ((label) => (label ? t(label) : key.replace(/_/g, " ")))(metricLabelKey(key)),
+      type: "num" as const,
+      cell: (peer: IndustryPeer) =>
+        formatMetricValue(locale, latestByCode(metricsByPeer?.[peer.id]).get(key)) ?? <MissingReason reason={null} />,
+    })),
+  ];
+  return (
+    <ResearchSection title={t("rp_peers_title")}>
+      <DataTable
+        columns={columns}
+        rows={peers}
+        rowKey={(peer) => peer.id}
+        caption={t("rp_peers_caption")}
+        loading={loading}
+        loadingThing={t("rp_thing")}
+        hideDensityToggle
+      />
+    </ResearchSection>
+  );
+}
 
-  const [idsText, setIdsText] = useState("");
-  const [edited, setEdited] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-
-  const peerIds = data ? data.peers.items.map((p) => p.id).join(", ") : "";
-  useEffect(() => {
-    if (!edited) setIdsText(peerIds);
-  }, [edited, peerIds]);
-
-  const handleSave = async (): Promise<void> => {
-    if (!data) return;
-    setSaving(true);
-    setSaveError(null);
-    setSaved(false);
-    try {
-      const ids = idsText
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-      await putPeerOverride(companyId, ids);
-      setEdited(false);
-      setSaved(true);
-      await queryClient.invalidateQueries({ queryKey: ["industry", companyId] });
-      await refetch();
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="loading">Loading industry peers...</div>;
-  }
-
-  if (error || !data) {
-    return (
-      <div className="alert alert-error">
-        Couldn't load industry peers.{" "}
-        <button className="link-btn" onClick={() => refetch()}>
-          Retry
-        </button>
+function PercentilesTable({
+  rows,
+  metrics,
+}: {
+  rows: IndustryPercentile[];
+  metrics: Map<string, FinancialMetric>;
+}) {
+  const { t, locale } = useLang();
+  const columns: Column<IndustryPercentile>[] = [
+    {
+      id: "metric",
+      header: t("rs_col_metric"),
+      sticky: true,
+      cell: (row) => {
+        const key = metricLabelKey(row.metric_key);
+        return key ? t(key) : <ForeignText>{row.display_name}</ForeignText>;
+      },
+    },
+    {
+      id: "value",
+      header: t("rp_col_value"),
+      type: "num",
+      cell: (row) => formatMetricValue(locale, metrics.get(row.metric_key)) ?? <MissingReason reason={null} />,
+    },
+    {
+      id: "percentile",
+      header: t("rp_col_percentile"),
+      type: "num",
+      cell: (row) => {
+        const n = row.value === null || row.status === "INSUFFICIENT_DATA" ? null : Number(row.value);
+        if (n === null || !Number.isFinite(n)) return <MissingReason reason={row.reason || row.explanation} />;
+        return t("rp_pct_cell", {
+          pct: fmtNum(locale, n, { maximumFractionDigits: 0 }),
+          n: fmtNum(locale, row.n_with_data),
+        });
+      },
+    },
+  ];
+  return (
+    <ResearchSection title={t("rp_pct_title")} lead={t("rp_pct_lead")}>
+      <div className="rs-wrap-table">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.metric_key}
+          caption={t("rp_pct_caption")}
+          loadingThing={t("rp_thing")}
+          empty={<p className="empty">{t("rp_pct_empty")}</p>}
+          hideDensityToggle
+        />
       </div>
-    );
-  }
+    </ResearchSection>
+  );
+}
 
-  const gicsName =
-    data.company.gics?.sub_industry_name ??
-    data.company.gics?.industry_name ??
-    null;
-  const basisLabel = BASIS_LABELS[data.peers.basis] ?? data.peers.basis;
+/** Default peers and percentiles, read-only (R43 #10). The peer list is edited in Admin. */
+export default function PeersTab({ companyId, ticker }: PeersTabProps) {
+  const { t, locale } = useLang();
+  const { data, isLoading, error, refetch } = useIndustrySnapshot(companyId);
+  const { data: metrics } = useCompanyMetrics(companyId);
+  const peerIds = data?.peers.items.map((p) => p.id) ?? [];
+  const peerMetrics = usePeersMetrics(peerIds);
+
+  if (isLoading) return <LoadingState thing={t("rp_thing")} />;
+  if (error || !data) return <ErrorState thing={t("rp_thing")} onRetry={() => void refetch()} />;
+
+  const label = ticker ?? data.company.ticker;
+  const hasSector = !!(data.company.sector ?? data.company.egx_sector ?? data.company.gics);
+  const hasPeers = data.peers.items.length > 0;
+  const asOf = fmtDate(locale, data.as_of);
 
   return (
-    <div className="peers-tab">
-      <div className="card">
-        <h2>Industry</h2>
-        <p>
-          Sector: {data.company.sector ?? "—"}
-          {" · "}EGX sector: {data.company.egx_sector ?? "—"}
-          {gicsName ? ` · GICS: ${gicsName}` : ""}
-        </p>
-        <p className="muted">
-          Peer basis: {basisLabel} · {data.n_peers}{" "}
-          {data.n_peers === 1 ? "peer" : "peers"} · as of{" "}
-          {formatAsOf(data.as_of)}
-        </p>
-      </div>
+    <div className="page">
+      {hasPeers ? (
+        <BasisLine data={data} />
+      ) : (
+        <p className="rs-lead">{hasSector ? t("rp_no_peers", { ticker: label }) : t("rp_no_sector", { ticker: label })}</p>
+      )}
 
-      <div className="card">
-        <h2>Peers</h2>
-        {data.peers.items.length === 0 ? (
-          <p className="muted">
-            No peers resolved for {ticker ?? data.company.ticker} under the
-            current basis. Percentiles below will show as not enough data.
-          </p>
-        ) : (
-          <ul className="peers-chips" aria-label="Peer companies">
-            {data.peers.items.map((peer) => (
-              <li className="peers-chip" key={peer.id} title={peer.name}>
-                {peer.ticker}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Percentiles</h2>
-        <p className="muted">
-          Each metric is ranked against the peer set above — potentially
-          informative under these assumptions, not advice.
-        </p>
-        {data.percentiles.length === 0 ? (
-          <p className="muted">
-            No metrics in profile '{data.profile.profile_id}' for this peer
-            set.
-          </p>
-        ) : (
-          data.percentiles.map((row) => (
-            <PercentileRow row={row} key={row.metric_key} />
-          ))
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Edit peer list</h2>
-        <p className="muted">
-          Paste company IDs (comma-separated UUIDs). Saving persists the
-          override and recomputes the percentiles above.
-        </p>
-        <label className="peers-editor-label" htmlFor="peers-ids">
-          Peer company IDs
-        </label>
-        <textarea
-          id="peers-ids"
-          className="peers-editor"
-          rows={3}
-          value={idsText}
-          onChange={(e) => {
-            setIdsText(e.target.value);
-            setEdited(true);
-            setSaved(false);
-          }}
+      {hasPeers && (
+        <PeersTable
+          peers={data.peers.items}
+          metricKeys={data.profile.metric_keys}
+          metricsByPeer={peerMetrics.data}
+          loading={peerMetrics.isLoading}
         />
-        {saveError ? (
-          <div className="alert alert-error">
-            {saveError}{" "}
-            <button className="link-btn" onClick={handleSave}>
-              Retry
-            </button>
-          </div>
-        ) : null}
-        {saved ? (
-          <p className="peers-saved" role="status">
-            Peer override saved — percentiles recomputed.
-          </p>
-        ) : null}
-        <button
-          className="btn btn-primary"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? "Saving…" : "Save peer list"}
-        </button>
-      </div>
+      )}
+      {hasPeers && <PercentilesTable rows={data.percentiles} metrics={latestByCode(metrics)} />}
 
-      <p className="muted">
-        Methodology v{data.methodology_version} · profile{" "}
-        {data.profile.profile_id} (v{data.profile.methodology_version}) · as of{" "}
-        {formatAsOf(data.as_of)}
-      </p>
+      <footer className="rs-stack">
+        <Link className="rs-text-link" to={`/admin/peers?ticker=${encodeURIComponent(label)}`}>
+          {t("rp_admin_link")}
+        </Link>
+        <p className="rs-note">
+          {t("rs_methodology", { version: data.methodology_version })}
+          {asOf !== null && ` · ${t("rs_as_of", { date: asOf })}`}
+        </p>
+        <TechnicalDetails>
+          <span>{`profile = ${data.profile.profile_id} (${data.profile.methodology_version})`}</span>
+          <span>{`basis = ${data.peers.basis}`}</span>
+          <span>{`metric_keys = ${data.profile.metric_keys.join(", ")}`}</span>
+        </TechnicalDetails>
+      </footer>
     </div>
   );
 }

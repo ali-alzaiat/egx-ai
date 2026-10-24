@@ -72,6 +72,17 @@ class ScreeningRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one()
 
+    async def delete_rule_results(self, screening_result_id: uuid.UUID) -> None:
+        """Remove a result's rule rows so a re-screen replaces, never appends."""
+        from sqlalchemy import delete
+
+        await self.session.execute(
+            delete(ScreeningRuleResultDB).where(
+                ScreeningRuleResultDB.screening_result_id == screening_result_id
+            )
+        )
+        await self.session.flush()
+
     async def add_rule_result(
         self,
         screening_result_id: uuid.UUID,
@@ -114,7 +125,9 @@ class ScreeningRepository:
             query = query.where(
                 ShariahScreeningResult.methodology_version == methodology_version
             )
-        query = query.order_by(ShariahScreeningResult.screened_at.desc())
+        query = query.order_by(ShariahScreeningResult.screened_at.desc()).execution_options(
+            populate_existing=True
+        )
         result = await self.session.execute(query)
         return result.scalars().first()
 
@@ -212,7 +225,9 @@ class ScreeningRepository:
             query = query.where(
                 ScreeningPurificationEstimate.methodology_version == methodology_version
             )
-        query = query.order_by(ScreeningPurificationEstimate.computed_at.desc())
+        query = query.order_by(ScreeningPurificationEstimate.computed_at.desc()).execution_options(
+            populate_existing=True
+        )
         result = await self.session.execute(query)
         return result.scalars().first()
 
