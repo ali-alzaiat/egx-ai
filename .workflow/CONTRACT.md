@@ -18,7 +18,10 @@ The same eleven-agent team runs under two runtimes; the rules below apply to bot
 ## Result contract (end every result with exactly one)
 - NEXT: <agent> — work continues, handoff logged
 - BLOCKED: <question> — unsure; never guess; router routes to tech-lead
-- ASK USER: <precise question> — tech-lead only; router asks the human
+- ASK USER: <precise question> — tech-lead, architect, ux-expert and pm; router asks the human
+
+## Owner decisions (user directive, 2026-10-24)
+Every architecture decision (schema/migrations, data model, new tables, patterns, new services or dependencies, auth, process/agent structure) and every UX decision (layout, navigation, flows, what a screen shows, copy tone, visual direction) goes to the user before it is built. The agent writes the options (2–4, with trade-offs) and one recommendation into its deliverable and ends with `ASK USER: <question>`; the router asks with options and the recommendation first, then records the answer in decisions/. Implementers who meet such a choice mid-task stop with `BLOCKED` naming it. Details inside an approved decision or spec (naming, refactors, test layout) need no asking.
 - DONE — task complete
 
 ## Standard pipeline (every task/feature)
@@ -68,6 +71,7 @@ Cost scales with agents × context, so the router keeps both small:
 2. Router dispatches tech-lead with the question.
 3. Tech-lead resolves -> writes ruling to decisions/ -> work resumes.
 4. Tech-lead cannot resolve -> ASK USER -> router asks the human. No silent defaults.
+5. Architecture and UX choices skip steps 2–3: they always go to the human (see Owner decisions).
 
 ## Handoffs
 The router appends every handoffs.log entry. Agents write their own deliverable to the path named in their brief (reviewers only under `.workflow/`, implementers only in their code scope) and hand back a summary of at most 150 words — the router never re-types a deliverable.
