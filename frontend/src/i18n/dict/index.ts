@@ -1,6 +1,7 @@
 import { ADMIN_COPY } from "./admin";
 import { COMPANIES_COPY } from "./companies";
 import { HUB_COPY } from "./hub";
+import { HUB_RESEARCH_COPY } from "./hubResearch";
 import { MARKETS_COPY } from "./markets";
 import { SHELL_COPY } from "./shell";
 import { STANCE_COPY } from "./stance";
@@ -21,6 +22,7 @@ export const SHORT_COPY = {
   ...MARKETS_COPY,
   ...COMPANIES_COPY,
   ...HUB_COPY,
+  ...HUB_RESEARCH_COPY,
   ...TRACKING_COPY,
   ...ADMIN_COPY,
 } as const;
@@ -32,6 +34,7 @@ export const COPY_MODULES: Record<string, Record<string, CopyEntry>> = {
   markets: MARKETS_COPY,
   companies: COMPANIES_COPY,
   hub: HUB_COPY,
+  hubResearch: HUB_RESEARCH_COPY,
   tracking: TRACKING_COPY,
   admin: ADMIN_COPY,
 };
