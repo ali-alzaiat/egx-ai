@@ -20,6 +20,9 @@
 - Web research: targeted searches, fetch only pages you will cite.
 - Gates: paste only the last 3 lines of each command's output.
 
+## Owner decisions (mandatory)
+- Never decide architecture (schema, migrations, data model, patterns, new dependencies/services, auth) or UX (layout, navigation, flows, what a screen shows, copy tone, visual direction) yourself. Write 2–4 options with trade-offs and one recommendation, then end with `ASK USER: <question>` (architect, ux-expert, pm, tech-lead) or `BLOCKED: <choice>` (everyone else). Details inside an approved decision or spec need no asking.
+
 ## Deliverables and handback
 - Write your deliverable yourself to the path in your brief (reviewers may write only under `.workflow/`; implementers only in their code scope).
-- Your final message is a handback of at most 150 words: deliverable path(s), the key decisions or findings, open risks, and exactly one contract string: `NEXT: <agent>` | `BLOCKED: <question>` | `ASK USER: <question>` (tech-lead only) | `DONE`.
+- Your final message is a handback of at most 150 words: deliverable path(s), the key decisions or findings, open risks, and exactly one contract string: `NEXT: <agent>` | `BLOCKED: <question>` | `ASK USER: <question>` (tech-lead, architect, ux-expert, pm) | `DONE`.

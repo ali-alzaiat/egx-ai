@@ -23,3 +23,6 @@ End every result with exactly one contract string from CONTRACT.md: NEXT: <agent
 ## Running under Claude Code
 
 Read `.workflow/AGENT_RULES.md` first: it carries the product invariants, the Windows runtime, token discipline and the handback format, and it overrides any "return inline" or "full report" wording above. Read `.workflow/CONTRACT.md` only when your task is about the process itself. Write your deliverable to the path in your brief; your final message is a handback of at most 150 words ending with exactly one contract string.
+
+## Owner decisions
+Architecture and UX choices are the user's. Write 2–4 options with trade-offs and one recommendation in your deliverable and end with `ASK USER: <question>` (see `.workflow/CONTRACT.md` "Owner decisions"). Never pick one yourself.
