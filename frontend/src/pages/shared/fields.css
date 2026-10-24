@@ -1,0 +1,37 @@
+/* Form fields shared by the tracking pages and /admin (spec 6.13). */
+
+.fld { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.fld-label { font-size: var(--fs-table); color: var(--text-2); font-weight: 500; }
+.fld-hint { font-size: var(--fs-meta); color: var(--text-3); }
+.fld > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.fld > select,
+.fld > textarea {
+  width: 100%; min-height: var(--control-h); padding-inline: var(--space-3);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm); color: var(--text); font-size: var(--fs-ui);
+}
+.fld > textarea { padding-block: var(--space-2); resize: vertical; }
+.fld > input[type="file"] { font-size: var(--fs-table); padding-block: var(--space-1); }
+.fld > input[type="number"] { text-align: right; }
+.fld > input[disabled], .fld > select[disabled] { opacity: 0.6; }
+
+.fld-check { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-ui); min-height: var(--control-h); }
+.fld-check input { flex: none; }
+
+.fld-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); align-items: end; }
+.fld-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+.fld-fieldset { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4) var(--space-4); min-width: 0; }
+.fld-fieldset > legend { padding-inline: var(--space-2); font-size: var(--fs-table); color: var(--text-2); font-weight: 500; }
+.fld-fieldset { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Layout only: surface, border and radius come from .card (central re-skin). */
+.panel { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.panel > h2, .panel > h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); }
+.panel p.panel-lead { color: var(--text-2); font-size: var(--fs-ui); }
+
+.fold > summary { cursor: pointer; font-size: var(--fs-table); color: var(--text-2); padding-block: var(--space-1); }
+.fold[open] > summary { margin-bottom: var(--space-3); }
+.fold-body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+

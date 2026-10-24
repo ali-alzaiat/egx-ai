@@ -1,13 +1,130 @@
 import type { CopyEntry } from "./types";
 
-/** Markets: recommendations radar and rankings. */
+/**
+ * Markets: dashboard, recommendations, momentum rankings and the Shariah
+ * list. Plural nouns come in sets of five keys (`_one` … `_other`) read by
+ * `countText` in pages/companies/shared.tsx; a form without `{n}` spells the
+ * number out ("one stock", "سهم واحد").
+ */
 export const MARKETS_COPY = {
-  signals_radar_title: { en: "Stance radar", ar: "رادار المواقف" },
-  signals_radar_count: { en: "companies", ar: "شركة" },
-  reco_title: { en: "Recommendations radar", ar: "رادار الترشيحات" },
+  // ---- Shared by the market pages ----
+  tier_strongest: { en: "Strongest", ar: "الأقوى" },
+  tier_strong: { en: "Strong", ar: "قوي" },
+  tier_neutral: { en: "Neutral", ar: "محايد" },
+  tier_weak: { en: "Weak", ar: "ضعيف" },
+  tier_weakest: { en: "Weakest", ar: "الأضعف" },
+  col_rank: { en: "#", ar: "#" },
+  col_stock: { en: "Stock", ar: "السهم" },
+  col_tier: { en: "Tier", ar: "الفئة" },
+  col_last_close: { en: "Last close (EGP)", ar: "آخر إغلاق (ج.م)" },
+  no_stored_price: { en: "No stored price for this company", ar: "لا يوجد سعر مخزَّن لهذه الشركة" },
+  no_engine_input: {
+    en: "No engine produced an input for this company",
+    ar: "لم ينتج أي محرك مدخلاً لهذه الشركة",
+  },
+  rules_label: { en: "rules {rules}", ar: "القواعد {rules}" },
+  prices_as_of_short: { en: "prices as of {date}", ar: "الأسعار حتى {date}" },
+
+  // ---- Plural sets ----
+  stocks_count_one: { en: "one stock", ar: "سهم واحد" },
+  stocks_count_two: { en: "two stocks", ar: "سهمان" },
+  stocks_count_few: { en: "{n} stocks", ar: "{n} أسهم" },
+  stocks_count_many: { en: "{n} stocks", ar: "{n} سهماً" },
+  stocks_count_other: { en: "{n} stocks", ar: "{n} سهم" },
+  matches_count_one: { en: "one match", ar: "نتيجة واحدة" },
+  matches_count_two: { en: "two matches", ar: "نتيجتان" },
+  matches_count_few: { en: "{n} matches", ar: "{n} نتائج" },
+  matches_count_many: { en: "{n} matches", ar: "{n} نتيجة" },
+  matches_count_other: { en: "{n} matches", ar: "{n} نتيجة" },
+  no_history_count_one: { en: "one without price history", ar: "شركة واحدة بلا سجل أسعار" },
+  no_history_count_two: { en: "two without price history", ar: "شركتان بلا سجل أسعار" },
+  no_history_count_few: { en: "{n} without price history", ar: "{n} شركات بلا سجل أسعار" },
+  no_history_count_many: { en: "{n} without price history", ar: "{n} شركة بلا سجل أسعار" },
+  no_history_count_other: { en: "{n} without price history", ar: "{n} شركة بلا سجل أسعار" },
+  watchlists_count_one: { en: "one watchlist", ar: "قائمة متابعة واحدة" },
+  watchlists_count_two: { en: "two watchlists", ar: "قائمتا متابعة" },
+  watchlists_count_few: { en: "{n} watchlists", ar: "{n} قوائم متابعة" },
+  watchlists_count_many: { en: "{n} watchlists", ar: "{n} قائمة متابعة" },
+  watchlists_count_other: { en: "{n} watchlists", ar: "{n} قائمة متابعة" },
+  unacked_alerts_count_one: { en: "one unacknowledged alert", ar: "تنبيه واحد غير مُقرّ" },
+  unacked_alerts_count_two: { en: "two unacknowledged alerts", ar: "تنبيهان غير مُقرّين" },
+  unacked_alerts_count_few: { en: "{n} unacknowledged alerts", ar: "{n} تنبيهات غير مُقرّة" },
+  unacked_alerts_count_many: { en: "{n} unacknowledged alerts", ar: "{n} تنبيهاً غير مُقرّ" },
+  unacked_alerts_count_other: { en: "{n} unacknowledged alerts", ar: "{n} تنبيه غير مُقرّ" },
+  factors_missing_one: { en: "one factor missing", ar: "عامل واحد غير متوفر" },
+  factors_missing_two: { en: "two factors missing", ar: "عاملان غير متوفرين" },
+  factors_missing_few: { en: "{n} factors missing", ar: "{n} عوامل غير متوفرة" },
+  factors_missing_many: { en: "{n} factors missing", ar: "{n} عاملاً غير متوفر" },
+  factors_missing_other: { en: "{n} factors missing", ar: "{n} عامل غير متوفر" },
+  hidden_results_one: {
+    en: "one result for a company no longer in the universe is hidden",
+    ar: "نتيجة واحدة لشركة لم تعد ضمن القائمة مخفية",
+  },
+  hidden_results_two: {
+    en: "two results for companies no longer in the universe are hidden",
+    ar: "نتيجتان لشركتين لم تعودا ضمن القائمة مخفيتان",
+  },
+  hidden_results_few: {
+    en: "{n} results for companies no longer in the universe are hidden",
+    ar: "{n} نتائج لشركات لم تعد ضمن القائمة مخفية",
+  },
+  hidden_results_many: {
+    en: "{n} results for companies no longer in the universe are hidden",
+    ar: "{n} نتيجة لشركات لم تعد ضمن القائمة مخفية",
+  },
+  hidden_results_other: {
+    en: "{n} results for companies no longer in the universe are hidden",
+    ar: "{n} نتيجة لشركات لم تعد ضمن القائمة مخفية",
+  },
+
+  // ---- Dashboard ----
+  dash_title: { en: "Market overview", ar: "نظرة على السوق" },
+  dash_subtitle: {
+    en: "Prices, model stances and momentum leaders for EGX-listed companies.",
+    ar: "الأسعار ومواقف النموذج وأقوى الأسهم زخماً في البورصة المصرية.",
+  },
+  dash_strip_aria: { en: "Market summary", ar: "ملخص السوق" },
+  dash_stat_latest_close: { en: "Latest close date", ar: "تاريخ آخر إغلاق" },
+  dash_stat_priced: { en: "Companies with prices", ar: "شركات لها أسعار" },
+  dash_stat_priced_value: { en: "{priced} of {total}", ar: "{priced} من {total}" },
+  dash_stat_stances: { en: "Most-traded 50: stances", ar: "مواقف أكثر 50 سهماً تداولاً" },
+  dash_stat_tracked: { en: "Tracked companies", ar: "الشركات المتابَعة" },
+  dash_stances_aria: {
+    en: "{buy} lean buy, {hold} neutral, {reduce} lean reduce",
+    ar: "{buy} يميل للشراء، {hold} محايد، {reduce} يميل للتخفيض",
+  },
+  dash_not_assessed_count: { en: "{n} not assessed", ar: "{n} لم يُقيَّم" },
+  dash_traded_title: { en: "Most-traded stocks", ar: "الأسهم الأكثر تداولاً" },
+  dash_traded_thing: { en: "stances", ar: "المواقف" },
+  dash_traded_empty: {
+    en: "No stances yet. Stances are computed after the next price sync.",
+    ar: "لا توجد مواقف بعد. تُحتسب المواقف بعد مزامنة الأسعار التالية.",
+  },
+  dash_traded_more: { en: "All 50 in Recommendations", ar: "الخمسون كاملةً في الترشيحات" },
+  dash_leaders_title: { en: "Momentum leaders", ar: "الأعلى زخماً" },
+  dash_leaders_thing: { en: "momentum scores", ar: "درجات الزخم" },
+  dash_leaders_empty: {
+    en: "No momentum scores yet. Scores are computed after the next price sync.",
+    ar: "لا توجد درجات زخم بعد. تُحتسب الدرجات بعد مزامنة الأسعار التالية.",
+  },
+  dash_leaders_more: { en: "Full momentum rankings", ar: "ترتيب الزخم كاملاً" },
+  dash_tracking_title: { en: "Your tracking", ar: "متابعتك" },
+  dash_tracking_line: { en: "{watchlists} · {alerts}", ar: "{watchlists} · {alerts}" },
+  dash_tracking_empty: {
+    en: "No watchlists yet. Create one in Watchlists.",
+    ar: "لا توجد قوائم متابعة بعد. أنشئ واحدة من قوائم المتابعة.",
+  },
+  dash_tracking_unavailable: {
+    en: "Your watchlists and alerts are not available right now.",
+    ar: "قوائم المتابعة والتنبيهات غير متاحة حالياً.",
+  },
+  dash_stat_unavailable: { en: "Not available right now", ar: "غير متاح حالياً" },
+
+  // ---- Recommendations ----
+  reco_title: { en: "Recommendations", ar: "الترشيحات" },
   reco_subtitle: {
-    en: "Most-traded EGX stocks, ranked by value traded.",
-    ar: "أكثر أسهم البورصة المصرية تداولاً، مرتبة حسب قيمة التداول.",
+    en: "Model stances for the 50 most-traded EGX stocks, ordered by 30-day average value traded. Research calculations, not advice.",
+    ar: "مواقف النموذج لأكثر 50 سهماً تداولاً في البورصة المصرية، مرتبة حسب متوسط قيمة التداول خلال 30 يوماً. حسابات بحثية وليست نصيحة استثمارية.",
   },
   reco_shariah_only: {
     en: "EGX33 Shariah members only",
@@ -15,18 +132,37 @@ export const MARKETS_COPY = {
   },
   reco_filter_label: { en: "Stance", ar: "الموقف" },
   reco_filter_all: { en: "All", ar: "الكل" },
+  reco_filter_text: { en: "Filter by ticker or name", ar: "تصفية بالرمز أو الاسم" },
+  reco_things: { en: "stocks", ar: "أسهم" },
+  reco_thing_loading: { en: "recommendations", ar: "الترشيحات" },
   reco_col_stock: { en: "Stock", ar: "السهم" },
-  reco_col_price: { en: "Last close", ar: "آخر إغلاق" },
+  reco_col_confidence: { en: "Confidence (0–100)", ar: "الثقة (0–100)" },
+  reco_col_composite: { en: "Composite (−100 to +100)", ar: "المؤشر المركب (−100 إلى +100)" },
+  reco_col_price: { en: "Last close (EGP)", ar: "آخر إغلاق (ج.م)" },
+  reco_col_upside: { en: "Upside ref.", ar: "مرجع الصعود" },
+  reco_col_downside: { en: "Downside ref.", ar: "مرجع الهبوط" },
   reco_col_shariah: { en: "Shariah", ar: "الشرعية" },
-  reco_empty: { en: "No stocks match these filters.", ar: "لا توجد أسهم مطابقة لهذه الفلاتر." },
-  reco_levels_note: {
-    en: "Upside / downside are a volatility band (2× / 1.5× ATR) around the last close — not a forecast.",
-    ar: "مرجعا الصعود والهبوط نطاق تذبذب (2× / 1.5× ATR) حول آخر إغلاق — وليسا توقعاً.",
+  reco_empty: {
+    en: "No stances yet. Stances are computed after the next price sync.",
+    ar: "لا توجد مواقف بعد. تُحتسب المواقف بعد مزامنة الأسعار التالية.",
   },
+  reco_levels_note: {
+    en: "Upside and downside references are a volatility band (+2 / −1.5 × ATR14) around the last close, not a forecast.",
+    ar: "مرجعا الصعود والهبوط نطاق تذبذب (+2 / −1.5 × ATR14) حول آخر إغلاق، وليسا توقعاً.",
+  },
+  reco_confidence_note: {
+    en: "Confidence is capped at 50 when only price data is available.",
+    ar: "الثقة محدودة بحد أقصى 50 عندما تتوفر بيانات الأسعار فقط.",
+  },
+  reco_composite_note: {
+    en: "The composite is the weighted mean of the engines that had data, from −100 to +100.",
+    ar: "المؤشر المركب هو المتوسط المرجّح للمحركات التي توفرت بياناتها، من −100 إلى +100.",
+  },
+  reco_no_atr: { en: "Not enough price history for the ATR band", ar: "سجل الأسعار غير كافٍ لحساب نطاق ATR" },
   low_liquidity: { en: "Low liquidity", ar: "سيولة منخفضة" },
   low_liquidity_title: {
     en: "Average value traded below EGP 500K over 20 sessions",
-    ar: "متوسط قيمة التداول أقل من 500 ألف جنيه خلال 20 جلسة",
+    ar: "متوسط قيمة التداول أقل من 500 ألف ج.م خلال 20 جلسة",
   },
   signals_score: { en: "Composite score", ar: "الدرجة المركبة" },
   signals_coverage: { en: "Engine coverage", ar: "تغطية المحركات" },
@@ -37,5 +173,88 @@ export const MARKETS_COPY = {
   signals_liquidity: {
     en: "Avg value traded (20 sessions, EGP)",
     ar: "متوسط قيمة التداول (20 جلسة، جنيه)",
+  },
+
+  // ---- Momentum rankings ----
+  rank_title: { en: "Momentum rankings", ar: "ترتيب الزخم" },
+  rank_subtitle: {
+    en: "Companies with price history, scored 0–100 against each other on momentum, trend, drawdown, volatility and liquidity. Prices only, no fundamentals.",
+    ar: "الشركات التي لها سجل أسعار، مُقيّمة من 0 إلى 100 مقارنةً ببعضها في الزخم والاتجاه والتراجع والتذبذب والسيولة. أسعار فقط، دون بيانات مالية.",
+  },
+  rank_thing: { en: "momentum rankings", ar: "ترتيب الزخم" },
+  rank_things: { en: "companies", ar: "شركات" },
+  rank_meta_scored: {
+    en: "{scored} of {total} companies scored",
+    ar: "تم تقييم {scored} من {total} شركة",
+  },
+  rank_meta_as_of: { en: "as of {date}", ar: "حتى {date}" },
+  rank_meta_model: { en: "model", ar: "النموذج" },
+  rank_show_excluded: { en: "show", ar: "عرض" },
+  rank_hide_excluded: { en: "hide", ar: "إخفاء" },
+  rank_excluded_title: { en: "Companies without price history", ar: "شركات بلا سجل أسعار" },
+  rank_tier_label: { en: "Tier", ar: "الفئة" },
+  rank_min_score: { en: "Min score", ar: "أدنى درجة" },
+  rank_show_label: { en: "Show", ar: "عرض" },
+  rank_show_all: { en: "All", ar: "الكل" },
+  rank_col_score: { en: "Momentum score (0–100)", ar: "درجة الزخم (0–100)" },
+  rank_col_3m: { en: "3M return", ar: "عائد 3 أشهر" },
+  rank_col_6m: { en: "6M return", ar: "عائد 6 أشهر" },
+  rank_col_trend: { en: "Trend (−1 to +1)", ar: "الاتجاه (−1 إلى +1)" },
+  rank_col_drawdown: { en: "Max drawdown", ar: "أقصى تراجع" },
+  rank_col_factors: { en: "Top factors", ar: "أبرز العوامل" },
+  rank_factor_pctl: { en: "{factor}: {p} pctl", ar: "{factor}: المئين {p}" },
+  rank_value_missing: { en: "Not available for this company", ar: "غير متوفر لهذه الشركة" },
+  rank_empty: {
+    en: "No momentum scores yet. Scores are computed after the next price sync.",
+    ar: "لا توجد درجات زخم بعد. تُحتسب الدرجات بعد مزامنة الأسعار التالية.",
+  },
+  rank_disclaimer: {
+    en: "Research signal only, not investment advice. Each score is relative standing within the covered universe on that date.",
+    ar: "إشارة بحثية فقط وليست نصيحة استثمارية. كل درجة تعبّر عن الموقع النسبي ضمن الشركات المشمولة في ذلك التاريخ.",
+  },
+  rank_how_title: { en: "How the score is built", ar: "كيف تُبنى الدرجة" },
+  rank_how_weight: { en: "weight {w}%", ar: "الوزن {w}%" },
+  rank_how_higher: { en: "higher is better", ar: "الأعلى أفضل" },
+  rank_how_lower: { en: "lower is better", ar: "الأقل أفضل" },
+  rank_how_note: {
+    en: "Each factor is converted to its percentile rank within the covered universe on that date, then combined. Percentiles show where a company sits against the market, not an absolute judgement.",
+    ar: "يُحوَّل كل عامل إلى مئينه بين الشركات المشمولة في ذلك التاريخ ثم تُجمع العوامل. تُظهر المئينات موقع الشركة مقارنةً بالسوق، وليست حكماً مطلقاً.",
+  },
+  factor_momentum_1m: { en: "1M momentum", ar: "زخم شهر" },
+  factor_momentum_3m: { en: "3M momentum", ar: "زخم 3 أشهر" },
+  factor_momentum_6m: { en: "6M momentum", ar: "زخم 6 أشهر" },
+  factor_trend_alignment: { en: "Trend", ar: "الاتجاه" },
+  factor_distance_from_high: { en: "Distance from 52w high", ar: "البعد عن قمة 52 أسبوعاً" },
+  factor_max_drawdown: { en: "Drawdown", ar: "التراجع" },
+  factor_volatility: { en: "Volatility", ar: "التذبذب" },
+  factor_liquidity: { en: "Liquidity", ar: "السيولة" },
+  factor_volume_confirmation: { en: "Volume", ar: "حجم التداول" },
+
+  // ---- Shariah screening list ----
+  scr_title: { en: "Shariah screening", ar: "التصفية الشرعية" },
+  scr_subtitle: {
+    en: "Our ratio screen beside the official EGX33 Shariah index. A screening result is research input, not a certification.",
+    ar: "فحص النسب الخاص بنا بجانب مؤشر EGX33 الشرعي الرسمي. نتيجة الفحص مدخل بحثي، وليست شهادة.",
+  },
+  scr_egx33_title: { en: "EGX33 Shariah index members ({cycle} review)", ar: "أعضاء مؤشر EGX33 الشرعي (مراجعة {cycle})" },
+  scr_egx33_title_plain: { en: "EGX33 Shariah index members", ar: "أعضاء مؤشر EGX33 الشرعي" },
+  scr_egx33_thing: { en: "EGX33 members", ar: "أعضاء EGX33" },
+  scr_egx33_empty: {
+    en: "No EGX33 membership snapshot has been recorded yet.",
+    ar: "لم تُسجَّل بعد لقطة لعضوية EGX33.",
+  },
+  scr_col_our: { en: "Our screen", ar: "فحصنا" },
+  scr_col_cycle: { en: "EGX33 cycle", ar: "دورة EGX33" },
+  scr_col_method: { en: "Methodology", ar: "المنهجية" },
+  scr_col_screened: { en: "Screened", ar: "تاريخ الفحص" },
+  scr_ours_title: { en: "Screened by our methodology", ar: "ما فُحص وفق منهجيتنا" },
+  scr_ours_thing: { en: "screening results", ar: "نتائج الفحص" },
+  scr_ours_empty: {
+    en: "No screening results yet. Screens run automatically after statements are imported.",
+    ar: "لا توجد نتائج فحص بعد. يجري الفحص تلقائياً بعد استيراد القوائم المالية.",
+  },
+  scr_footnote: {
+    en: "Verdicts are tied to the methodology version shown and to the statements recorded at screening time.",
+    ar: "ترتبط الأحكام بإصدار المنهجية المعروض وبالقوائم المسجَّلة وقت الفحص.",
   },
 } as const satisfies Record<string, CopyEntry>;

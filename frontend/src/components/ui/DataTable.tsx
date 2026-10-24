@@ -19,6 +19,8 @@ export interface Column<T> {
   /** Sticks to the inline-start edge on horizontal scroll. */
   sticky?: boolean;
   cell: (row: T) => ReactNode;
+  /** Optional leaner content for the phone card (e.g. percent change only). Defaults to `cell`. */
+  cardCell?: (row: T) => ReactNode;
   /** Value to sort by; required when `sortable`. Null/undefined sort last. */
   sortValue?: (row: T) => SortValue;
 }
@@ -178,7 +180,7 @@ export default function DataTable<T>({
                       <div key={col.id} className="card-pair">
                         <span className="card-pair-label">{col.header}</span>
                         <span className="card-pair-value" {...(col.type === "num" ? { dir: "ltr" } : {})}>
-                          {col.cell(row)}
+                          {(col.cardCell ?? col.cell)(row)}
                         </span>
                       </div>
                     ))}
@@ -279,7 +281,7 @@ export default function DataTable<T>({
   );
 }
 
-/** Stock cell: "TICKER" and the name on one line, linking to the hub (spec 3.4). */
+/** Stock cell: "TICKER" with the name stacked beneath it, linking to the hub (spec 3.4, friendly look). */
 export function StockCell({ ticker, name, href }: { ticker: string; name: ReactNode; href?: string }) {
   return (
     <span className="stock-cell">

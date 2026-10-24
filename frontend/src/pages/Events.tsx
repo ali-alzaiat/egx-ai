@@ -1,211 +1,55 @@
+import "./shared/fields.css";
 import "./Events.css";
 
-import { memo, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { exportEvents, getCompanyByTicker, useCompanies, useEvents } from "../api/client";
-import type { PhaseEvent } from "../types";
-
-interface EventFilters {
-  symbol: string;
-  type: string;
-  date_from: string;
-  date_to: string;
-}
-
-const EMPTY_FILTERS: EventFilters = { symbol: "", type: "", date_from: "", date_to: "" };
-
-const EVENT_TYPES = [
-  "watchlist.add",
-  "watchlist.remove",
-  "alert.created",
-  "alert.fired",
-  "alert.acked",
-  "fact.landed",
-  "check.evaluated",
-  "restatement.detected",
-  "thesis.updated",
-  "rule.changed",
-  "note.added",
-] as const;
-
-function prettifyEventType(type: string): string {
-  const [a, b] = type.split(".");
-  if (!a || !b) return type;
-  const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
-  return `${cap(a)} ${b}`;
-}
-
-function toQueryParams(filters: EventFilters): {
-  symbol?: string;
-  type?: string;
-  date_from?: string;
-  date_to?: string;
-} {
-  const params: { symbol?: string; type?: string; date_from?: string; date_to?: string } = {};
-  const symbol = filters.symbol.trim().toUpperCase();
-  if (symbol) params.symbol = symbol;
-  if (filters.type) params.type = filters.type;
-  if (filters.date_from) params.date_from = filters.date_from;
-  if (filters.date_to) params.date_to = filters.date_to;
-  return params;
-}
-
-function formatTs(ts: string): string {
-  const t = new Date(ts).getTime();
-  if (Number.isNaN(t)) return ts;
-  return new Date(ts).toLocaleString();
-}
-
-/** Pull the well-known provenance keys out of an opaque inputs snapshot. */
-function snapshotHighlights(snapshot: Record<string, unknown>): string[] {
-  const out: string[] = [];
-  const facts = snapshot.fact_ids ?? snapshot.facts ?? snapshot.factIds;
-  if (Array.isArray(facts) && facts.length > 0) out.push(`fact ids: ${facts.map(String).join(", ")}`);
-  const priceAsOf = snapshot.price_as_of ?? snapshot.priceAsOf;
-  if (typeof priceAsOf === "string" && priceAsOf) out.push(`price as-of: ${priceAsOf}`);
-  const methodology = snapshot.methodology_version ?? snapshot.methodologyVersion;
-  if (typeof methodology === "string" && methodology) out.push(`methodology v${methodology}`);
-  return out;
-}
-
-function stringifySnapshot(snapshot: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(snapshot, null, 2);
-  } catch {
-    return String(snapshot);
-  }
-}
-
-const EventRow = memo(function EventRow({
-  event,
-  companyName,
-}: {
-  event: PhaseEvent;
-  companyName: (id: string) => { ticker: string; name: string } | null;
-}) {
-  const highlights = useMemo(
-    () => snapshotHighlights(event.inputs_snapshot ?? {}),
-    [event.inputs_snapshot],
-  );
-  const actorRole = event.actor_type === "system" ? "by the system" : "by you";
-  return (
-    <article className="events-row" id={`event-${event.id}`} aria-label={`Event ${event.id}`}>
-      <div className="events-row-head">
-        <span className="events-type" title={`Rule version ${event.rule_version}`}>
-          {prettifyEventType(event.type)}
-        </span>
-        <span className="muted">{formatTs(event.ts)}</span>
-      </div>
-      <p className="events-reason">{event.reason || "No reason recorded."}</p>
-      <p className="muted">
-        {event.symbols.length > 0 ? (
-          <>
-            {event.symbols.map((s) => {
-              const found = companyName(s);
-              return found ? (
-                <span key={s}>
-                  <Link to={`/companies/${found.ticker}`}>{found.ticker}</Link>
-                  <span className="muted"> — {found.name}; </span>
-                </span>
-              ) : (
-                <span key={s} className="events-symbol" title={s}>
-                  {s.slice(0, 8)}…
-                </span>
-              );
-            })}
-          </>
-        ) : (
-          "No company attached"
-        )}
-      </p>
-      {highlights.length > 0 && <p className="muted">Inputs: {highlights.join(" · ")}</p>}
-      <details className="events-details">
-        <summary>Technical details</summary>
-        <pre>{stringifySnapshot(event.inputs_snapshot ?? {})}</pre>
-      </details>
-      {event.supersedes_id ? (
-        <p className="muted">
-          Corrects{" "}
-          <a href={`#event-${event.supersedes_id}`}>
-            {event.supersedes_id.slice(0, 8)}
-          </a>{" "}
-          — corrections arrive as new rows; the original is never edited.
-        </p>
-      ) : null}
-      <p className="muted events-frame">
-        Validate or invalidate under these assumptions — this record is evidence, not advice.{" "}
-        <span title={`Actor ${event.actor_type} ${event.actor_id}`}>
-          Recorded {actorRole}.
-        </span>
-      </p>
-    </article>
-  );
-});
+import { useMemo, useState } from "react";
+import { exportEvents, useEvents } from "../api/client";
+import { Tag } from "../components/ui/Badges";
+import CompanySearch from "../components/ui/CompanySearch";
+import { PageHeader } from "../components/ui/PageHeader";
+import { PageTitle } from "../components/ui/PageTitle";
+import { EmptyState, ErrorState, LoadingState, NoMatch } from "../components/ui/States";
+import { useLang } from "../i18n/useLang";
+import type { Company, PhaseEvent } from "../types";
+import { describeError, type ErrorView } from "./shared/apiError";
+import { Field, FieldGroup } from "./shared/Field";
+import { ErrorMessage } from "./shared/FormMessage";
+import { ForeignText } from "./shared/ForeignText";
+import { CompanyRef } from "./tracking/CompanyRef";
+import { fmtDateTime } from "./tracking/dateTime";
+import {
+  EMPTY_FILTERS,
+  EVENT_TYPES,
+  eventTypeLabel,
+  hasFilters,
+  snapshotHighlights,
+  stringifySnapshot,
+  toQueryParams,
+  type EventFilters,
+} from "./tracking/eventFormat";
+import { useCompanyIndex } from "./shared/useCompanyIndex";
 
 export default function Events() {
-  const [draft, setDraft] = useState<EventFilters>(EMPTY_FILTERS);
-  const [applied, setApplied] = useState<EventFilters>(EMPTY_FILTERS);
+  const { t } = useLang();
+  const { byId: companies, loading: companiesLoading } = useCompanyIndex();
+  const [filters, setFilters] = useState<EventFilters>(EMPTY_FILTERS);
+  const [picked, setPicked] = useState<Company | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [filterError, setFilterError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<ErrorView | null>(null);
 
-  const { data: companiesPage1 } = useCompanies({ page_size: 200 });
-  const { data: companiesPage2 } = useCompanies({ page_size: 200, page: 2 });
+  const params = useMemo(() => toQueryParams(filters), [filters]);
+  const { data, isLoading, isError, refetch } = useEvents(params);
+  const events = useMemo(() => [...(data ?? [])].sort((a, b) => b.ts.localeCompare(a.ts)), [data]);
+  const filtered = hasFilters(filters);
 
-  const companyOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const page of [companiesPage1, companiesPage2]) {
-      for (const c of page?.items ?? []) {
-        if (!seen.has(c.ticker)) seen.set(c.ticker, c.name);
-      }
-    }
-    return [...seen.entries()]
-      .map(([ticker, name]) => ({ ticker, name }))
-      .sort((a, b) => a.ticker.localeCompare(b.ticker));
-  }, [companiesPage1, companiesPage2]);
-  const companiesLoading = companiesPage1 === undefined && companiesPage2 === undefined;
-
-  // Ticker shown in the UI; the backend symbol filter takes a company UUID.
-  const [symbolTicker, setSymbolTicker] = useState("");
-
-  const handleApply = async (): Promise<void> => {
-    setFilterError(null);
-    const next = { ...draft, symbol: "" };
-    const rawTicker = symbolTicker.trim().toUpperCase();
-    if (rawTicker !== "") {
-      let company = null;
-      try {
-        company = await getCompanyByTicker(rawTicker);
-      } catch (err) {
-        setFilterError(err instanceof Error ? err.message : "Could not look up that ticker.");
-        return;
-      }
-      if (!company) {
-        setFilterError(`No company "${rawTicker}" — pick one from the list.`);
-        return;
-      }
-      next.symbol = company.id;
-    }
-    setApplied(next);
+  const clear = (): void => {
+    setFilters(EMPTY_FILTERS);
+    setPicked(null);
   };
 
-  const params = useMemo(() => toQueryParams(applied), [applied]);
-  const { data, isLoading, error, refetch } = useEvents(params);
-
-  const events = useMemo(() => [...(data ?? [])].sort((a, b) => b.ts.localeCompare(a.ts)), [data]);
-
-  const companyById = useMemo(() => {
-    const byId = new Map<string, { ticker: string; name: string }>();
-    for (const page of [companiesPage1, companiesPage2]) {
-      for (const c of page?.items ?? []) {
-        if (!byId.has(c.id)) byId.set(c.id, { ticker: c.ticker, name: c.name });
-      }
-    }
-    return byId;
-  }, [companiesPage1, companiesPage2]);
-
-  const companyName = (id: string): { ticker: string; name: string } | null =>
-    companyById.get(id) ?? null;
+  const setCompany = (company: Company | null): void => {
+    setPicked(company);
+    setFilters((f) => ({ ...f, symbol: company?.id ?? "" }));
+  };
 
   const handleExport = async (): Promise<void> => {
     setExporting(true);
@@ -222,7 +66,7 @@ export default function Events() {
       link.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : "Export failed");
+      setExportError(describeError(err, t, "ev_export_failed"));
     } finally {
       setExporting(false);
     }
@@ -230,153 +74,123 @@ export default function Events() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <h1>Events ledger</h1>
-          <p className="subtitle">
-            Append-only record of assessments, alerts, and corrections — newest first.
-            Corrections appear as new rows referencing the old; nothing here is rewritten.
-          </p>
-        </div>
-        <button className="btn btn-primary" onClick={handleExport} disabled={exporting}>
-          {exporting ? "Exporting…" : "Export JSON"}
-        </button>
-      </div>
+      <PageTitle parts={[t("nav_events")]} />
+      <PageHeader
+        title={t("nav_events")}
+        subtitle={t("ev_subtitle")}
+        actions={
+          <button type="button" className="btn btn-secondary" onClick={() => void handleExport()} disabled={exporting}>
+            {exporting ? t("ev_exporting") : t("ev_export")}
+          </button>
+        }
+      />
 
-      <form
-        className="card events-filters"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleApply();
-        }}
-      >
-        <label>
-          Symbol / company
-          <select
-            value={symbolTicker}
-            onChange={(e) => setSymbolTicker(e.target.value)}
-            disabled={companiesLoading}
-          >
-            <option value="">All companies</option>
-            {companyOptions.map((c) => (
-              <option key={c.ticker} value={c.ticker}>
-                {c.ticker} — {c.name}
+      <form className="card ev-filters" onSubmit={(e) => e.preventDefault()}>
+        <FieldGroup label={t("ev_company")}>
+          <CompanySearch mode="picker" value={picked} onSelect={setCompany} onClear={() => setCompany(null)} />
+          {!picked && <span className="fld-hint">{t("ev_all_companies")}</span>}
+        </FieldGroup>
+        <Field label={t("ev_type")}>
+          <select value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}>
+            <option value="">{t("ev_all_types")}</option>
+            {EVENT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {eventTypeLabel(type, t)}
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Event type
-          <select
-            value={draft.type}
-            onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
-          >
-            <option value="">All types</option>
-            {EVENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {prettifyEventType(t)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          From
+        </Field>
+        <Field label={t("ev_from")}>
           <input
             type="date"
-            value={draft.date_from}
-            onChange={(e) => setDraft((d) => ({ ...d, date_from: e.target.value }))}
+            dir="ltr"
+            value={filters.date_from}
+            max={filters.date_to || undefined}
+            onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))}
           />
-        </label>
-        <label>
-          To
+        </Field>
+        <Field label={t("ev_to")}>
           <input
             type="date"
-            value={draft.date_to}
-            onChange={(e) => setDraft((d) => ({ ...d, date_to: e.target.value }))}
+            dir="ltr"
+            value={filters.date_to}
+            min={filters.date_from || undefined}
+            onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
           />
-        </label>
-        <div className="events-filter-actions">
-          <button type="submit" className="btn btn-primary">
-            Apply filters
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setDraft(EMPTY_FILTERS);
-              setApplied(EMPTY_FILTERS);
-              setSymbolTicker("");
-              setFilterError(null);
-            }}
-          >
-            Clear
-          </button>
-        </div>
-        {filterError ? (
-          <div className="alert alert-error" role="alert">
-            {filterError}{" "}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => {
-                setSymbolTicker("");
-                void handleApply();
-              }}
-            >
-              Show all companies
+        </Field>
+        {filtered && (
+          <div>
+            <button type="button" className="btn btn-secondary" onClick={clear}>
+              {t("clear_filters")}
             </button>
           </div>
-        ) : null}
+        )}
       </form>
 
-      {exportError && (
-        <div className="alert alert-error">
-          Couldn&apos;t export events: {exportError}{" "}
-          <button className="link-btn" onClick={handleExport}>
-            Retry
-          </button>
-        </div>
-      )}
+      {exportError && <ErrorMessage view={exportError} />}
 
       {isLoading ? (
-        <div className="loading">Loading events…</div>
-      ) : error ? (
-        <div className="alert alert-error" role="alert">
-          Couldn&apos;t load events. Check the symbol field — use a ticker from the list.{" "}
-          <button className="link-btn" onClick={() => refetch()}>
-            Retry
-          </button>
-        </div>
+        <LoadingState thing={t("ev_things")} />
+      ) : isError ? (
+        <ErrorState thing={t("ev_things")} onRetry={() => void refetch()} />
       ) : events.length === 0 ? (
-        applied.symbol === "" &&
-        applied.type === "" &&
-        applied.date_from === "" &&
-        applied.date_to === "" ? (
-          <div className="empty">
-            No events yet. Assess a company or fire an alert to start the ledger.
-          </div>
+        filtered ? (
+          <NoMatch things={t("ev_things_plural")} onClear={clear} />
         ) : (
-          <div className="empty">
-            No events for these filters.{" "}
-            <button
-              className="link-btn"
-              onClick={() => {
-                setDraft(EMPTY_FILTERS);
-                setApplied(EMPTY_FILTERS);
-                setSymbolTicker("");
-              }}
-            >
-              Clear filters
-            </button>
-          </div>
+          <EmptyState>{t("ev_empty")}</EmptyState>
         )
       ) : (
-        <div className="events-feed">
+        <ul className="ev-feed" aria-label={t("nav_events")}>
           {events.map((event) => (
-            <EventRow key={event.id} event={event} companyName={companyName} />
+            <EventRow key={event.id} event={event} companies={companies} loading={companiesLoading} />
           ))}
-        </div>
+        </ul>
       )}
     </div>
+  );
+}
+
+function EventRow({
+  event,
+  companies,
+  loading,
+}: {
+  event: PhaseEvent;
+  companies: ReadonlyMap<string, Company>;
+  loading: boolean;
+}) {
+  const { t, locale } = useLang();
+  const highlights = snapshotHighlights(event.inputs_snapshot ?? {}, t, locale);
+  const when = fmtDateTime(locale, event.ts);
+  return (
+    <li id={`event-${event.id}`} className="card ev-row">
+      <div className="ev-head">
+        <Tag title={t("ev_rule_version", { version: event.rule_version })}>{eventTypeLabel(event.type, t)}</Tag>
+        <span className="text-note" dir="ltr">
+          {when ?? t("no_value")}
+        </span>
+      </div>
+      <p>{event.reason ? <ForeignText>{event.reason}</ForeignText> : t("ev_no_reason")}</p>
+      <p className="ev-companies">
+        {event.symbols.length > 0
+          ? event.symbols.map((id) => <CompanyRef key={id} company={companies.get(id)} loading={loading} />)
+          : <span className="text-note">{t("ev_no_company")}</span>}
+      </p>
+      {highlights.length > 0 && <p className="text-note">{t("ev_inputs", { items: highlights.join(" · ") })}</p>}
+      {event.supersedes_id && (
+        <p className="text-note">
+          <a href={`#event-${event.supersedes_id}`}>{t("ev_corrects")}</a> {t("ev_corrects_note")}
+        </p>
+      )}
+      <details className="fold">
+        <summary>{t("al_technical_details")}</summary>
+        <pre className="ev-json" dir="ltr">
+          {stringifySnapshot(event.inputs_snapshot ?? {})}
+        </pre>
+      </details>
+      <p className="text-note">
+        {t("ev_frame")} {event.actor_type === "system" ? t("ev_recorded_system") : t("ev_recorded_you")}
+      </p>
+    </li>
   );
 }

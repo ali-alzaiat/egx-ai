@@ -1,0 +1,9 @@
+# Inbox: staff-frontend (Lane A: market pages)
+
+From: router · 2026-10-24
+Task: rebuild these pages on the FE-1 foundation (`src/components/ui/*`, tokens, `lib/format.ts`) per `.workflow/design/ui-redesign-2026-10.md` §4.1 Dashboard, §4.2 Recommendations, §4.3 Companies, §4.5 Rankings, §4.6 Shariah list, plus §5 (stance/Shariah/valuation copy), §6 (RTL), §9 checks 1–6.
+Files you own: `pages/Dashboard.tsx`, `Recommendations.tsx`, `Companies.tsx` (+ `Companies.css` and `pages/companies/*`), `Rankings.tsx`, `Screening.tsx`, their CSS, and `i18n/dict/markets.ts` + `i18n/dict/companies.ts`. Do NOT edit hub pages, Watchlists/Alerts/Events/admin, `App.tsx`, `styles/*`, `components/ui/*` (another lane runs in parallel). Avoid `api/client.ts` and `types/index.ts`; if unavoidable, only append new hooks/types at the end of the file.
+Rules: every visible string through `t()` with a real Arabic translation (no English left in AR except tickers/proper nouns); Western digits; no "BUY"/certainty wording; missing data uses `Missing` with the reason, never 0 or "—" alone; no raw codes/UUIDs/snake_case. Companies page shows company data and stance only (search/sector/sort/pagination are the only controls; user asked for data, not forms). Delete CSS you made dead.
+`/api/stance/*` may return 500 while the backend R43 work is in flight: build against the existing types; verify with real data where it loads, otherwise note it.
+Verify in the built-in browser (`preview_start` name `frontend`; open your own tab, close it after): each of your pages in EN and AR at 1280 and 375, no overflow (`scrollWidth === clientWidth`), no console errors from your code. Reset viewport to desktop.
+Gates: `cd frontend && npx tsc -b; npm run lint; npx vitest run; npm run build` (last 3 lines each). Handback ≤150 words. End NEXT: qa-ui | BLOCKED: <q>.

@@ -1,18 +1,7 @@
 # Inbox: qa-ui
 
 From: router · 2026-10-24
-Task: QA the FE-1 foundation only (shell, tokens, shared ui/ components, hub routing, /admin shell). Page bodies are NOT migrated yet (lanes A/B/C come next), so English inside unmigrated page bodies and backend 500s from `/api/stance/*` (R43 backend WIP) are out of scope; note them in one line, don't itemize.
-
-Spec: `.workflow/design/ui-redesign-2026-10.md` §1 (IA, routes, sidebar, narrow screens, hub, admin), §2 (tokens, themes, Arabic), §3.1–3.9, §6 (RTL), §9 checks 1, 2, 7 (focus rings), 8, 9.
-
-Check, in EN and AR, at 1280 and 375 px (reset to desktop after):
-- Every top-level route and the 7 hub tabs for COMI: renders, no console errors from frontend code, no horizontal overflow (`scrollWidth === innerWidth`).
-- Old tab paths and `/intake` redirect per §1.1; `/companies/COMI/ai` shows Not found; unknown ticker shows Not found.
-- Mobile: menu drawer opens/closes (Esc, backdrop), search overlay works, language and theme toggles reachable.
-- RTL: sidebar on the right, icons/chevrons mirrored, numbers Western digits, `dir`/`lang` on `<html>` switch.
-- Dark theme: toggle works, no unreadable text in the shell.
-- Keyboard: Tab through shell and search, focus visible; `/` or the spec's shortcut opens search if specified.
-
-Start the UI with `preview_start` name `frontend` (proxies to the backend on :8000). Do not submit forms. Gates: `cd frontend && npx tsc -b; npm run lint; npx vitest run; npm run build` (last 3 lines each).
-
-Deliverable: `.workflow/research/qa-fe1-2026-10-24.md` — findings table (route, lang, width, severity, evidence, file:line if known). Evidence only. End with NEXT: staff-frontend (if findings) | DONE.
+Task: QA the uncommitted frontend: Lane A (Dashboard, Recommendations, Companies, Rankings, Shariah list), Lane C (Watchlists, Alerts, Events, /admin and all its sections), and the FE-2 re-skin to variant A "Cobalt Cards" (`.workflow/design/ui-friendly-direction.md` variant A; spec `.workflow/design/ui-redesign-2026-10.md` §4–6, §9 checks 1–7). Hub tabs are NOT migrated yet (Lane B) — only check the hub shell/header.
+Per page, EN and AR, light and dark, 1280 and 375: renders, no document overflow (`scrollWidth === clientWidth`), no console errors from frontend code, no English left in AR (except tickers/proper nouns/backend free text), Western digits, phone cards < 768 px, focus rings visible on keyboard Tab, contrast plausible. Known items to confirm or clear: AR negative percent uses ASCII hyphen (`fmtPct`); `.table-wrap{position:relative}` stopgap in `pages/shared/fields.css`; Statements tab `source-provisional` style after Companies.css trim; legacy `.card` no shadow; `/api/theses/*` 500 and `/api/companies/overview` ~8 s are backend (dev server runs pre-R43 code/DB) — note once, don't itemize.
+Do not submit forms. Start with `preview_start` name `frontend`; close only your tab; reset viewport. Gates: `cd frontend && npx tsc -b; npm run lint; npx vitest run; npm run build` (last 3 lines each).
+Deliverable: `.workflow/research/qa-ui-lanes-2026-10-24.md` — findings table (route, lang, theme, width, severity, evidence, file:line). End NEXT: staff-frontend (findings) | DONE.

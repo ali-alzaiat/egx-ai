@@ -59,6 +59,8 @@ describe("formatting rules", () => {
   });
   it("percent takes decimals once", () => {
     expect(fmtPct(EN, 0.42)).toBe("42.0%");
+    expect(fmtPct(EN, -0.0525)).toBe("−5.3%");
+    expect(fmtPct(AR, -0.0525)).not.toContain("-");
     expect(fmtSignedPct(EN, 0.631)).toBe("+63.1%");
     expect(fmtSignedPct(EN, -0.143)).toBe("−14.3%");
   });

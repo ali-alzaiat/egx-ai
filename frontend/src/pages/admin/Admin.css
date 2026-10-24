@@ -1,0 +1,14 @@
+/* Layout only: surfaces, radii and type come from the tokens and shared components. */
+.adm-stack { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.adm-narrow { max-width: 420px; }
+.adm-chips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.adm-chip-remove { display: inline-flex; background: transparent; border: 0; color: inherit; padding: 0; }
+.adm-failures { list-style: none; display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-table); }
+.adm-ledger { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.adm-ledger > li { display: flex; flex-direction: column; gap: var(--space-1); }
+.adm-company-cell { display: inline-flex; align-items: center; gap: var(--space-3); }
+.adm-tags, .adm-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.adm-form-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+.adm-line-cell { display: flex; flex-direction: column; white-space: normal; min-width: 6rem; }
+.adm-cell-input { min-width: 5.5rem; margin-inline-start: auto; }
+.adm-cell-input-page { min-width: 3.5rem; }

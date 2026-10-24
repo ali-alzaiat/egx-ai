@@ -1,56 +1,63 @@
 /*
- * Design tokens (ui-redesign-2026-10 section 2). Fonts load from index.html
+ * Design tokens: variant A "Cobalt Cards" (ui-friendly-direction section 5). Fonts load from index.html
  * (<link>), never from a CSS @import.
  */
 
 /* ─── Light theme (default) plus shared tokens ──────────────────────── */
+/* Variant A "Cobalt Cards" (ui-friendly-direction section 5, owner decision R45 U1). */
 :root {
   color-scheme: light;
   /* surfaces */
-  --bg: #f6f6f3; --surface: #ffffff; --surface-2: #efefeb;
-  --border: #dcdcd5; --border-strong: #878a83;
+  --bg: #f4f6fa; --surface: #ffffff; --surface-2: #eaeef5;
+  --border: #dde2ec; --border-strong: #7d8699;
   /* text */
-  --text: #16181b; --text-2: #474b52; --text-3: #62666e;
+  --text: #0f1729; --text-2: #3d4660; --text-3: #5a6480;
   /* brand + state */
-  --accent: #2a4a7f; --accent-bg: #e9eef6; --accent-ink: #ffffff;
-  --gain: #0a7a3e; --gain-bg: #e8f3ec;
-  --loss: #c1272d; --loss-bg: #fbeaea;
-  --warn: #8a5300; --warn-bg: #fbf1e1;
-  --neutral: #5b6068;
+  --accent: #1f4fd1; --accent-bg: #e6edfd; --accent-ink: #ffffff;
+  --gain: #0b7a43; --gain-bg: #e3f4ea;
+  --loss: #c42b33; --loss-bg: #fdeaec;
+  --warn: #8a5300; --warn-bg: #fdf1dc;
+  --neutral: #55607a;
   --focus: var(--accent);
-  --scrim: rgba(22, 24, 27, 0.4);
-  --shadow-pop: 0 4px 16px rgba(22, 24, 27, 0.12);
+  --scrim: rgba(15, 23, 41, 0.4);
+  --shadow-pop: 0 8px 28px rgba(15, 23, 41, 0.16);
+  --shadow-card: 0 1px 2px rgba(15, 23, 41, 0.06), 0 6px 16px rgba(15, 23, 41, 0.06);
+  --card-border: transparent;
   /* chart series (Okabe-Ito, darkened for 3:1 on white) */
   --series-1: #0072b2; --series-2: #9a5b00; --series-3: #8e4a75; --series-4: #6b6f76;
   --chart-grid: var(--border); --chart-axis: var(--text-3); --chart-ref: var(--text-3);
 
   /* type */
-  --font-ui: "IBM Plex Sans", "IBM Plex Sans Arabic", "Noto Sans Arabic", system-ui, sans-serif;
+  --font-ui: "Plus Jakarta Sans", "Cairo", system-ui, sans-serif;
   --font-code: "IBM Plex Mono", ui-monospace, monospace; /* methodology versions/IDs only */
-  --fs-micro: 11px; --lh-micro: 14px;
-  --fs-meta: 12px; --lh-meta: 16px;
-  --fs-table: 13px; --lh-table: 18px;
-  --fs-ui: 14px; --lh-ui: 20px;
-  --fs-read: 16px; --lh-read: 24px;
-  --fs-h3: 16px; --lh-h3: 22px;
-  --fs-h2: 20px; --lh-h2: 28px;
-  --fs-h1: 24px; --lh-h1: 32px;
-  --fs-figure: 28px; --lh-figure: 32px;
-  --tracking-heading: -0.01em;
+  --fs-micro: 12px; --lh-micro: 16px;
+  --fs-meta: 13px; --lh-meta: 18px;
+  --fs-table: 15px; --lh-table: 22px;
+  --fs-ui: 16px; --lh-ui: 24px;
+  --fs-read: 17px; --lh-read: 26px;
+  --fs-h3: 18px; --lh-h3: 26px;
+  --fs-h2: 22px; --lh-h2: 30px;
+  --fs-h1: 28px; --lh-h1: 36px;
+  --fs-figure: 36px; --lh-figure: 40px;
+  --tracking-heading: -0.02em;
 
   /* space (4px grid) */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
-  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
-  --gutter: 24px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+  --gutter: 32px;
 
   /* shape + size */
-  --radius-sm: 4px; /* controls, badges, inputs */
-  --radius-md: 6px; /* panels, table frame, popovers, drawer */
-  --control-h: 32px; --row-h: 32px; --row-h-compact: 28px;
-  --sidebar-w: 224px; --topbar-h: 48px; --content-max: 1440px;
+  --radius-sm: 10px; /* controls, inputs */
+  --radius-md: 16px; /* cards, table frame, popovers, drawer */
+  --radius-lg: 24px; /* hero card, bottom sheet */
+  --radius-pill: 999px;
+  --badge-radius: 8px; --badge-h: 24px; --badge-pad: 0 10px;
+  --control-h: 44px; --row-h: 56px; --row-h-compact: 48px;
+  --card-pad: 20px; --card-gap: 16px;
+  --sidebar-w: 248px; --topbar-h: 56px; --content-max: 1280px;
 
   /* motion + layers */
-  --dur: 120ms; --ease: ease-out;
+  --dur: 150ms; --ease: ease-out;
   --z-sticky: 10; --z-drawer: 40; --z-popover: 50; --z-toast: 60;
 
   /*
@@ -72,45 +79,47 @@
   --font-mono: var(--font-code); --font-sans: var(--font-ui);
 }
 @media (max-width: 767px) {
-  :root { --gutter: 16px; --control-h: 40px; }
+  :root { --gutter: 16px; --card-pad: 16px; }
 }
 
 /* ─── Dark theme (follows the OS; manual override wins) ─────────────── */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0f1012; --surface: #16171a; --surface-2: #1e2024;
-    --border: #2b2d32; --border-strong: #666a73;
-    --text: #e7e8ea; --text-2: #b3b6bc; --text-3: #8e929a;
-    --accent: #9db7e6; --accent-bg: #1c2433; --accent-ink: #0f1012;
-    --gain: #45c07a; --gain-bg: #14261c;
-    --loss: #f07a72; --loss-bg: #2a1716;
-    --warn: #e3a64a; --warn-bg: #2a2112;
-    --neutral: #a3a7ae;
+    --bg: #0b0f19; --surface: #131928; --surface-2: #1b2335;
+    --border: #27304a; --border-strong: #6b7694;
+    --text: #eaeef8; --text-2: #b6bfd6; --text-3: #8c97b3;
+    --accent: #8fb0ff; --accent-bg: #172547; --accent-ink: #0b0f19;
+    --gain: #4ccb86; --gain-bg: #11291d;
+    --loss: #ff8a82; --loss-bg: #331a1c;
+    --warn: #e8b05a; --warn-bg: #2b2112;
+    --neutral: #a5aec6;
     --scrim: rgba(0, 0, 0, 0.6);
-    --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.55);
+    --shadow-card: none; --card-border: var(--border);
     --series-1: #56b4e9; --series-2: #e69f00; --series-3: #cc79a7; --series-4: #9aa0a8;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1012; --surface: #16171a; --surface-2: #1e2024;
-  --border: #2b2d32; --border-strong: #666a73;
-  --text: #e7e8ea; --text-2: #b3b6bc; --text-3: #8e929a;
-  --accent: #9db7e6; --accent-bg: #1c2433; --accent-ink: #0f1012;
-  --gain: #45c07a; --gain-bg: #14261c;
-  --loss: #f07a72; --loss-bg: #2a1716;
-  --warn: #e3a64a; --warn-bg: #2a2112;
-  --neutral: #a3a7ae;
+  --bg: #0b0f19; --surface: #131928; --surface-2: #1b2335;
+  --border: #27304a; --border-strong: #6b7694;
+  --text: #eaeef8; --text-2: #b6bfd6; --text-3: #8c97b3;
+  --accent: #8fb0ff; --accent-bg: #172547; --accent-ink: #0b0f19;
+  --gain: #4ccb86; --gain-bg: #11291d;
+  --loss: #ff8a82; --loss-bg: #331a1c;
+  --warn: #e8b05a; --warn-bg: #2b2112;
+  --neutral: #a5aec6;
   --scrim: rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.55);
+  --shadow-card: none; --card-border: var(--border);
   --series-1: #56b4e9; --series-2: #e69f00; --series-3: #cc79a7; --series-4: #9aa0a8;
 }
 
-/* ─── Arabic overrides ──────────────────────────────────────────────── */
+/* ─── Arabic overrides: line-heights +4px over Latin, sizes unchanged ─ */
 html[lang="ar"] {
-  --font-ui: "IBM Plex Sans Arabic", "IBM Plex Sans", "Noto Sans Arabic", system-ui, sans-serif;
-  --lh-micro: 16px; --lh-meta: 18px; --lh-table: 20px; --lh-ui: 22px; --lh-read: 26px;
-  --lh-h3: 26px; --lh-h2: 32px; --lh-h1: 36px; --lh-figure: 32px;
+  --font-ui: "Cairo", "Plus Jakarta Sans", system-ui, sans-serif;
+  --lh-micro: 20px; --lh-meta: 22px; --lh-table: 26px; --lh-ui: 28px; --lh-read: 30px;
+  --lh-h3: 30px; --lh-h2: 34px; --lh-h1: 40px; --lh-figure: 44px;
   --tracking-heading: 0;
 }
