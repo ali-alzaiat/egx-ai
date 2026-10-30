@@ -1,0 +1,50 @@
+/*
+ * Tailwind for the shadcn components (R48 U1). No preflight: shell.css keeps the reset.
+ * Colours, radii and fonts point at our tokens (tokens.css), so light/dark/Arabic follow
+ * the tokens and Tailwind's own palette is switched off (no stray red-500s).
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@theme {
+  --color-*: initial;
+  --shadow-*: initial;
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-ink);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-3);
+  /* shadcn's "accent" is the subtle hover fill, not our brand accent */
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--loss);
+  --color-border: var(--border);
+  --color-input: var(--border-strong);
+  --color-ring: var(--focus);
+  --color-gain: var(--gain);
+  --color-gain-bg: var(--gain-bg);
+  --color-loss: var(--loss);
+  --color-loss-bg: var(--loss-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-brand-bg: var(--accent-bg);
+  --color-text-2: var(--text-2);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --shadow-pop: var(--shadow-pop);
+  --shadow-card: var(--shadow-card);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-code);
+}

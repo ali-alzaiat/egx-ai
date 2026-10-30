@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Direction } from "radix-ui";
 import { t, type CopyKey, type CopyParams, type Lang } from "./dict";
 
 type LangContextValue = {
@@ -56,7 +57,12 @@ export function LangProvider({ children }: { children: ReactNode }) {
     [lang, setLang],
   );
 
-  return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
+  // Radix (shadcn) menus, tabs and toggles read their direction from this provider.
+  return (
+    <LangContext.Provider value={value}>
+      <Direction.Provider dir={lang === "ar" ? "rtl" : "ltr"}>{children}</Direction.Provider>
+    </LangContext.Provider>
+  );
 }
 
 export function useLang(): LangContextValue {
