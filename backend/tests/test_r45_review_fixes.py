@@ -57,30 +57,26 @@ D = Decimal
 
 class TestPercentRounding:
     def test_margins_keep_two_decimals(self) -> None:
-        # SWDY FY2025 (vendor): [removed] / [removed] = 5.4286 %
-        assert calculate_net_margin(D("[removed]"), D("[removed]")).value == D("5.43")
-        assert calculate_gross_margin(D("[removed]"), D("[removed]")).value == D("14.50")
-        assert calculate_operating_margin(D("[removed]"), D("[removed]")).value == D("8.97")
+        # 54,286 / 1,000,000 = 5.4286 % -> 5.43
+        assert calculate_net_margin(D("54286"), D("1000000")).value == D("5.43")
+        assert calculate_gross_margin(D("145036"), D("1000000")).value == D("14.50")
+        assert calculate_operating_margin(D("89690"), D("1000000")).value == D("8.97")
 
     def test_fcf_margin_keeps_two_decimals(self) -> None:
-        # ([removed] - [removed]) / [removed] = 0.8341 %
-        result = calculate_free_cash_flow_margin(
-            D("[removed]"), D("[removed]"), D("[removed]")
-        )
+        # (20,000 - 11,659) / 1,000,000 = 0.8341 %
+        result = calculate_free_cash_flow_margin(D("20000"), D("11659"), D("1000000"))
         assert result.value == D("0.83")
 
     def test_growth_keeps_two_decimals(self) -> None:
         assert calculate_revenue_growth_yoy(D("200"), D("190")).value == D("5.26")
-        assert calculate_net_income_growth_yoy(D("[removed]"), D("[removed]")).value == D("12.01")
+        assert calculate_net_income_growth_yoy(D("1120146"), D("1000000")).value == D("12.01")
         assert calculate_eps_growth_yoy(D("2"), D("1.6")).value == D("25.00")
 
     def test_roa_roe_use_average_and_two_decimals(self) -> None:
-        # COMI FY2025 (vendor): ROA [removed] / avg([removed]bn; [removed]bn) = 4.6386 %
-        roa = calculate_roa(
-            D("[removed]"), D("[removed]"), D("[removed]")
-        )
+        # 46,386 / avg(1,100,000; 900,000) = 4.6386 % -> 4.64
+        roa = calculate_roa(D("46386"), D("1100000"), D("900000"))
         assert roa.value == D("4.64")
-        roe = calculate_roe(D("[removed]"), D("[removed]"), D("[removed]"))
+        roe = calculate_roe(D("320909"), D("1200000"), D("800000"))
         assert roe.value == D("32.09")
         assert calculate_roa(D("200"), D("2000"), D("1800")).value == D("10.53")
 

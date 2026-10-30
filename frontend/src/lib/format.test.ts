@@ -67,9 +67,9 @@ describe("formatting rules", () => {
   it("ratios, integers and millions", () => {
     expect(fmtRatio(EN, 1.1823)).toBe("1.18");
     expect(fmtInt(EN, 4461086)).toBe("4,461,086");
-    expect(fmtEgpMillions(EN, [removed])).toBe("[removed]");
-    expect(fmtEgpMillions(EN, -[removed])).toBe("−[removed]");
-    expect(fmtEgpMillions(AR, -[removed])).toBe("−[removed]");
+    expect(fmtEgpMillions(EN, 123456789000)).toBe("123,456.8");
+    expect(fmtEgpMillions(EN, -1234567000)).toBe("−1,234.6");
+    expect(fmtEgpMillions(AR, -1234567000)).toBe("−1,234.6");
     expect(fmtInt(EN, -1500)).toBe("−1,500");
   });
   it("compact EGP in both languages with Western digits", () => {

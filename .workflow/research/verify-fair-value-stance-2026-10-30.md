@@ -8,7 +8,7 @@ Scope: all 234 companies via the running API (valuation 1.2, signal-rules-2.0), 
 - Inputs: app FCF equals the vendor file `fcf` (ncfo + capex) for the same period in 91/91. Share counts are period-end common shares (e.g. CCAP 4.23bn after its 2025 capital increase), not weighted averages.
 
 ## Not reliable (methodology / coverage)
-1. Single-year FCF base. Fair value / price median 0.37; 35 of 84 below 0.25 (AMES 0.04 vs 31.86: FCF [removed] = OCF [removed] - capex [removed]). One lumpy capex year sets the whole valuation.
+1. Single-year FCF base. Fair value / price median 0.37; 35 of 84 below 0.25 (AMES: one year's capex almost equalled its operating cash flow, leaving a near-zero FCF). One lumpy capex year sets the whole valuation.
 2. "FCFE" is OCF - capex with no net borrowing; consolidated, so minority interests' share is included. Overstates indebted groups (CCAP 6.6x price).
 3. One profile for everyone: all 234 on `default` (sector is null everywhere), so banks get FCFE (COMI INVALID: negative FCF).
 4. Relative (P/E) leg: 234/234 INSUFFICIENT_DATA (no sourced target multiples). DDM: 234/234 (no DPS). Fair value = FCFE alone.

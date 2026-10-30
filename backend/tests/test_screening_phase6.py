@@ -151,13 +151,13 @@ class TestDividendPurification:
         assert "at least" not in PARTIAL_ESTIMATE_REASON.lower()
 
     def test_ratio_above_one_is_insufficient_with_reason(self) -> None:
-        """Bank gross interest income over net revenue (COMI FY2025: 1.648)."""
+        """Bank gross interest income over net revenue can exceed 1 (here 1.648)."""
         est = estimate_dividend_purification(
             ticker="COMI",
             is_compliant=None,
             dividend_egp=Decimal("100"),
-            non_permissible_revenue=Decimal("[removed]"),
-            total_revenue=Decimal("[removed]"),
+            non_permissible_revenue=Decimal("1648"),
+            total_revenue=Decimal("1000"),
             ratio_is_partial=True,
         )
         assert est.status == PurificationStatus.INSUFFICIENT_DATA
