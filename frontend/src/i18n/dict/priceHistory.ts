@@ -22,8 +22,8 @@ export const PRICE_HISTORY_COPY = {
   pxf_mode_line: { en: "Line", ar: "خط" },
   pxf_mode_candles: { en: "Candles", ar: "شموع" },
   pxf_zoom_hint: {
-    en: "Drag to pan; scroll or pinch to zoom; double-click an axis to reset.",
-    ar: "اسحب للتحريك؛ مرّر العجلة أو اقرص للتكبير؛ انقر نقرًا مزدوجًا على أحد المحورين لإعادة الضبط.",
+    en: "Drag to pan; Ctrl or Cmd + scroll, or pinch, to zoom; double-click an axis to reset.",
+    ar: "اسحب للتحريك؛ اضغط Ctrl أو Cmd مع تمرير العجلة، أو اقرص، للتكبير؛ انقر نقرًا مزدوجًا على أحد المحورين لإعادة الضبط.",
   },
 
   // ---- Day: last session summary ----

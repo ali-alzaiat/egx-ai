@@ -11,9 +11,14 @@ import {
   patternInView,
   patternOverlay,
   patternValues,
+  trimLine,
   priceExtent,
   rangeStart,
   sliceRange,
+  sliceRangePadded,
+  coneHorizonDays,
+  zoomSpan,
+  wheelZoomFactor,
   tickLabel,
   tickUnitFor,
   timeToIso,
@@ -235,7 +240,20 @@ describe("pattern overlays", () => {
     expect(patternInView({ ...shape, confirmationDate: "2026-09-01" }, history)).toBe(false);
     expect(patternInView(shape, [])).toBe(false);
   });
-  it("includes points, lines, break level and target in the price scale values", () => {
+  it("trims a line to the price band of the shape's key points", () => {
+    // Upper boundary projected back far above the points: it starts where it enters the band.
+    const line = { start: { date: "2026-06-08", price: 150 }, end: { date: "2026-07-07", price: 130 } };
+    const trimmed = trimLine(line, shape.points, history);
+    expect(trimmed).not.toBeNull();
+    expect(trimmed!.start.price).toBeLessThanOrEqual(136.7);
+    expect(trimmed!.start.date > "2026-06-08").toBe(true);
+    expect(trimmed!.end).toEqual(line.end);
+    // A flat neckline inside the band is untouched; one outside it is dropped.
+    expect(trimLine(shape.lines[0]!, shape.points, history)).toEqual(shape.lines[0]);
+    expect(trimLine({ start: { date: "2026-06-08", price: 160 }, end: { date: "2026-07-07", price: 160 } }, shape.points, history)).toBeNull();
+    expect(patternValues({ ...shape, lines: [line] })).not.toContain(150);
+  });
+  it("includes points, break level and target in the price scale values", () => {
     expect(patternValues(shape)).toEqual(expect.arrayContaining([130.1, 126.89, 136.7, 144.9]));
     expect(patternValues({ ...shape, target: null })).not.toContain(144.9);
   });
@@ -274,5 +292,60 @@ describe("pattern overlays", () => {
     ]);
     const oneSided = patternOverlay({ ...forming, forming: { above: 140, below: null } }, history);
     expect(oneSided.levels.map((l) => l.side)).toEqual(["above"]);
+  });
+});
+
+describe("history padded to the cone horizon", () => {
+  const daily: ChartBar[] = Array.from({ length: 200 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 0, 1) + i * 86400000);
+    return { date: d.toISOString().slice(0, 10), close: 100 + i };
+  });
+  it("keeps the range when it already has enough bars", () => {
+    expect(sliceRangePadded(daily, "3M", 20)).toEqual(sliceRange(daily, "3M"));
+  });
+  it("adds earlier bars so a short range is at least as long as the horizon", () => {
+    const padded = sliceRangePadded(daily, "1W", 126);
+    expect(padded).toHaveLength(126);
+    expect(padded[padded.length - 1]).toBe(daily[daily.length - 1]);
+    expect(padded.length).toBeGreaterThan(sliceRange(daily, "1W").length);
+  });
+  it("uses every bar when fewer exist, and no padding for no horizon", () => {
+    expect(sliceRangePadded(daily, "1W", 500)).toHaveLength(200);
+    expect(sliceRangePadded(daily, "1W", 0)).toEqual(sliceRange(daily, "1W"));
+    expect(sliceRangePadded([], "1W", 126)).toEqual([]);
+  });
+  it("reads the longest horizon of a cone", () => {
+    expect(coneHorizonDays({ lastClose: 1, levels: [{ days: 21, p05: 1, p25: 1, p75: 1, p95: 1 }, { days: 126, p05: 1, p25: 1, p75: 1, p95: 1 }] })).toBe(126);
+    expect(coneHorizonDays({ lastClose: 1, levels: [] })).toBe(0);
+  });
+});
+
+describe("wheel zoom", () => {
+  it("zooms in about the anchor, keeping it fixed", () => {
+    const out = zoomSpan({ from: 0, to: 100 }, 0.5, 0.5, 5, 1000);
+    expect(out).toEqual({ from: 25, to: 75 });
+    const left = zoomSpan({ from: 0, to: 100 }, 0.5, 0, 5, 1000);
+    expect(left).toEqual({ from: 0, to: 50 });
+    const right = zoomSpan({ from: 0, to: 100 }, 0.5, 1, 5, 1000);
+    expect(right).toEqual({ from: 50, to: 100 });
+  });
+  it("keeps the span between the limits", () => {
+    expect(zoomSpan({ from: 0, to: 10 }, 0.1, 0.5, 5, 100).to - 0).toBeGreaterThan(0);
+    const tight = zoomSpan({ from: 0, to: 10 }, 0.01, 0.5, 5, 100);
+    expect(tight.to - tight.from).toBe(5);
+    const wide = zoomSpan({ from: 0, to: 90 }, 5, 0.5, 5, 100);
+    expect(wide.to - wide.from).toBe(100);
+  });
+  it("ignores a bad factor or an empty span", () => {
+    const span = { from: 0, to: 10 };
+    expect(zoomSpan(span, 0, 0.5, 1, 100)).toBe(span);
+    expect(zoomSpan(span, Number.NaN, 0.5, 1, 100)).toBe(span);
+    expect(zoomSpan({ from: 5, to: 5 }, 0.5, 0.5, 1, 100)).toEqual({ from: 5, to: 5 });
+  });
+  it("zooms in when scrolling up and out when scrolling down", () => {
+    expect(wheelZoomFactor(-100)).toBeLessThan(1);
+    expect(wheelZoomFactor(100)).toBeGreaterThan(1);
+    expect(wheelZoomFactor(0)).toBe(1);
+    expect(wheelZoomFactor(1e6)).toBe(wheelZoomFactor(200));
   });
 });

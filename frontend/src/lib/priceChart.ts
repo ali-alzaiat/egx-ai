@@ -54,6 +54,48 @@ export function sliceRange(bars: readonly ChartBar[], range: ChartRange): ChartB
   return inRange.length >= 2 ? inRange : bars.slice(-2);
 }
 
+/**
+ * Bars for `range`, padded with earlier bars so at least `minBars` are shown (all there are, if fewer).
+ * With the forecast on, `minBars` is the cone's horizon in sessions: the history never looks shorter
+ * than the forecast beside it, so Week and Month stay readable.
+ */
+export function sliceRangePadded(bars: readonly ChartBar[], range: ChartRange, minBars: number): ChartBar[] {
+  const inRange = sliceRange(bars, range);
+  const want = Math.max(0, Math.floor(minBars));
+  return inRange.length >= want ? inRange : bars.slice(-Math.min(bars.length, want));
+}
+
+/** The cone's longest horizon in sessions (0 without horizons). */
+export function coneHorizonDays(cone: ConeShape): number {
+  const days = cone.levels.map((l) => (Number.isFinite(l.days) ? Math.round(l.days) : 0));
+  return Math.max(0, ...days);
+}
+
+/** A visible logical (bar-index) range. */
+export interface BarSpan {
+  from: number;
+  to: number;
+}
+
+/**
+ * Zoom a visible span about the point at `anchorRatio` (0 left edge, 1 right edge) of the plot.
+ * `factor` below 1 zooms in, above 1 out; the span stays between `minSpan` and `maxSpan` bars.
+ */
+export function zoomSpan(span: BarSpan, factor: number, anchorRatio: number, minSpan: number, maxSpan: number): BarSpan {
+  const width = span.to - span.from;
+  if (!(width > 0) || !Number.isFinite(factor) || factor <= 0) return span;
+  const ratio = Math.min(1, Math.max(0, anchorRatio));
+  const next = Math.min(Math.max(width * factor, Math.min(minSpan, maxSpan)), maxSpan);
+  const anchor = span.from + width * ratio;
+  const from = anchor - next * ratio;
+  return { from, to: from + next };
+}
+
+/** Zoom factor for a wheel step: scrolling up (negative `deltaY`) zooms in. */
+export function wheelZoomFactor(deltaY: number): number {
+  return Math.exp(Math.max(-200, Math.min(200, deltaY)) * 0.0025);
+}
+
 // ---- Series data: one point per bar, the time being the ISO date (a lightweight-charts business day) ----
 
 export interface LinePoint {
@@ -274,9 +316,9 @@ export function patternInView(shape: PatternShape, bars: readonly ChartBar[]): b
 
 /** Every price a pattern reaches (points, lines, break level, target), for the price scale. */
 export function patternValues(shape: PatternShape): number[] {
+  // Lines are drawn trimmed to the points' price band (trimLine), so they never widen the scale.
   return [
     ...shape.points.map((p) => p.price),
-    ...shape.lines.flatMap((l) => [l.start.price, l.end.price]),
     ...(shape.forming ? [] : [shape.breakLevel]),
     ...(shape.target === null ? [] : [shape.target]),
     ...(shape.forming?.above != null ? [shape.forming.above] : []),
@@ -308,6 +350,36 @@ export interface PatternOverlay {
   levels: { startDate: string; endDate: string; price: number; side: "above" | "below" }[];
 }
 
+type DatedLine = { start: DatedPrice; end: DatedPrice };
+
+/**
+ * Cuts a pattern line to the price band of the shape's own key points (R48 owner ruling): a fitted
+ * boundary can otherwise run far above or below the shape, e.g. a triangle's upper line projected back
+ * to its first trough. The line stays straight in bar-index space; null when no part of it is in the band.
+ */
+export function trimLine(line: DatedLine, points: readonly DatedPrice[], bars: readonly ChartBar[]): DatedLine | null {
+  if (points.length === 0) return line;
+  const lo = Math.min(...points.map((p) => p.price));
+  const hi = Math.max(...points.map((p) => p.price));
+  const i0 = dateIndex(bars, line.start.date);
+  const i1 = dateIndex(bars, line.end.date);
+  const p0 = line.start.price;
+  const p1 = line.end.price;
+  if (p0 === p1) return p0 >= lo && p0 <= hi ? line : null;
+  const ta = (lo - p0) / (p1 - p0);
+  const tb = (hi - p0) / (p1 - p0);
+  const from = Math.max(0, Math.min(ta, tb));
+  const to = Math.min(1, Math.max(ta, tb));
+  if (from > to) return null;
+  if (i1 <= i0) return line;
+  // Round inwards to whole bars so both ends stay inside the band.
+  const a = Math.ceil(i0 + (i1 - i0) * from - 1e-9);
+  const b = Math.floor(i0 + (i1 - i0) * to + 1e-9);
+  if (a > b) return null;
+  const at = (i: number): DatedPrice => ({ date: bars[i]!.date, price: p0 + ((p1 - p0) * (i - i0)) / (i1 - i0) });
+  return { start: at(a), end: at(b) };
+}
+
 /**
  * A pattern in (date, price) space over `bars`: every date is moved to the first bar on or after it,
  * so each point sits on a bar of the time axis.
@@ -323,7 +395,7 @@ export function patternOverlay(shape: PatternShape, bars: readonly ChartBar[]): 
     forming: !!shape.forming,
     outline: points,
     points,
-    lines: shape.lines.map((l) => ({ start: at(l.start), end: at(l.end) })),
+    lines: shape.lines.flatMap((l) => trimLine({ start: at(l.start), end: at(l.end) }, points, bars) ?? []),
     breakMark: shape.forming ? null : { date: confirmDate, price: shape.breakLevel },
     target: shape.target === null ? null : { startDate: snap(shape.startDate), endDate: confirmDate, price: shape.target },
     levels: formingLevels(shape).map((l) => ({

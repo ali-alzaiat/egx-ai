@@ -22,7 +22,10 @@ import {
   patternOverlay,
   patternValues,
   priceExtent,
-  sliceRange,
+  coneHorizonDays,
+  sliceRangePadded,
+  wheelZoomFactor,
+  zoomSpan,
   tickLabel,
   tickUnitFor,
   timeToIso,
@@ -65,6 +68,9 @@ function chartOptions(p: ChartPalette, locale: string, withCone: boolean): Chart
       // TradingView licence: keep the attribution logo.
       attributionLogo: true,
     },
+    // A plain wheel scrolls the page; Ctrl / Cmd + wheel zooms (see the wheel listener below).
+    handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+    handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
     grid: { vertLines: { visible: false }, horzLines: { color: p.grid } },
     crosshair: {
       mode: CrosshairMode.Normal,
@@ -104,6 +110,10 @@ interface Hover {
   width: number;
 }
 
+/** Plot height while patterns or the cone are drawn. */
+const OVERLAY_HEIGHT = 360;
+const OVERLAY_HEIGHT_PHONE = 280;
+
 function ChartCanvas({
   shown,
   refLines,
@@ -131,6 +141,7 @@ function ChartCanvas({
   const overlayRef = useRef<OverlayPrimitive | null>(null);
   const barsByDate = useRef<ReadonlyMap<string, ChartBar>>(new Map());
   const keepView = useRef<LogicalRange | null>(null);
+  const pointCount = useRef(0);
   const drawnData = useRef<{ shown: readonly ChartBar[]; futureDates: readonly string[] | undefined } | null>(null);
   const [hover, setHover] = useState<Hover | null>(null);
 
@@ -202,7 +213,21 @@ function ChartCanvas({
       const next: Hover = { date: bar.date, x, y, width: host.clientWidth };
       setHover((prev) => (prev && prev.date === next.date && prev.x === next.x && prev.width === next.width ? prev : next));
     });
+    // Ctrl / Cmd + wheel (a trackpad pinch arrives the same way) zooms about the pointer.
+    const onWheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const scale = chart.timeScale();
+      const span = scale.getVisibleLogicalRange();
+      const width = host.clientWidth;
+      if (!span || width <= 0) return;
+      const left = host.getBoundingClientRect().left;
+      const next = zoomSpan(span, wheelZoomFactor(e.deltaY), (e.clientX - left) / width, 5, Math.max(5, pointCount.current + 2));
+      scale.setVisibleLogicalRange(next as typeof span);
+    };
+    host.addEventListener("wheel", onWheel, { passive: false });
     return () => {
+      host.removeEventListener("wheel", onWheel);
       chartRef.current = null;
       drawnRef.current = null;
       overlayRef.current = null;
@@ -272,6 +297,7 @@ function ChartCanvas({
       drawn.series.setData([...lineData(shown), ...gaps]);
     }
     barsByDate.current = byDate;
+    pointCount.current = shown.length + gaps.length;
     // Switching line / candles keeps the user's zoom and pan; new bars or a new cone fit the view again.
     const sameData = drawnData.current?.shown === shown && drawnData.current.futureDates === futureDates;
     if (keepView.current && sameData) chart.timeScale().setVisibleLogicalRange(keepView.current);
@@ -363,7 +389,7 @@ function ChartCanvas({
 
 /**
  * Daily price chart (spec 3.10) on lightweight-charts: a close line or candlesticks, drag to pan and
- * wheel / pinch to zoom. Time always runs left to right, also in Arabic (a time axis on a price
+ * Ctrl/Cmd + wheel or pinch to zoom (a plain wheel scrolls the page). Time always runs left to right, also in Arabic (a time axis on a price
  * chart keeps its direction). Hover or Left/Right keys show a crosshair and the day's figures.
  * Optional overlays, both display only: a volatility cone on the real trading days after the last
  * close, and chart patterns (confirmed or still forming) over the history.
@@ -400,7 +426,9 @@ export default function PriceChart({
 }) {
   const { t, locale } = useLang();
   const phone = useMediaQuery("(max-width: 767px)");
-  const shown = useMemo(() => sliceRange(bars, range), [bars, range]);
+  // With the forecast on, pad the history to at least the cone's horizon so short ranges stay readable.
+  const minBars = cone ? coneHorizonDays(cone) : 0;
+  const shown = useMemo(() => sliceRangePadded(bars, range, minBars), [bars, range, minBars]);
   const lastBar = shown[shown.length - 1];
 
   if (shown.length < 2 || !lastBar) {
@@ -412,13 +440,16 @@ export default function PriceChart({
   }
 
   const asOf = fmtDate(locale, lastBar.date);
+  // Patterns and the cone widen the price scale, so the chart grows while either is drawn (R48 ruling).
+  const overlaid = cone !== null || patterns.length > 0;
+  const plotHeight = overlaid ? Math.max(height, phone ? OVERLAY_HEIGHT_PHONE : OVERLAY_HEIGHT) : phone ? Math.min(height, 200) : height;
   return (
     <figure className="price-chart">
       <ChartCanvas
         shown={shown}
         refLines={refLines}
         range={range}
-        height={phone ? Math.min(height, 200) : height}
+        height={plotHeight}
         mode={mode}
         cone={cone}
         patterns={patterns}
