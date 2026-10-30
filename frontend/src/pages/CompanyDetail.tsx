@@ -1,19 +1,17 @@
 import "../components/hub/hubPages.css";
 
-import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useCompanyByTicker, useDataQuality, useFairValue, useStance } from "../api/client";
+import PriceHistory from "../components/hub/PriceHistory";
 import { fiftyTwoWeekRange, useYearPrices } from "../components/hub/priceData";
 import { ReasonMissing } from "../components/hub/Reason";
 import SectionLink from "../components/hub/SectionLink";
 import { Egx33Note, ShariahBadge, StanceBadge, Tag } from "../components/ui/Badges";
 import { BackendText } from "../components/ui/BackendText";
 import { Missing } from "../components/ui/Missing";
-import PriceChart from "../components/ui/PriceChart";
 import { StatStrip, type StatItem } from "../components/ui/StatStrip";
 import { useLang } from "../i18n/useLang";
 import { fmtDate, fmtEgpCompact, fmtInt, fmtPct, fmtPrice, toNumber } from "../lib/format";
-import type { ChartRange } from "../lib/priceChart";
 import { visibleReasons } from "../lib/stanceModel";
 import type { Company, ComputeMeta, DataQualityScore } from "../types";
 
@@ -75,16 +73,15 @@ function Profile({ company }: { company: Company }) {
   );
 }
 
-/** Hub Overview (spec 4.4.1): day stats, 1Y chart, at a glance, data quality, profile. Read-only. */
+/** Hub Overview (spec 4.4.1): day stats, price history (Day to 5Y with forecast and patterns), at a glance, data quality, profile. Read-only. */
 export default function CompanyDetail() {
   const { ticker = "" } = useParams<{ ticker: string }>();
   const { t, locale } = useLang();
   const { data: company } = useCompanyByTicker(ticker);
-  const { query, bars, series, latest, source } = useYearPrices(company?.id);
+  const { query, bars, latest } = useYearPrices(company?.id);
   const stance = useStance(ticker);
   const fairValue = useFairValue(company?.id);
   const quality = useDataQuality(company?.id);
-  const [range, setRange] = useState<ChartRange>("1Y");
 
   if (!company) return null;
 
@@ -128,7 +125,7 @@ export default function CompanyDetail() {
       <StatStrip items={items} label={t("ov_stats_aria")} />
 
       <section className="card-surface" aria-label={t("ov_chart_aria")}>
-        <PriceChart bars={series} range={range} onRangeChange={setRange} source={source} />
+        <PriceHistory companyId={company.id} />
       </section>
 
       <section>

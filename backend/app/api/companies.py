@@ -2,16 +2,18 @@ import logging
 import math
 import uuid
 from datetime import date
-from typing import Any
+from decimal import Decimal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.market import CompanyStatus
+from app.models.market import Company, CompanyStatus, DailyPrice
 from app.repositories.company import CompanyRepository
 from app.repositories.price import PriceRepository
 from app.schemas.company import CompanyRead
+from app.statements.freshness import fundamentals_freshness
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +28,18 @@ async def list_companies(
     industry: str | None = Query(None),
     status: CompanyStatus | None = Query(None),
     search: str | None = Query(None),
+    forming: Literal["any", "up", "down"] | None = Query(
+        None, description="Only companies with a chart shape forming now (R47 P7)"
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
+    ids: list[uuid.UUID] | None = None
+    if forming is not None:
+        from app.technical.pattern_backtest import forming_by_company
+        from app.technical.patterns import forming_matches
+
+        shapes = await forming_by_company(session)
+        ids = [cid for cid, found in shapes.items() if forming_matches(found, forming)]
     repo = CompanyRepository(session)
     companies, total = await repo.list_companies(
         page=page,
@@ -36,6 +48,7 @@ async def list_companies(
         industry=industry,
         status=status,
         search=search,
+        ids=ids,
     )
     return {
         "items": [CompanyRead.model_validate(c).model_dump() for c in companies],
@@ -47,11 +60,14 @@ async def list_companies(
 
 
 MAX_OVERVIEW_TICKERS = 50
+#: One request covers five years of daily bars (about 1,250 sessions).
+MAX_PRICES_PAGE_SIZE = 2000
 
 
 @router.get("/overview")
 async def companies_overview(
     tickers: str = Query(..., description="Comma-separated tickers (at most 50)"),
+    forming: bool = Query(False, description="Add the shapes forming now (R47 P7)"),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """Everything one Companies-table page needs, in one request.
@@ -76,6 +92,11 @@ async def companies_overview(
     shariah = await shariah_statuses(session, [c.id for c in companies])
     stance_service = StanceService(session)
     statements = StatementService(session)
+    forming_shapes = None
+    if forming:
+        from app.technical.pattern_backtest import forming_by_company
+
+        forming_shapes = await forming_by_company(session)
 
     items: dict[str, dict[str, Any]] = {}
     for company in companies:
@@ -109,11 +130,24 @@ async def companies_overview(
                 else None
             ),
         }
+        if forming_shapes is not None:
+            from app.technical.patterns import forming_summary
+
+            items[company.ticker]["forming"] = [
+                forming_summary(f) for f in forming_shapes.get(company.id, [])
+            ]
     return {
         "items": items,
         "missing": [t for t in wanted if t not in items],
         "price_date": price_date.isoformat() if price_date else None,
     }
+
+
+async def _company_payload(session: AsyncSession, company: Company) -> dict[str, Any]:
+    """Company record plus the freshness of its fundamentals (R47 Q3)."""
+    payload = CompanyRead.model_validate(company).model_dump()
+    payload["fundamentals"] = await fundamentals_freshness(session, company.id)
+    return payload
 
 
 @router.get("/{company_id}")
@@ -125,7 +159,7 @@ async def get_company(
     company = await repo.get_by_id(company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    return CompanyRead.model_validate(company).model_dump()
+    return await _company_payload(session, company)
 
 
 @router.get("/ticker/{ticker}")
@@ -137,7 +171,7 @@ async def get_company_by_ticker(
     company = await repo.get_by_ticker(ticker.upper())
     if not company:
         raise HTTPException(status_code=404, detail=f"Company '{ticker}' not found")
-    return CompanyRead.model_validate(company).model_dump()
+    return await _company_payload(session, company)
 
 
 @router.get("/{company_id}/prices")
@@ -146,7 +180,7 @@ async def get_company_prices(
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(200, ge=1, le=1000),
+    page_size: int = Query(200, ge=1, le=MAX_PRICES_PAGE_SIZE),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     company_repo = CompanyRepository(session)
@@ -203,7 +237,9 @@ async def get_latest_price(
         raise HTTPException(status_code=404, detail="Company not found")
 
     price_repo = PriceRepository(session)
-    price = await price_repo.get_latest(company_id)
+    last_two = await price_repo.get_last(company_id, 2)
+    price = last_two[0] if last_two else None
+    previous = last_two[1] if len(last_two) > 1 else None
     if not price:
         # A known company with no stored prices is missing data, not a missing
         # resource: answer 200 with the reason (AGENTS rule 2).
@@ -217,6 +253,7 @@ async def get_latest_price(
 
     return {
         "status": "AVAILABLE",
+        **session_change(price, previous),
         "id": str(price.id),
         "company_id": str(price.company_id),
         "date": price.date.isoformat(),
@@ -230,4 +267,35 @@ async def get_latest_price(
         "trades": price.trades,
         "source_id": str(price.source_id),
         "created_at": price.created_at.isoformat(),
+    }
+
+
+def session_change(price: DailyPrice, previous: DailyPrice | None) -> dict[str, Any]:
+    """Change against the previous stored session (R47 P1); null with a reason when unknown.
+
+    ``previous_date`` is shown so a gap in stored history is visible, never assumed away.
+    """
+    if previous is None:
+        return {
+            "previous_close": None,
+            "previous_date": None,
+            "change": None,
+            "change_pct": None,
+            "change_reason": "No earlier stored session to compare with",
+        }
+    change = price.close - previous.close
+    if previous.close <= 0:
+        return {
+            "previous_close": str(previous.close),
+            "previous_date": previous.date.isoformat(),
+            "change": str(change),
+            "change_pct": None,
+            "change_reason": "Previous close is not positive: percentage change undefined",
+        }
+    return {
+        "previous_close": str(previous.close),
+        "previous_date": previous.date.isoformat(),
+        "change": str(change),
+        "change_pct": str((change / previous.close * 100).quantize(Decimal("0.01"))),
+        "change_reason": None,
     }

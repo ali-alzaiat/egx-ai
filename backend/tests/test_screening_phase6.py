@@ -295,8 +295,9 @@ async def _make_line_backed_company(
     published: date | None = None,
     extra: dict[str, Decimal] | None = None,
     industry: str = "Software",
+    sector: str | None = None,
 ) -> Company:
-    company = await make_company(db_session, industry=industry)
+    company = await make_company(db_session, industry=industry, sector=sector)
     values = {
         "interest_bearing_debt": Decimal("10"),
         "total_assets": Decimal("100"),
@@ -320,13 +321,13 @@ class TestScreeningProvenanceApi:
         assert body["engine"] == "statement_lines"
         assert body["compute_status"] == "ok"
         # No statement lines: report_date unknown with reason; every ratio rule
-        # names its missing statement lines; industry rule cites the company record.
+        # names its missing statement lines; industry rule cites the activity tags.
         assert body["report_date"] is None
         assert body["report_date_reason"] is not None
         rules = {r["rule_name"]: r for r in body["rule_results"]}
         assert rules["debt_ratio"]["missing_input"] == "interest_bearing_debt, total_assets"
         assert rules["debt_ratio"]["source"] is None
-        assert rules["industry_screen"]["source"] == "company record"
+        assert rules["industry_screen"]["source"].startswith("activity tags 1.0: ")
 
     async def test_filing_lines_report_publication_date(
         self, client: AsyncClient, db_session: AsyncSession
@@ -450,7 +451,7 @@ class TestPurificationApi:
     ) -> None:
         company = await _make_line_backed_company(
             db_session,
-            industry="Alcohol Production",
+            sector="Banks",  # conventional-banking activity tag: industry rule FAILs
             extra={"dividends_paid": Decimal("-50"), "shares_outstanding": Decimal("100")},
         )
         body = (
@@ -496,8 +497,8 @@ class TestEgxMembershipApi:
             ticker=f"EGX_{uuid.uuid4().hex[:8].upper()}",
             isin=f"EG{uuid.uuid4().hex[:10].upper()}",
             name="EGX33 Name",
-            sector="Beverages",
-            industry="Alcohol Production",
+            sector="Banks",  # conventional-banking activity tag (no Islamic override)
+            industry=None,
             currency="EGP",
             status=CompanyStatus.ACTIVE,
         )

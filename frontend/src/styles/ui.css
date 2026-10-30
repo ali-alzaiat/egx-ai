@@ -19,6 +19,7 @@
   .page-header h1, .page-header h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); }
 }
 .page-header p, .subtitle { color: var(--text-2); font-size: var(--fs-ui); }
+.page-header .page-header-asof { color: var(--text-3); font-size: var(--fs-meta); }
 .page-header-actions { display: flex; gap: var(--space-2); align-items: center; }
 .page { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 .section-title { font-size: var(--fs-h3); line-height: var(--lh-h3); margin-bottom: var(--space-3); }
@@ -265,3 +266,4 @@ a.stock-ticker:hover { text-decoration: underline; }
 .subnav .tab-link:hover { background: var(--surface-2); }
 .subnav .tab-link[aria-current="page"] { background: var(--accent-bg); color: var(--accent); }
 .admin-picker { max-width: 420px; margin-bottom: var(--space-4); }
+.forming-cell { display: flex; flex-direction: column; gap: var(--space-1); white-space: normal; overflow-wrap: anywhere; }

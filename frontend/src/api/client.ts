@@ -36,6 +36,7 @@ import type {
   StanceResult,
   StanceRadarResponse,
   CompaniesOverviewResponse,
+  FormingFilter,
   IntakeResponse,
   ManualFilingRequest,
   ManualFilingResponse,
@@ -63,6 +64,7 @@ export function useCompanies(params: {
   sector?: string;
   status?: string;
   search?: string;
+  forming?: FormingFilter;
 }) {
   const searchParams = new URLSearchParams();
   if (params.page) searchParams.set("page", String(params.page));
@@ -70,6 +72,7 @@ export function useCompanies(params: {
   if (params.sector) searchParams.set("sector", params.sector);
   if (params.status) searchParams.set("status", params.status);
   if (params.search) searchParams.set("search", params.search);
+  if (params.forming) searchParams.set("forming", params.forming);
   const qs = searchParams.toString();
   return useQuery({
     queryKey: ["companies", params],
@@ -853,12 +856,15 @@ export async function recordManualFiling(
   return res.json();
 }
 
-export function useCompaniesOverview(tickers: string[]) {
+/** `forming` adds the shapes forming now to each row (R47 P7). */
+export function useCompaniesOverview(tickers: string[], forming = false) {
   const key = tickers.join(",");
   return useQuery({
-    queryKey: ["companiesOverview", key],
+    queryKey: ["companiesOverview", key, forming],
     queryFn: () =>
-      fetchApi<CompaniesOverviewResponse>(`/companies/overview?tickers=${encodeURIComponent(key)}`),
+      fetchApi<CompaniesOverviewResponse>(
+        `/companies/overview?tickers=${encodeURIComponent(key)}${forming ? "&forming=true" : ""}`,
+      ),
     enabled: tickers.length > 0,
   });
 }
@@ -906,5 +912,37 @@ export function usePeersMetrics(peerIds: string[]) {
       return Object.fromEntries(entries) as Record<string, FinancialMetric[]>;
     },
     enabled: peerIds.length > 0,
+  });
+}
+
+// ---- Price history chart (R47 P1-P5): read-only, fetched only while the view needs it ----
+import type { LatestPrice, PatternsResponse, VolatilityConeResponse } from "../types";
+
+// GET /api/companies/{id}/prices/latest: last session with its change vs the previous stored session (Day view).
+export function useLatestPrice(companyId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["latestPrice", companyId],
+    queryFn: () => fetchApi<LatestPrice>(`/companies/${companyId}/prices/latest`),
+    enabled: !!companyId && enabled,
+  });
+}
+
+// GET /api/technical/companies/{id}/volatility-cone: range of typical moves plus its measured calibration.
+export function useVolatilityCone(companyId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["volatilityCone", companyId],
+    queryFn: () => fetchApi<VolatilityConeResponse>(`/technical/companies/${companyId}/volatility-cone`),
+    enabled: !!companyId && enabled,
+    retry: retryUnless404,
+  });
+}
+
+// GET /api/technical/companies/{id}/patterns: confirmed chart patterns and their measured EGX odds (display only).
+export function useChartPatterns(companyId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ["chartPatterns", companyId],
+    queryFn: () => fetchApi<PatternsResponse>(`/technical/companies/${companyId}/patterns`),
+    enabled: !!companyId && enabled,
+    retry: retryUnless404,
   });
 }

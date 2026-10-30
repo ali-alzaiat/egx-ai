@@ -16,6 +16,7 @@ from typing import NamedTuple
 
 class IndicatorType(Enum):
     """Supported technical indicators."""
+
     SMA = "sma"
     EMA = "ema"
     RSI = "rsi"
@@ -28,6 +29,7 @@ class IndicatorType(Enum):
 
 class IndicatorStatus(Enum):
     """Status of indicator calculation."""
+
     AVAILABLE = "AVAILABLE"
     INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
     INVALID = "INVALID"
@@ -35,6 +37,7 @@ class IndicatorStatus(Enum):
 
 class IndicatorResult(NamedTuple):
     """Result of a technical indicator calculation."""
+
     value: Decimal | None
     status: IndicatorStatus
     indicator: IndicatorType

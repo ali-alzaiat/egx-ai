@@ -59,6 +59,32 @@ class PriceRepository:
         await self.session.execute(stmt)
         return len(records)
 
+    async def insert_missing(self, records: list[DailyPriceCreate]) -> int:
+        """Insert only the (company, date) rows that do not exist; never overwrite.
+
+        Returns the number of rows actually inserted.
+        """
+        if not records:
+            return 0
+        stmt = (
+            pg_insert(DailyPrice)
+            .values([r.model_dump() for r in records])
+            .on_conflict_do_nothing(constraint="uq_daily_price_company_date")
+            .returning(DailyPrice.id)
+        )
+        return len((await self.session.execute(stmt)).all())
+
+    async def existing_dates(self, company_id: uuid.UUID, start: date, end: date) -> set[date]:
+        """Stored bar dates of one company within ``[start, end]``."""
+        rows = await self.session.execute(
+            select(DailyPrice.date).where(
+                DailyPrice.company_id == company_id,
+                DailyPrice.date >= start,
+                DailyPrice.date <= end,
+            )
+        )
+        return set(rows.scalars().all())
+
     async def get_latest(self, company_id: uuid.UUID) -> DailyPrice | None:
         result = await self.session.execute(
             select(DailyPrice)
@@ -67,6 +93,16 @@ class PriceRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def get_last(self, company_id: uuid.UUID, n: int) -> Sequence[DailyPrice]:
+        """The ``n`` newest bars, newest first."""
+        result = await self.session.execute(
+            select(DailyPrice)
+            .where(DailyPrice.company_id == company_id)
+            .order_by(DailyPrice.date.desc())
+            .limit(n)
+        )
+        return result.scalars().all()
 
     async def get_prices(
         self,

@@ -57,4 +57,24 @@ export const COMPANIES_COPY = {
     ar: "صفحة {page} من {pages} ({total} شركة)",
   },
   page_aria: { en: "Pagination", ar: "التنقل بين الصفحات" },
+
+  // ---- Forming-pattern filter (R47 P7) ----
+  comp_forming_label: { en: "Forming chart pattern", ar: "نمط رسم قيد التكوّن" },
+  comp_forming_all: { en: "All", ar: "الكل" },
+  comp_forming_any: { en: "Any forming", ar: "أي نمط قيد التكوّن" },
+  comp_forming_up: { en: "Expected up", ar: "متوقع لأعلى" },
+  comp_forming_down: { en: "Expected down", ar: "متوقع لأسفل" },
+  comp_col_forming: { en: "Forming pattern", ar: "النمط قيد التكوّن" },
+  comp_forming_above: { en: "confirms above {price}", ar: "يتأكد فوق {price}" },
+  comp_forming_below: { en: "confirms below {price}", ar: "يتأكد تحت {price}" },
+  comp_forming_either: { en: "confirms above {above} or below {below}", ar: "يتأكد فوق {above} أو تحت {below}" },
+  comp_forming_left: { en: "{n} sessions left", ar: "متبقٍ {n} جلسة" },
+  comp_forming_none: {
+    en: "No company has a matching chart pattern forming right now.",
+    ar: "لا توجد شركة بها نمط رسم مطابق قيد التكوّن الآن.",
+  },
+  comp_forming_note: {
+    en: "Shapes with no breakout yet; many never break out. Open a company to see the measured odds.",
+    ar: "أشكال لم تُكسر بعد، وكثير منها لا يُكسر أبدًا. افتح الشركة لترى الاحتمالات المقاسة.",
+  },
 } as const satisfies Record<string, CopyEntry>;

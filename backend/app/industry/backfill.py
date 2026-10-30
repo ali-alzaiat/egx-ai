@@ -1,4 +1,4 @@
-"""One-shot EGX sector backfill of companies (ISIN join, no scheduler).
+"""One-shot EGX sector backfill of companies (ISIN join, ticker fallback, no scheduler).
 
 Every update traces to a source row (EGX page URL + as-of). Rows that match
 no company, or carry no sector, are reported as skipped — never fabricated.
@@ -23,6 +23,8 @@ class EgxListingRow:
     isin: str | None
     reuters_code: str | None
     sector_name: str
+    #: sector_index_reuters | alias | name_review; stored on the company when given.
+    match_basis: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,11 @@ def normalize_isin(isin: str | None) -> str | None:
         return None
     cleaned = isin.strip().upper()
     return cleaned or None
+
+
+def normalize_sector_name(name: str) -> str:
+    """Trim and collapse EGX's ``" ,"`` spacing so one sector is never two rows."""
+    return " ".join(name.replace(" ,", ",").split())
 
 
 def normalize_reuters_ticker(reuters_code: str | None) -> str | None:
@@ -104,7 +111,7 @@ async def backfill_egx_sectors(
     for row in rows:
         isin = normalize_isin(row.isin)
         ticker = normalize_reuters_ticker(row.reuters_code)
-        sector_name = row.sector_name.strip()
+        sector_name = normalize_sector_name(row.sector_name)
 
         if not sector_name:
             skipped.append(SkippedRow(isin, row.reuters_code, "missing sector name"))
@@ -123,6 +130,12 @@ async def backfill_egx_sectors(
             skipped.append(SkippedRow(isin, row.reuters_code, "no company match"))
             continue
 
+        if isin is not None and company.isin is not None and company.isin != isin:
+            skipped.append(
+                SkippedRow(isin, row.reuters_code, f"isin conflict: company has {company.isin}")
+            )
+            continue
+
         sector = sector_cache.get(sector_name)
         if sector is None:
             sector = await _ensure_egx_sector(session, sector_name)
@@ -130,6 +143,10 @@ async def backfill_egx_sectors(
 
         company.sector = sector_name
         company.egx_sector_id = sector.id
+        if row.match_basis is not None:
+            company.sector_match_basis = row.match_basis
+        if isin is not None and company.isin is None:
+            company.isin = isin
         updated += 1
 
     await session.flush()

@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from "react";
-import { useCompanies, useScreenedCompanies, useStanceRadar } from "../api/client";
+import { useCompanies, useCompaniesOverview, useScreenedCompanies, useStanceRadar } from "../api/client";
 import { ShariahBadge } from "../components/ui/Badges";
 import DataTable, { type Column } from "../components/ui/DataTable";
 import { Missing } from "../components/ui/Missing";
@@ -34,6 +34,9 @@ export default function Screening() {
   const { t, locale } = useLang();
   const members = useStanceRadar(50, "egx33");
   const screened = useScreenedCompanies();
+  // Date of the latest stored prices: the overview answers it for any one ticker.
+  const firstTicker = members.data?.items[0]?.ticker;
+  const market = useCompaniesOverview(firstTicker ? [firstTicker] : []);
   // The screening list carries company_id only; resolve tickers through the
   // full universe (page_size caps at 200).
   const universe1 = useCompanies({ page_size: 200 });
@@ -119,7 +122,7 @@ export default function Screening() {
   return (
     <div className="page">
       <PageTitle parts={[t("scr_title")]} />
-      <PageHeader title={t("scr_title")} subtitle={t("scr_subtitle")} />
+      <PageHeader title={t("scr_title")} subtitle={t("scr_subtitle")} pricesAsOf={fmtDate(locale, market.data?.price_date)} />
 
       <section aria-labelledby="scr-egx33">
         <h2 className="section-title" id="scr-egx33">

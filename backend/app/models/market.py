@@ -67,6 +67,9 @@ class Company(Base):
     egx_sector_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("egx_sectors.id", ondelete="RESTRICT"), nullable=True
     )
+    #: How ``sector`` was matched to this company (R47 S1): sector_index_reuters | alias |
+    #: name_review. NULL = no sector assigned. Never set without a source row.
+    sector_match_basis: Mapped[str | None] = mapped_column(String(30), nullable=True)
     gics_sub_industry_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("gics_sub_industries.id", ondelete="RESTRICT"),

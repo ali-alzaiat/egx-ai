@@ -91,3 +91,15 @@
   white-space: normal; max-width: 360px; overflow: visible; padding-block: var(--space-2);
 }
 .rs-wrap-table td.text-cell:first-child { min-width: 160px; }
+
+/* R47 Q1/Q2: Piotroski checks and dividend-safety card (Score tab). */
+.rx-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.rx-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rx-check { display: flex; flex-direction: column; gap: var(--space-2); padding-block: var(--space-3); border-block-start: 1px solid var(--border); min-width: 0; }
+.rx-check:first-child { border-block-start: 0; }
+.rx-check-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.rx-check-head .rs-cell-stack { font-size: var(--fs-ui); line-height: var(--lh-ui); }
+.rx-inputs { grid-template-columns: 1fr; gap: var(--space-1); }
+.rx-input { display: flex; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.rx-input dt { min-width: 0; }
+.rx-input dd { flex: none; text-align: end; font-variant-numeric: tabular-nums; }

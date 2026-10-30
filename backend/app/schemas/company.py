@@ -42,6 +42,8 @@ class CompanyRead(CompanyBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    #: How ``sector`` was matched (sector_index_reuters | alias | name_review); None = no sector.
+    sector_match_basis: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,0 +1,231 @@
+ticker,our_name,our_isin,s1_name,s1_isin,egx_sector,match_basis,confidence,note
+AALR,"General Company For Land Reclamation, Development & Reconstruction",,"General Company For Land Reclamation,Development & Reconstru",EGS01081C016,Contracting & Construction Engineering,name_review,high,"S1 name truncated at ""Reconstru""; otherwise identical"
+ABUK,Abu Qir Fertilizers & Chemical Industries Company (S.A.E),,Abou Kir Fertilizers,EGS38191C010,Basic Resources,name_review,high,Abou Kir = Abu Qir spelling variant
+ACAMD,"Arab Co.,for asset management and development",,Arab Co. for Asset Management And Development,EGS72AQ1C016,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+ACAP,A Capital Holding,,A Capital Holding,EGS697S1C015,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+ACGC,Arabia Cotton Ginning Company,,Arab Cotton Ginning,EGS32221C011,Textile & Durables,name_review,high,
+ACTF,Act Financial,,Act Financial,EGS7D5P1C019,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+ADCI,The Arab Drug Company,,Arab Pharmaceuticals,EGS38321C013,Health Care & Pharmaceuticals,name_review,medium,"Our name ""The Arab Drug Company"" vs S1 ""Arab Pharmaceuticals""; ticker ADCI is listed as Arab Pharmaceuticals on https://english.mubasher.info/markets/EGX/stocks/ADCI (evidence only, via search 2026-10-30)"
+ADIB,Abu Dhabi Islamic Bank - Egypt - S.A.E,,Abu Dhabi Islamic Bank- Egypt,EGS60111C019,Banks,name_review,high,
+ADPC,The Arab Dairy Products Co.,,The Arab Dairy Products Co. Arab Dairy - Panda,EGS30221C013,"Food, Beverages and Tobacco",name_review,high,
+AFDI,Al Ahly for Development & Investment,,El Ahli Investment and Development,EGS69021C011,Non-bank financial services,name_review,medium,Transliteration only (Al Ahly = El Ahli); S1 has no ticker column to confirm
+AFMC,Alexandria Flour Mills,,Alexandria Flour Mills,EGS30471C014,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+AIDC,Arabia for Investment and Development S.A.E.,,Arabia for Investment and Development,EGS65R01C015,Non-bank financial services,name_review,high,
+AIHC,Arabia Investments Holding,,Arabia Investments Holding,EGS21351C019,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+AJWA,AJWA For Food Industries Co. Egypt,,AJWA for Food Industries company Egypt,EGS30211C014,"Food, Beverages and Tobacco",name_review,high,
+ALCN,Alexandria Container&Cargo Handling Company,,Alexandria Containers and goods,EGS42111C012,Shipping & Transportation Services,name_review,high,"S1 name ""Alexandria Containers and goods"""
+ALRA,Atlas for Investment & Food Industries,,Atlas For Investment and Food Industries,EGS071L1C018,Real Estate,alias,medium,"Reviewed alias: ALRA in our DB is AIFI on EGX (egx_sectors.py). S1 name identical to ours. S1 files it under Real Estate although it is a food company; sector is S1 as published, flagged for owner"
+ALUM,Arab Aluminum Company (S.A.E),,Arab Aluminum,EGS3D031C018,Basic Resources,name_review,high,
+AMER,Amer Group Holding Company S.A.E.,,Amer Group Holding,EGS675S1C011,Real Estate,name_review,high,
+AMES,Alexandria New Medical Center,,Alexandria New Medical Center,EGS72081C010,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+AMIA,Arab Moltaqa Investments Company,,Arab Moltaka Investments Co,EGS67221C019,Non-bank financial services,name_review,high,Moltaqa/Moltaka spelling
+AMII,Arabian Metal Industries and Industrial Investments,,Arabian Metal Industries And Industrial Investments,EGS3E1E1C013,Building Materials,name_review,high,Exact name match after case/punctuation normalisation
+AMOC,Alexandria Mineral Oils Company,,Alexandria Mineral Oils Company,EGS380P1C010,Energy & Support Services,name_review,high,Exact name match after case/punctuation normalisation
+APSW,Unirab Polvara Spinning & Weaving Co.,,ARAB POLVARA SPINNING & WEAVING CO.,EGS32331C018,Textile & Durables,name_review,medium,"Our ""Unirab Polvara"" vs S1 ""ARAB POLVARA""; ""Unirab"" prefix differs"
+ARAB,Arab Developers Holding,,Arab Developers Holding,EGS694A1C018,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+ARCC,Arabian Cement Company S.A.E.,,Arabian Cement Company,EGS3C0O1C016,Building Materials,name_review,high,
+AREH,Real Estate Egyptian Consortium S.A.E,,,,,,,"No sector by R44 D-9 (UNASSIGNED_TICKERS); left blank on purpose. S1 has ""Egyptian Real Estate Group"" (EGS65211C012, Real Estate), a doubtful name-only candidate; not assigned"
+ASCM,"ASEC Company for Mining ASCOM, S.A.E",,ASEC Company For Mining - ASCOM,EGS10001C013,Basic Resources,name_review,high,
+ASPI,Aspire Capital Holding for Financial Investments,,Aspire Capital Holding For Financial Investments,EGS691L1C018,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+ATLC,Al Tawfeek Leasing Company,,Al Tawfeek Leasing Company-A.T.LEASE,EGS676N1C015,Non-bank financial services,name_review,high,
+ATQA,Misr National Steel - Ataqa,,Misr National Steel - Ataqa,EGS3D0C1C018,Basic Resources,name_review,high,Exact name match after case/punctuation normalisation
+AXPH,Alexandria Co. For Pharmaceuticals & Chemical Industries,,Alexandria Pharmaceuticals,EGS38341C011,Health Care & Pharmaceuticals,name_review,high,
+BINV,B Investments Holding S.A.E.,,B Investments Holding,EGS691T1C010,Non-bank financial services,name_review,high,
+BIOC,GlaxoSmithKline S.A.E,,Glaxo Smith Kline,EGS38171C012,Health Care & Pharmaceuticals,name_review,high,GlaxoSmithKline spacing
+BONY,Bonyan for Development and Trade,,Bonyan for Development and Trade,EGS656M1C010,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+BTFH,Beltone Holding S.A.E,,Beltone Holding,EGS691G1C015,Non-bank financial services,name_review,high,
+CAED,Cairo Educational Services SAE,,Cairo Educational Services,EGS72201C014,Education Services,name_review,high,
+CANA,Suez Canal Bank (S.A.E),,Suez Canal Bank S.A.E,EGS60231C015,Banks,name_review,high,Exact name match after case/punctuation normalisation
+CCAP,QALA For Financial Investments,,QALAA For Financial Investments,EGS73541C012,Non-bank financial services,name_review,high,"Matched the ordinary shares (S1 also lists a Preferred Shares line EGS73541P048, not used)"
+CCRS,Gulf Canadian Company for Arab Real Estate Investment,,Gulf Canadian Real Estate Investment Co.,EGS651B1C018,Real Estate,name_review,high,
+CEFM,Middle Egypt Flour Mills,,Middle Egypt Flour Mills,EGS30401C011,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+CERA,The Arab Ceramic Co.,,The Arab Ceramic CO.- Ceramica Remas,EGS3C151C015,Building Materials,name_review,high,
+CFGH,Concrete Fashion Group For Commercial and Industrial investments S.A.E,,Concrete Fashion Group For Commercial& Industrial Investment,EGS672I2C014,Textile & Durables,name_review,high,
+CICH,CI Capital Holding For Financial Investments (S.A.E),,CI Capital Holding For Financial Investments,EGS691D1C018,Non-bank financial services,name_review,high,
+CIEB,Credit Agricole - Egypt Bank (S.A.E.),,Credit Agricole Egypt,EGS60041C018,Banks,name_review,high,
+CIRA,Cairo For Investment And Real Estate Developments-CIRA Education,,Cairo For Investment And Real Estate Developments-CIRA Edu,EGS65541C012,Education Services,name_review,high,"S1 name truncated (""Edu"")"
+CLHO,Cleopatra Hospitals Group S.A.E.,,Cleopatra Hospital Company,EGS729J1C018,Health Care & Pharmaceuticals,name_review,high,
+CNFN,Contact Financial Holding S.A.E.,,Contact Financial Holding,EGS738I1C018,Non-bank financial services,name_review,high,
+COMI,Commercial International Bank Egypt (CIB) S.A.E.,,Commercial International Bank-Egypt (CIB),EGS60121C018,Banks,name_review,high,
+COPR,Copper for Commercial Investment & Real Estate Development,,Copper For Commercial Investment & Real Estate Development,EGS65511C015,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+COSG,Cairo Oil & Soap Company,,Cairo Oils & Soap,EGS30581C010,"Food, Beverages and Tobacco",name_review,high,
+CPCI,Kahira Pharmaceuticals & Chemical Industries Company,,Cairo Pharmaceuticals,EGS38391C016,Health Care & Pharmaceuticals,name_review,high,Kahira = Cairo
+CPME,Catalyst Partners,,Catalyst Partners Middle East –CPME,EGS698X1C017,Non-bank financial services,name_review,high,
+CRST,Creast Mark For Contracting And Real Estate Development,,Creast Mark For Contracting And Real Estate Development,EGS23141C012,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+CSAG,Canal Shipping Agencies Company,,Canal Shipping Agencies,EGS44031C010,Shipping & Transportation Services,name_review,high,
+DAPH,Development & Engineering Consultants,,Development & Engineering Consultants,EGS65081C019,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+DCCC,Damietta Container & Cargo Handling Co.,,Damietta Container and Cargo Handling,EGS42121C011,Shipping & Transportation Services,name_review,high,
+DEIN,Delta Insurance Company,,Delta Insurance,EGS63031C016,Non-bank financial services,name_review,high,
+DGTZ,Digitize for Investment And Technology,,Digitize for Investment And Technology,EGS74F71C015,"IT, Media & Communication Services",name_review,high,Exact name match after case/punctuation normalisation
+DOMT,Arabian Food Industries Company (DOMTY) - S.A.E,,Arabian Food Industries DOMTY,EGS30031C016,"Food, Beverages and Tobacco",name_review,high,
+DSCW,Dice For Ready-Made Garments (SAE),,Dice Sport & Casual Wear,EGS33321C018,Textile & Durables,name_review,medium,"Our ""Dice For Ready-Made Garments"" vs S1 ""Dice Sport & Casual Wear"" (probable rename)"
+DTPP,Delta Co. For Printing & Packaging S.A.E,,Delta For Printing & Packaging,EGS370W1C013,"Industrial Goods, Services and Automobiles",name_review,high,
+EALR,Arab Company For Land Reclamation,,El Arabia for Land Reclamation,EGS65771C015,Contracting & Construction Engineering,name_review,medium,"Our ""Arab Company For Land Reclamation"" vs S1 ""El Arabia for Land Reclamation""; not to be confused with AALR"
+EASB,Egyptian Arabian Company (Themar) for securities Brokerage EAC,,Egyptian Arabian(Themar)Comp. For Securities&Bonds Brok. EAC,EGS681D1C010,Non-bank financial services,name_review,high,
+EAST,Eastern Company S.A.E,,Eastern Company,EGS37091C013,"Food, Beverages and Tobacco",name_review,high,
+EBSC,Osool ESB Securities Brokerage,,Osool ESB Securities Brokerage,EGS68181C014,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+ECAP,Al Ezz Ceramics & Porcelain Co.,,El Ezz Porcelain (Gemma),EGS3C071C015,Building Materials,name_review,medium,"Our ""Al Ezz Ceramics & Porcelain"" vs S1 ""El Ezz Porcelain (Gemma)"""
+EDFM,East Delta Flour Mills,,East Delta Flour Mills,EGS30351C018,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+EEII,Arab Engineering Industries,,El Arabia Engineering Industries,EGS3G111C015,"Industrial Goods, Services and Automobiles",name_review,medium,"Our ""Arab Engineering Industries"" vs S1 ""El Arabia Engineering Industries"""
+EFIC,Egyptian Financial and Industrial SAE,,Egyptian Financial & Industrial,EGS38381C017,Basic Resources,name_review,high,
+EFID,Edita Food Industries Company (S.A.E),,Edita Food Industries S.A.E,EGS305I1C011,"Food, Beverages and Tobacco",name_review,high,
+EFIH,e-finance for Digital and Financial Investments S.A.E.,,E-finance For Digital and Financial Investments,EGS743O1C013,"IT, Media & Communication Services",name_review,high,
+EGAL,Egypt Aluminum,,Egypt Aluminum,EGS3E181C010,Basic Resources,name_review,high,Exact name match after case/punctuation normalisation
+EGAS,Egypt Gas Company SAE,,Natural Gas & Mining Project (Egypt Gas),EGS39011C019,Utilities,name_review,high,"S1 name ""Natural Gas & Mining Project (Egypt Gas)"""
+EGBE,Egyptian Gulf Bank (S.A.E),,Egyptian Gulf Bank,EGS60182C010,Banks,name_review,high,
+EGCH,Egyptian Chemical Industries,,Egyptian Chemical Industries (Kima),EGS38201C017,Basic Resources,name_review,high,
+EGSA,The Egyptian Satellite Company Nilesat,,Egyptian Satellites (NileSat),EGS48022C015,"IT, Media & Communication Services",name_review,high,
+EGTS,Egyptian Resorts Company (S.A.E),,Egyptian for Tourism Resorts,EGS70431C019,Travel & Leisure,name_review,high,
+EHDR,Egyptians for Housing & Development Co.,,Egyptians Housing Development & Reconstruction,EGS65341C017,Real Estate,name_review,high,
+ELEC,Electro Cable Egypt,,Electro Cable Egypt,EGS3G231C011,"Industrial Goods, Services and Automobiles",name_review,high,Exact name match after case/punctuation normalisation
+ELKA,Cairo for Housing and Development Company (S.A.E),,El Kahera Housing,EGS65071C010,Real Estate,name_review,medium,"Our ""Cairo for Housing and Development"" vs S1 ""El Kahera Housing"" (Kahera = Cairo)"
+ELNA,El Nasr Manufacturing Agricultural Crops S.A.E,,El Nasr For Manufacturing Agricultural Crops,EGS300L1C011,"Food, Beverages and Tobacco",name_review,high,
+ELSH,Al-Shams Company for Housing and Urban Development,,El Shams Housing & Urbanization,EGS65091C018,Real Estate,name_review,medium,"Our ""Housing and Urban Development"" vs S1 ""Housing & Urbanization"""
+ELWA,El Wadi for International and Investment Development SAE,,El Wadi For International and Investement Development,EGS70R91C016,Travel & Leisure,name_review,high,
+EMFD,Emaar Misr for Development Company (S.A.E.),,Emaar Misr for Development,EGS673Y1C015,Real Estate,name_review,high,
+ENGC,Industrial Engineering Company for Construction and Development (ICON) (S.A.E.),,Engineering Industries (ICON),EGS3F021C017,Contracting & Construction Engineering,name_review,high,ICON in both names
+EOSB,El Orouba Securities Brokerage,,El Orouba Securities Brokerage,EGS681I1C015,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+EPCO,Egypt for Poultry,,Egypt for Poultry,EGS02211C018,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+EPPK,El Ahram Co. For Printing And Packaging SAE,,El Ahram Co. For Printing And Packing,EGS360A1C011,Paper & Packaging,name_review,high,
+ETEL,Telecom Egypt Company,,Telecom Egypt,EGS48031C016,"IT, Media & Communication Services",name_review,high,
+ETRS,Egyptian Transport & Commercial Services Co. -EGYTRANS NOSCO,,Egyptian Transport & Commercial Services Co. -EGYTRANS NOSCO,EGS42051C010,Shipping & Transportation Services,name_review,high,Exact name match after case/punctuation normalisation
+EXPA,Export Development Bank of Egypt (S.A.E.),,Export Development Bank of Egypt,EGS60241C014,Banks,name_review,high,
+FAIT,Faisal Islamic Bank of Egypt,,Faisal Islamic Bank of Egypt - In EGP,EGS60321C014,Banks,name_review,medium,"Share class inferred: FAIT and FAITA have identical names; S1 has an EGP line and a US-dollar line. FAIT taken as EGP, FAITA as USD (suffix A = USD is an EGX convention I could not verify on S1). Both lines are Banks, so the sector is unaffected"
+FAITA,Faisal Islamic Bank of Egypt,,Faisal Islamic Bank of Egypt - In US Dollars,EGS60322C012,Banks,name_review,medium,"USD line, see FAIT. Sector identical for both lines"
+FCMD,International Company For Medical Industries S.A.E.,,Future Care for Medical Industries - FCMI,EGS3I0S1C019,Health Care & Pharmaceuticals,name_review,medium,"Our name ""International Company For Medical Industries"" vs S1 ""Future Care for Medical Industries - FCMI""; ticker FCMD is Future Care for Medical Industries per https://english.mubasher.info/markets/EGX/stocks/FCMD (evidence only, via search 2026-10-30). Probable rename, not confirmed"
+FERC,Ferchem Misr for fertilizers and chemicals S.A.E,,FERCHEM MISR CO. FOR FERTILLIZERS & CHEMICALS,EGS385S1C012,Basic Resources,name_review,high,
+FWRY,Fawry for Banking Technology and Electronic Payments S.A.E.,,Fawry For Banking Technology And Electronic Payment,EGS745L1C014,"IT, Media & Communication Services",name_review,high,
+GBCO,GB Corp,,GB Corp,EGS673T1C012,"Industrial Goods, Services and Automobiles",name_review,high,Exact name match after case/punctuation normalisation
+GDWA,Gadwa for Industrial Development,,Gadwa For Industrial Development,EGS3JM11C012,"Industrial Goods, Services and Automobiles",name_review,high,Exact name match after case/punctuation normalisation
+GGCC,Giza General - Contracting and Real Estate Investment S.A.E,,Giza General Contracting,EGS21541C015,Contracting & Construction Engineering,name_review,high,"S1 name ""Giza General Contracting"""
+GGRN,Go Green For Agricultural Investment And Development,,Gogreen for Agricultural Investment,EGS07DR1C012,"Food, Beverages and Tobacco",name_review,high,Gogreen spelling
+GIHD,Gharbia Islamic Housing Development Company,,Gharbia Islamic Housing Development,EGS65461C013,Real Estate,name_review,high,
+GMCI,GMC Group For Industrial Commercial & Financial Investments,,GMC GROUP FOR INDUSTRIAL COMMERCIAL & FINANCIAL INVESTMENTS,EGS46051C016,Trade & Distributors,name_review,high,Exact name match after case/punctuation normalisation
+GOUR,Gourmet Egypt.Com Foods,,Gourmet Egypt.Com Foods,EGS540S1C014,Trade & Distributors,name_review,high,Exact name match after case/punctuation normalisation
+GPIM,GPI for Urban Growth,,GPI For Urban Growth,EGS213S1C010,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+GPPL,Golden Pyramids Plaza S.A.E.,,Golden Pyramids Plaza,EGS70342C018,Travel & Leisure,name_review,high,
+GRCA,Grand Capital for Financial Investments,,Grand Investment Capital,EGS69261C013,Non-bank financial services,name_review,medium,"Our ""Grand Capital for Financial Investments"" vs S1 ""Grand Investment Capital"""
+GSSC,General Co. For Silos & Storage,,General Silos & Storage,EGS30441C017,"Food, Beverages and Tobacco",name_review,high,
+GTEX,GTEX for Commercial and Industrial Investments S.A.E,,GTEX For Commercial And Industrial,EGS59U92C011,Textile & Durables,name_review,high,
+GTWL,Golden Textiles & Clothes Wool,,Golden Textiles & Clothes Wool,EGS32161C019,Textile & Durables,name_review,high,Exact name match after case/punctuation normalisation
+HALN,MNT Tech Holding For Financial Investments,,MNT Tech Holding For Financial Investments,EGS59231C018,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+HDBK,Housing and Development Bank- Egypt (S.A.E),,Housing & Development Bank,EGS60301C016,Banks,name_review,high,
+HELI,Heliopolis Co. for Housing & Development,,Heliopolis Housing,EGS65591C017,Real Estate,name_review,high,
+HRHO,EFG Holding Company S.A.E,,EFG Holding,EGS69101C011,Non-bank financial services,name_review,high,
+ICFC,International Company for Fertilizers and Chemicals S.A.E,,International Company For Fertilizers & Chemicals,EGS520D1C015,Trade & Distributors,name_review,high,Name matches; S1 files it under Trade & Distributors although it is a fertilizer company; sector as published
+ICID,International Co. For Investment & Development,,International Co For Investment & Development,EGS67191C014,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+ICLE,International Company for Leasing S.A.E.,,International Company For Leasing (IncoLEASE),EGS67001C015,Non-bank financial services,name_review,high,
+IDRE,Ismailia Development and Real Estate Co,,Ismailia Development and Real Estate Co,EGS214Q1C011,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+IEEC,Industrial & Engineering Projects,,Industrial & Engineering Projects,EGS22171C010,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+IFAP,International Company for Agricultural Crops,,International Agricultural Products,EGS07061C012,Trade & Distributors,name_review,medium,"Our ""International Company for Agricultural Crops"" vs S1 ""International Agricultural Products"""
+INFI,Ismailia National Co. for Food Industries,,Ismailia National Food Industries,EGS01041C010,"Food, Beverages and Tobacco",name_review,high,
+IRON,Egyptian Iron and Steel Company,,Egyptian Iron & Steel,EGS3D061C015,Basic Resources,name_review,high,
+ISMA,Ismailia / Misr Poultry Company S.A.E,,Ismailia Misr Poultry,EGS02021C011,"Food, Beverages and Tobacco",name_review,high,
+ISMQ,Iron & Steel for Mines & Quarries,,Iron And Steel for Mines and Quarries,EGS102S1C014,Basic Resources,name_review,high,
+ISPH,Ibnsina Pharma,,Ibnsina Pharma,EGS512O1C012,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+JUFO,Juhayna Food Industries S.A.E.,,Juhayna Food Industries,EGS30901C010,"Food, Beverages and Tobacco",name_review,high,
+KABO,El-Nasr Clothing & Textiles Co. (KABO),,El Nasr Clothes & Textiles (Kabo),EGS33061C010,Textile & Durables,name_review,high,
+KORA,Korra for Energy and Investment Projects (S.A.E.),,KORRA,EGS07911C018,Contracting & Construction Engineering,name_review,high,"S1 name ""KORRA""; S1 Subscription Rights of KORRA (EGS924O1C014) deliberately not used"
+KRDI,AlKhair River for Development Agricultural Investment and Environmental Services,,Al Khair River For Development Agricultural Investment&Envir,EGS02291C010,"Food, Beverages and Tobacco",name_review,high,S1 name truncated
+KWIN,El Kahera El Watania Investment,,El Kahera El Watania Investment,EGS69011C012,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+KZPC,Kafr El Zayat For Pesticides & Chemicals Co.(S.A.E),,Kafr El Zayat Pesticides,EGS38411C012,Basic Resources,name_review,high,
+LCSW,Lecico Egypt (S.A.E.),,Lecico Egypt,EGS3C161C014,Building Materials,name_review,high,
+LUTS,Lotus For Agricultural Investments And Development,,Lotus For Agricultural Investments And Development,EGS07661C019,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+MAAL,Marseille Almasreia Alkhalegeya For Holding Investment SAE,,Egyptian Gulf Marseilia For Real Estate Investment,EGS739Z1C016,Real Estate,name_review,medium,"Our ""Marseille Almasreia Alkhalegeya For Holding Investment"" vs S1 ""Egyptian Gulf Marseilia For Real Estate Investment"" (shared Marseille/Gulf/Egypt words, different business descriptor)"
+MASR,Madinet Masr For Housing and Development,,Madinet Masr For Housing and Development,EGS65571C019,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+MBEG,M.B Engineering,,M.B Engineering,EGS221V1C015,"Industrial Goods, Services and Automobiles",name_review,high,Exact name match after case/punctuation normalisation
+MBSC,Misr Beni Suef Cement Co. S.A.E,,Misr Beni Suef Cement,EGS3C371C019,Building Materials,name_review,high,
+MCQE,Misr Cement (Qena) Company (S.A.E),,Misr Cement (Qena),EGS3C391C017,Building Materials,name_review,high,
+MCRO,Macro Group Pharmaceuticals (Macro Capital) S.A.E,,Macro Group Pharmaceuticals -Macro Capital,EGS7D971C011,Health Care & Pharmaceuticals,name_review,high,
+MEGM,Middle East Glass Manufacturing Company S.A.E.,,Middle East Glass Manufacturing,EGS3C001C012,Paper & Packaging,name_review,high,Name matches; S1 files this glass maker under Paper & Packaging; sector as published
+MENA,Mena for Touristic & Real Estate Investment,,Mena Touristic & Real Estate Investment,EGS65441C015,Real Estate,name_review,high,
+MEPA,Medical Packaging Company,,Medical Packaging Company,EGS3C4L1C015,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+MFPC,Misr Fertilizer Production Company,,Misr Fertilizers Production Company - Mopco,EGS39061C014,Basic Resources,name_review,high,
+MFSC,Egypt Free Shops Co.,,Misr Duty Free Shops,EGS53051C016,Trade & Distributors,name_review,medium,"Our ""Egypt Free Shops"" vs S1 ""Misr Duty Free Shops"""
+MHOT,Misr Hotels Company,,Misr Hotels,EGS70081C012,Travel & Leisure,name_review,high,
+MICH,Misr Chemical Industries Co.,,Misr Chemical Industries,EGS38211C016,Basic Resources,name_review,high,
+MILS,North Cairo Flour Mills,,North Cairo Mills,EGS30361C017,"Food, Beverages and Tobacco",name_review,high,"S1 name ""North Cairo Mills"""
+MIPH,MINAPHARM Pharmaceuticals,,Minapharm Pharmaceuticals,EGS380G1C011,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+MMAT,Marsa Marsa Alam For Tourism Development SAE,,Marsa Marsa Alam For Tourism Development,EGS70P91C010,Travel & Leisure,name_review,high,
+MOED,"The Egyptian Modern Education Systems, S.A.E.",,The Egyptian Modern Education Systems,EGS729F1C012,Education Services,name_review,high,
+MOIL,Maridive and Oil Services S.A.E.,,Maridive & oil services,EGS44012C010,Energy & Support Services,name_review,high,
+MOIN,Mohandes Insurance Company,,Mohandes Insurance,EGS63041C015,Non-bank financial services,name_review,high,
+MOSC,Misr Oils & Soap,,Misr Oils & Soap,EGS38421C011,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+MPCI,Memphis Pharmaceuticals & Chemical Industries,,Memphis Pharmaceuticals,EGS38351C010,Health Care & Pharmaceuticals,name_review,high,
+MPCO,Mansoura Poultry co.S.A.E,,Mansourah Poultry,EGS02091C014,"Food, Beverages and Tobacco",name_review,high,
+MPRC,Egyptian Media Production City,,Egyptian Media Production City,EGS78021C010,"IT, Media & Communication Services",name_review,high,Exact name match after case/punctuation normalisation
+MTIE,MM Group for Industry and International Trade S.A.E.,,MM Group For Industry And International Trade,EGS75011C014,Trade & Distributors,name_review,high,
+NAHO,Naeem Holding Company For Investments (S.A.E - Free Zone),,Naeem Holding,EGS69182C011,Non-bank financial services,name_review,high,
+NAPR,National Printing Company S.A.E.,,National Printing,EGS370O1C013,Paper & Packaging,name_review,high,
+NARE,Naeem Real Estate Holding Group,,Naeem Real Estate Holding Group,EGS69191C012,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+NCCW,Nasr Company for Civil Works,,Nasr Company for Civil Works,EGS23111C015,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+NDRL,National Drilling Company,,National Drilling,EGS735N2C012,Energy & Support Services,name_review,high,
+NEDA,Northern Upper Egypt For Development & Agricultural Production Co.,,Northern Upper Egypt Development & Agricultural Production,EGS52041C018,"Food, Beverages and Tobacco",name_review,high,
+NHPS,National Company for Housing Professional Syndicates SAE,,National Housing for Professional Syndicates,EGS65131C012,Real Estate,name_review,high,
+NINH,Nozha International Hospital,,Nozha International Hospital,EGS72011C017,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+NIPH,Nile Pharmaceuticals and Chemical Industries Company,,El-Nile Co. For Pharmaceuticals And Chemical Industries,EGS38331C012,Health Care & Pharmaceuticals,name_review,high,
+OBRI,El-Ebour Co. for Real Estate Investment S.A.E.,,El Obour Real Estate Investment,EGS65551C011,Real Estate,name_review,high,
+OCDI,"Sixth of October for Development and Investment Company ""SODIC"" (S.A.E.)",,Six of October Development & Investment (SODIC),EGS65851C015,Real Estate,name_review,high,SODIC
+OCPH,October Pharma S.A.E,,October Pharma,EGS380R1C018,Health Care & Pharmaceuticals,name_review,high,
+ODIN,ODIN Investments (S.A.E),,ODIN Investments,EGS67181C015,Non-bank financial services,name_review,high,"ODIN Investments company, not the Odin fund certificates (EGS696Z1C017)"
+OFH,O B Financial Holding S.A.E,,O B Financial Holding,EGS696S1C016,Non-bank financial services,name_review,high,
+OIH,Orascom Investment Holding S.A.E.,,Orascom Investment Holding,EGS693V1C014,"IT, Media & Communication Services",name_review,high,"Name matches; S1 files Orascom Investment Holding under IT, Media & Communication Services; sector as published"
+OLFI,Obour Land for Food Industries S.A.E.,,Obour Land For Food Industries,EGS30AL1C012,"Food, Beverages and Tobacco",name_review,high,
+ORAS,Orascom Construction PLC,,Orascom Construction PLC,EGS95001C011,Contracting & Construction Engineering,name_review,high,Exact name match after case/punctuation normalisation
+ORHD,Orascom Development Egypt S.A.E.,,Orascom Development Egypt,EGS70321C012,Real Estate,name_review,high,
+ORWE,Oriental Weavers Carpets Company (S.A.E),,Oriental Weavers,EGS33041C012,Textile & Durables,name_review,high,
+PHAR,Egyptian International Pharmaceutical Industries Company,,Egyptian International Pharmaceuticals (EIPICO),EGS38081C013,Health Care & Pharmaceuticals,name_review,high,
+PHDC,Palm Hills Developments S.A.E.,,Palm Hills Development Company,EGS655L1C012,Real Estate,name_review,high,
+PHGC,Premium Healthcare Group,,Premium HealthCare Group,EGS72XL1C014,Health Care & Pharmaceuticals,name_review,high,Exact name match after case/punctuation normalisation
+PHTV,Pyramisa Hotels & Resorts,,Pyramisa Hotels,EGS70331C011,Travel & Leisure,name_review,high,
+POCO,Port Said Containers And Cargo Handling Co.,,Port Said Containers And Cargo Handling Co.,EGS42101C013,Shipping & Transportation Services,name_review,high,Exact name match after case/punctuation normalisation
+POUL,Cairo Poultry Company S.A.E.,,Cairo Poultry,EGS02051C018,"Food, Beverages and Tobacco",name_review,high,
+PRCL,The General Company for Ceramic and Porcelain Products,,Ceramic & Porcelain,EGS3C111C019,Building Materials,name_review,high,
+PRDC,Pioneers Properties For Urban Development - PRE Group,,Pioneers Properties For Urban Development - PRE Group,EGS21FW1C015,Real Estate,name_review,high,Exact name match after case/punctuation normalisation
+PRMH,Prime Holding S.A.E,,Prime Holding,EGS691A1C011,Non-bank financial services,name_review,high,
+QNBE,Qatar National Bank,,Qatar National Bank,EGS60081C014,Banks,name_review,high,Exact name match after case/punctuation normalisation
+RACC,Raya Customer Experience,,Raya Customer Experience,EGS74191C015,"IT, Media & Communication Services",name_review,high,Exact name match after case/punctuation normalisation
+RAKT,Rakta Paper Manufacturing Company,,Rakta Paper Manufacturing,EGS36021C011,Paper & Packaging,name_review,high,
+RAYA,Raya Holding Company for Financial Investments (S.A.E),,Raya Holding For Financial Investments,EGS690C1C010,Non-bank financial services,name_review,high,
+RMDA,Tenth of Ramadan for Pharmaceutical Industries and Diagnostic Reagents (Rameda) (S.A.E),,Tenth Of Ramadan Pharmaceutical Industries&Diagnostic-Rameda,EGS381B1C015,Health Care & Pharmaceuticals,name_review,high,
+ROTO,Rowad Tourism Company,,Rowad Tourism (Al Rowad),EGS70281C018,Travel & Leisure,name_review,high,
+RREI,Arab Real Estate Investment Co.,,Arab Real Estate Investment CO.-ALICO,EGS65011C016,Real Estate,name_review,high,
+RTVC,Remco Tourism Villages Construction,,Remco for Touristic Villages Construction,EGS70271C019,Travel & Leisure,name_review,high,
+RUBX,Rubex International for Plastic and Acrylic Manufacturing,,Rubex International for Plastic and Acrylic Manufacturing,EGS3A221C018,Building Materials,name_review,high,Exact name match after case/punctuation normalisation
+SAIB,SociÃ©tÃ© Arabe Internationale de Banque S.A.E,,Societe Arabe Internationale De Banque S.A.E.,EGS60142C014,Banks,name_review,high,
+SAUD,alBaraka Bank Egypt S.A.E.,,Al Baraka Bank Egypt,EGS60101C010,Banks,name_review,high,alBaraka = Al Baraka
+SCEM,Sinai Cement Co. (S.A.E),,Sinai Cement,EGS3C401C014,Building Materials,name_review,high,
+SCFM,South Cairo and Giza Flour Mills and Bakeries Company,,South Cairo & Giza Mills & Bakeries,EGS30411C010,"Food, Beverages and Tobacco",name_review,high,
+SCTS,Suez Canal Company for Technology Settling (S.A.E),,Sues Canal Company For Technology Settling,EGS740C1C010,Education Services,name_review,high,"Name matches (""Sues"" typo in S1); S1 files it under Education Services; sector as published"
+SDTI,SHARM DREAMS Co. for Touristic Investment S.A.E,,Sharm Dreams Co. for Tourism Investment,EGS70571C012,Travel & Leisure,name_review,high,
+SEIG,Saudi Egyptian Investment & Finance Co. S.A.E,,Saudi Egyptian Investment & Finance,EGS67031C012,Non-bank financial services,name_review,medium,"Share class inferred: SEIG and SEIGA have the same name; S1 has an EGP line and a ""$"" line. SEIG taken as EGP, SEIGA as USD (unverified convention). Sector identical for both lines"
+SEIGA,Saudi Egyptian Investment & Finance Co. S.A.E,,Saudi Egyptian Investment & Finance $,EGS67032C010,Non-bank financial services,name_review,medium,"USD line, see SEIG. Sector identical for both lines"
+SIPC,Sabaa International Company for Pharmaceutical and Chemical Industry,,Sabaa International Company for Pharmaceutical and Chemical,EGS382M1C011,Health Care & Pharmaceuticals,name_review,high,
+SKPC,Sidi Kerir Petrochemicals Co.,,Sidi Kerir Petrochemicals - SIDPEC,EGS380S1C017,Basic Resources,name_review,high,
+SMFR,Samad Misr EGYFERT.S.A.E,,Samad Misr -EGYFERT,EGS51191C012,Trade & Distributors,name_review,high,Name matches; S1 sector Trade & Distributors
+SNFC,Sharkia National Company for Food Security,,Sharkia National Food,EGS30291C016,"Food, Beverages and Tobacco",name_review,high,
+SPHT,El Shams Pyramids Co. For Hotels & Touristic Projects S.A.E,,El Shams Pyramids For Hotels& Touristic Projects,EGS70H02C014,Travel & Leisure,name_review,high,
+SPIN,Alexandria Spinning & Weaving Co.,,Alexandria Spinning & Weaving (SPINALEX),EGS32041C013,Textile & Durables,name_review,high,
+SPMD,Speed Medical Co,,Speed Medical,EGS73BR1C013,Health Care & Pharmaceuticals,name_review,high,
+SUGR,Delta Sugar Company,,Delta Sugar,EGS30201C015,"Food, Beverages and Tobacco",name_review,high,
+SVCE,South Valley Cement Company,,South Valley Cement,EGS3C351C011,Building Materials,name_review,high,
+SWDY,El Sewedy Electric Company,,ELSWEDY ELECTRIC,EGS3G0Z1C014,"Industrial Goods, Services and Automobiles",name_review,high,
+TALM,Taaleem Management Services Company S.A.E.,,Taaleem Management Services,EGS597R1C017,Education Services,name_review,high,
+TANM,Tanmiya For Real Estate Investment (S.A.E),,Tanmiya for Real Estate Investment,EGS21EB1C011,Real Estate,name_review,high,
+TAQA,TAQA Arabia S.A.E.,,Taqa Arabia,EGS490S1C014,Utilities,name_review,high,
+TMGH,Talaat Moustafa Group Holding,,T M G Holding,EGS691S1C011,Real Estate,name_review,high,"S1 name ""T M G Holding"""
+TRTO,Trans Oceans Tours,,TransOceans Tours,EGS79072C012,Travel & Leisure,name_review,high,Exact name match after case/punctuation normalisation
+TWSA,Tawasoa For Factoring,,TAWASOA For Factoring,EGS7D231C010,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+TYCN,Tycoon Holding Company For Financial Investments,,Tycoon Holding Company For Financial Investments,EGS67331C016,Non-bank financial services,name_review,high,Exact name match after case/punctuation normalisation
+UBEE,The United Bank,,The United Bank,EGS600M1C017,Banks,name_review,high,Exact name match after case/punctuation normalisation
+UEFM,Upper Egypt Mills Company J.S.C,,Upper Egypt Flour Mills,EGS30451C016,"Food, Beverages and Tobacco",name_review,high,
+UEGC,"El-Saeed Company for Contracting and Real Estate Investment ""SCCD"" (S.A.E.)",,Elsaeed Contracting& Real Estate Investment Company SCCD,EGS21531C016,Real Estate,name_review,high,
+UNIP,Universal For Paper and Packaging Materials,,Universal For Paper and Packaging Materials (Unipack,EGS38161C013,Paper & Packaging,name_review,high,
+UNIT,United Co. for Housing & Development - S.A.E.,,United Housing & Development,EGS65061C011,Real Estate,name_review,high,
+VALU,U Consumer Finance S.A.E.,,U Consumer Finance,EGS505Z1C018,Non-bank financial services,name_review,high,
+VLMR,Valmore Holding S.A.E.,,Valmore Holding-EGP,EGS69081C023,Non-bank financial services,name_review,medium,"Share class inferred: S1 has ""Valmore Holding-EGP"" and ""Valmore Holding"" (ISIN series digit 2, like the other USD lines). VLMR taken as EGP, VLMRA as the other line. Sector identical for both lines"
+VLMRA,Valmore Holding S.A.E.,,Valmore Holding,EGS69082C013,Non-bank financial services,name_review,medium,"Other-currency line, see VLMR. Sector identical for both lines"
+WCDF,Middle & West Delta Flour Mills,,Middle & West Delta Flour Mills,EGS30421C019,"Food, Beverages and Tobacco",name_review,high,Exact name match after case/punctuation normalisation
+WKOL,Wadi Kom Ombo For Land Reclamation Co.,,Wadi Kom Ombo Land Reclamation,EGS01071C017,Contracting & Construction Engineering,name_review,high,
+ZEOT,Extracted Oil & Derivatives Co.,,Extracted Oils,EGS38251C012,"Food, Beverages and Tobacco",name_review,high,"S1 name ""Extracted Oils"""
+ZMID,Zahraa El Maadi Investment and Development Company SAE,,Zahraa Maadi Investment & Development,EGS21171C011,Real Estate,name_review,high,

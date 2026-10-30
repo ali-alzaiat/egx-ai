@@ -46,6 +46,7 @@ class ScreeningInput(NamedTuple):
     """Input data for Shariah screening."""
     company_id: str
     ticker: str
+    #: The Shariah activity TAG (``app.screening.activity_tags``), never a raw sector name.
     industry: str | None
     total_debt: Decimal | None
     total_assets: Decimal | None
@@ -53,6 +54,10 @@ class ScreeningInput(NamedTuple):
     total_revenue: Decimal | None
     cash_and_securities: Decimal | None
     provenance: dict[str, RuleProvenance] | None = None
+    #: How the tag was decided (sector_default, company_override, name_review, unreviewed).
+    industry_basis: str | None = None
+    #: Why the tag is unknown, when it is.
+    industry_reason: str | None = None
 
 
 class ScreeningOutput(NamedTuple):
@@ -120,6 +125,7 @@ class ShariahScreeningService:
             industry=screening_input.industry,
             prohibited_industries=prohibited,
         )
+        industry_result = self._explain_tag(industry_result, screening_input)
         rule_results.append(industry_result)
 
         # Determine overall compliance
@@ -138,6 +144,26 @@ class ShariahScreeningService:
             screened_at=datetime.now(UTC),
             report_date=report_date,
             report_date_reason=report_date_reason,
+        )
+
+    @staticmethod
+    def _explain_tag(
+        result: ScreeningRuleResult, screening_input: ScreeningInput
+    ) -> ScreeningRuleResult:
+        """Show the activity tag and its basis in the rule reason (tag only, no sector name)."""
+        if screening_input.industry is None:
+            if screening_input.industry_reason is None:
+                return result
+            return replace(result, reason=screening_input.industry_reason)
+        if screening_input.industry_basis is None:
+            return result
+        verdict = "prohibited" if result.verdict == ScreeningVerdict.FAIL else "permitted"
+        return replace(
+            result,
+            reason=(
+                f"Activity '{screening_input.industry}' ({screening_input.industry_basis}) "
+                f"is {verdict}"
+            ),
         )
 
     @staticmethod

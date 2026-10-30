@@ -9,7 +9,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useSignals, useStanceRadar } from "../api/client";
+import { useCompaniesOverview, useStanceRadar } from "../api/client";
 import { StanceBadge, Tag, ShariahPair, type StanceCode } from "../components/ui/Badges";
 import DataTable, { type Column } from "../components/ui/DataTable";
 import { Missing } from "../components/ui/Missing";
@@ -65,8 +65,9 @@ export default function Recommendations() {
   const clearFilters = (): void => update({ stance: null, egx33: null, q: null });
 
   const { data, isLoading, error, refetch } = useStanceRadar(50, shariahOnly ? "egx33" : undefined);
-  // Latest scored close date, the same date the stances are computed on.
-  const { data: market } = useSignals({ limit: 1 });
+  // Date of the latest stored prices: the overview answers it for any one ticker.
+  const firstTicker = data?.items[0]?.ticker;
+  const market = useCompaniesOverview(firstTicker ? [firstTicker] : []);
 
   const allRows = useMemo<RecoRow[]>(
     () =>
@@ -197,10 +198,9 @@ export default function Recommendations() {
         : `${t(value === "buy" ? "stance_buy" : value === "hold" ? "stance_hold" : "stance_reduce")} ${fmtInt(locale, counts[value])}`,
   }));
 
-  const asOf = fmtDate(locale, market?.as_of);
+  const asOf = fmtDate(locale, market.data?.price_date);
   const meta = [
     countText(t, locale, rows.length, "stocks_count"),
-    asOf ? t("prices_as_of_short", { date: asOf }) : null,
     rules ? t("rules_label", { rules }) : null,
   ]
     .filter((part): part is string => part !== null)
@@ -215,7 +215,7 @@ export default function Recommendations() {
   return (
     <div className="page">
       <PageTitle parts={[t("reco_title")]} />
-      <PageHeader title={t("reco_title")} subtitle={t("reco_subtitle")} />
+      <PageHeader title={t("reco_title")} subtitle={t("reco_subtitle")} pricesAsOf={asOf} />
 
       <div className="filters">
         <Segmented

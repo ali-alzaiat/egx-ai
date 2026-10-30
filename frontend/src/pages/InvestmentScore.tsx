@@ -3,6 +3,7 @@ import { useCompanyByTicker, useScore } from "../api/client";
 import { SCORE_COMPONENTS, SCORE_COMPONENT_KEYS, confidenceLabelKey, type ScoreComponentKey } from "../components/research/labels";
 import { ProvisionalTag, ResearchSection, TechnicalDetails } from "../components/research/parts";
 import { MissingReason, Reason } from "../components/research/reasons";
+import { ScoreExtras } from "../components/research/ScoreExtras";
 import DataTable, { type Column } from "../components/ui/DataTable";
 import { Notice } from "../components/ui/Notice";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
@@ -152,6 +153,7 @@ export default function InvestmentScore() {
           )}
         </>
       )}
+      <ScoreExtras piotroski={score?.piotroski} dividendSafety={score?.dividend_safety} />
     </ResearchSection>
   );
 }

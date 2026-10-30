@@ -20,6 +20,10 @@ const FILES = [
   "components/hub/DailyPrices.tsx",
   "components/hub/Reason.tsx",
   "components/hub/priceData.ts",
+  "components/hub/PriceHistory.tsx",
+  "components/hub/ConePanel.tsx",
+  "components/hub/PatternsPanel.tsx",
+  "components/hub/SessionSummary.tsx",
   "components/ui/PriceChart.tsx",
   "components/ui/InfoPopover.tsx",
 ];
@@ -48,6 +52,8 @@ const FORM_TAGS = new Set(["input", "select", "textarea", "form"]);
 const BUTTONS_ALLOWED = new Set([
   "components/ui/InfoPopover.tsx", // opens a definition
   "components/hub/DailyPrices.tsx", // pagination
+  "components/hub/PriceHistory.tsx", // Forecast / Patterns view toggles
+  "components/hub/PatternsPanel.tsx", // picks which pattern the chart emphasises
 ]);
 
 const SOURCES = import.meta.glob<string>(["../../pages/*.tsx", "../../components/*.tsx", "../../components/*/*.ts", "../../components/*/*.tsx"], {

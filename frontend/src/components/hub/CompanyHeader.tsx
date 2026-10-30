@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useCompanyPrices, useStance } from "../../api/client";
 import { useLang } from "../../i18n/useLang";
 import { fmtChange, fmtDate, fmtPrice, toNumber } from "../../lib/format";
-import type { Company, DailyPrice } from "../../types";
+import type { Company, DailyPrice, FundamentalsFreshness } from "../../types";
 import { ShariahPair, StanceBadge } from "../ui/Badges";
 import { CompanyName } from "../ui/CompanyName";
 import { TriangleDownIcon, TriangleUpIcon } from "../ui/icons";
@@ -20,6 +20,16 @@ export function latestTwoBars(items: readonly DailyPrice[]): DailyPrice[] {
     .filter((p) => !isPlaceholderBar(p))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, 2);
+}
+
+/** "Fundamentals: FY2025 (vendor, provisional)"; wording follows source tier and the provisional flag (R47 Q3). */
+function fundamentalsText(f: FundamentalsFreshness | undefined, t: ReturnType<typeof useLang>["t"]): string | null {
+  if (!f) return null;
+  if (f.status !== "AVAILABLE" || f.fiscal_year === null) return t("rx_fund_none");
+  const year = f.fiscal_year;
+  if (f.source_tier === "vendor") return t(f.provisional ? "rx_fund_vendor_prov" : "rx_fund_vendor", { year });
+  if (f.source_tier === "filing") return t("rx_fund_filing", { year });
+  return t("rx_fund_plain", { year });
 }
 
 function Skeleton() {
@@ -54,6 +64,7 @@ export default function CompanyHeader({ company }: { company: Company }) {
   const asOf = latest ? fmtDate(locale, latest.date) : null;
 
   const s = stance.data;
+  const fundamentals = fundamentalsText(company.fundamentals, t);
   const items: StatItem[] = [
     {
       id: "close",
@@ -116,11 +127,18 @@ export default function CompanyHeader({ company }: { company: Company }) {
         </h1>
       </div>
       <StatStrip items={items} label={company.ticker} />
-      {asOf && (
+      {(asOf || fundamentals) && (
         <p className="hub-asof">
-          {s?.rules_version
-            ? t("hub_prices_as_of", { date: asOf, rules: s.rules_version })
-            : t("hub_prices_as_of_only", { date: asOf })}
+          {[
+            asOf
+              ? s?.rules_version
+                ? t("hub_prices_as_of", { date: asOf, rules: s.rules_version })
+                : t("hub_prices_as_of_only", { date: asOf })
+              : null,
+            fundamentals,
+          ]
+            .filter((part): part is string => part !== null)
+            .join(" · ")}
         </p>
       )}
     </header>

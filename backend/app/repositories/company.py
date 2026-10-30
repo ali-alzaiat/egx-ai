@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import func, select, update
@@ -72,8 +72,9 @@ class CompanyRepository:
         await self.session.execute(stmt)
         return len(payload)
 
-    async def mark_absent_as(self, present_tickers: Sequence[str],
-                             status: CompanyStatus = CompanyStatus.DELISTED) -> int:
+    async def mark_absent_as(
+        self, present_tickers: Sequence[str], status: CompanyStatus = CompanyStatus.DELISTED
+    ) -> int:
         """Flag companies absent from the current universe snapshot.
 
         A company missing from a complete listing snapshot is no longer actively
@@ -114,10 +115,14 @@ class CompanyRepository:
         industry: str | None = None,
         status: CompanyStatus | None = None,
         search: str | None = None,
+        ids: Collection[uuid.UUID] | None = None,
     ) -> tuple[Sequence[Company], int]:
         query = select(Company)
         count_query = select(func.count(Company.id))
 
+        if ids is not None:
+            query = query.where(Company.id.in_(list(ids)))
+            count_query = count_query.where(Company.id.in_(list(ids)))
         if sector:
             query = query.where(Company.sector == sector)
             count_query = count_query.where(Company.sector == sector)

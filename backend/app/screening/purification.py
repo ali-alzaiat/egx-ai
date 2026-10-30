@@ -53,7 +53,7 @@ NOT_ZAKAT_COPY = (
 # EGX Islamic banks that pass screening by core-business carve-out, not by
 # ratio (research §3/§6). Their dividends take the carve-out branch — never a
 # silent zero multiplication.
-ISLAMIC_BANK_TICKERS: frozenset[str] = frozenset({"FAIT", "ADIB", "SAUD"})
+ISLAMIC_BANK_TICKERS: frozenset[str] = frozenset({"FAIT", "FAITA", "ADIB", "SAUD"})
 
 # The 14-line impure-income filing-extraction checklist (Islamicly) cited
 # verbatim in vocabulary whenever the ratio is unknown (R32 B4).

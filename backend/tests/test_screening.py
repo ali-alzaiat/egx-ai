@@ -182,16 +182,17 @@ class TestScreeningPersistence:
             id=uuid.uuid4(),
             ticker=f"ALC_{uuid.uuid4().hex[:8].upper()}",
             isin=f"EG{uuid.uuid4().hex[:10].upper()}",
-            name="Alcohol Producer",
-            sector="Beverages",
-            industry="Alcohol Production",
+            name="Conventional Bank",
+            sector="Banks",
+            industry=None,
             currency="EGP",
             status=CompanyStatus.ACTIVE,
         )
         db_session.add(company)
         await db_session.flush()
 
-        # Prohibited industry FAILs while every ratio rule lacks data.
+        # Conventional-banking activity tag (from the Banks sector default) FAILs while every
+        # ratio rule lacks data.
         response = await client.get(f"/api/screening/companies/{company.id}")
         assert response.status_code == 200
         assert response.json()["is_compliant"] is False

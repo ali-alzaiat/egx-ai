@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from app.screening.activity_tags import TAG_SET_VERSION, resolve_activity_tag
 from app.screening.rules import ScreeningRuleResult, ScreeningVerdict
 from app.screening.service import RuleProvenance, ScreeningInput
 from app.statements import bridge
@@ -66,8 +67,12 @@ def build_screening_input_from_statements(
         lv = p.get(code) if p is not None else None
         return lv.value if lv is not None else None
 
+    # Tag only: the raw EGX sector name never reaches ``screen_industry`` (R44 D-9).
+    activity = resolve_activity_tag(company.ticker, company.sector)
     provenance: dict[str, RuleProvenance] = {
-        "industry_screen": RuleProvenance(source="company record", source_date=None)
+        "industry_screen": RuleProvenance(
+            source=f"activity tags {TAG_SET_VERSION}: {activity.source}", source_date=None
+        )
     }
     if p is not None:
         for rule_name, codes in RULE_LINE_CODES.items():
@@ -78,13 +83,15 @@ def build_screening_input_from_statements(
     return ScreeningInput(
         company_id=str(company.id),
         ticker=company.ticker,
-        industry=company.industry,
+        industry=activity.tag,
         total_debt=value("interest_bearing_debt"),
         total_assets=value("total_assets"),
         interest_income=value("interest_income"),
         total_revenue=value("revenue"),
         cash_and_securities=value("cash_and_equivalents"),
         provenance=provenance,
+        industry_basis=activity.basis.value if activity.tag is not None else None,
+        industry_reason=activity.reason if activity.tag is None else None,
     )
 
 

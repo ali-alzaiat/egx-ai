@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.repositories.company import CompanyRepository
+from app.scores.extras import build_score_extras
 from app.scores.service import ScoreService
 from app.services.recompute import Engine, RecomputeService, compute_meta
 
@@ -23,12 +24,16 @@ async def get_score(
 
     404 for an unknown company. ``assessment`` is null only when the compute
     failed and no earlier snapshot exists (``compute_status: failed``).
+    ``piotroski`` and ``dividend_safety`` are always present (R47 Q1/Q2).
     """
-    if await CompanyRepository(session).get_by_id(company_id) is None:
+    company = await CompanyRepository(session).get_by_id(company_id)
+    if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
     state = await RecomputeService(session).ensure_fresh(company_id, Engine.SCORE)
     payload = await ScoreService(session).latest_payload(company_id)
     meta = compute_meta(state)
     meta.pop("methodology_version", None)
     payload.update(meta)
+    # Shown beside the score, never part of it (R47 Q1/Q2): computed on read, not persisted.
+    payload.update(await build_score_extras(session, company))
     return payload

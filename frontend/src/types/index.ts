@@ -13,6 +13,19 @@ export interface Company {
   status: 'ACTIVE' | 'SUSPENDED' | 'DELISTED' | 'UNKNOWN'
   created_at: string
   updated_at: string
+  /** Only on GET /companies/{id} and /companies/ticker/{ticker} (R47 Q3). */
+  fundamentals?: FundamentalsFreshness
+}
+
+/** Latest approved annual period of a company (R47 Q3); never a year when INSUFFICIENT_DATA. */
+export interface FundamentalsFreshness {
+  status: 'AVAILABLE' | 'INSUFFICIENT_DATA'
+  reason?: string | null
+  fiscal_year: number | null
+  period_end: string | null
+  source_tier: 'vendor' | 'filing' | null
+  provisional: boolean | null
+  published_date: string | null
 }
 
 export interface DailyPrice {
@@ -435,6 +448,70 @@ export interface ScoreResponse extends Partial<ComputeMeta> {
   methodology_version: string;
   scale: string;
   disclaimer: string;
+  /** R47 Q1/Q2: shown beside the score, never part of it. Absent on an older backend. */
+  piotroski?: PiotroskiBlock;
+  dividend_safety?: DividendSafetyBlock;
+}
+
+// ─── Score extras (R47 Q1 Piotroski, Q2 dividend safety) ─
+
+export type PiotroskiCheckStatus = "PASS" | "FAIL" | "INSUFFICIENT_DATA";
+
+export interface PiotroskiCheck {
+  key: string;
+  label: string;
+  group: "profitability" | "leverage_liquidity" | "operating_efficiency";
+  status: PiotroskiCheckStatus;
+  reason: string | null;
+  /** Named inputs as decimal strings; null = the input was missing (never a substituted 0). */
+  inputs: Record<string, string | null>;
+}
+
+export interface PiotroskiBlock {
+  version: string;
+  status: "AVAILABLE" | "INSUFFICIENT_DATA" | "NOT_RUN";
+  reason: string | null;
+  fiscal_year: number | null;
+  prior_fiscal_year: number | null;
+  /** Passes out of the checks that ran; null when none ran. */
+  passes: number | null;
+  checks_run: number;
+  checks_total: number;
+  checks: PiotroskiCheck[];
+  deviations: string[];
+  source_tier: SourceTier;
+  provisional: boolean;
+  sources: Provenance[];
+}
+
+export interface DividendMetric {
+  value: string | null;
+  status: "AVAILABLE" | "NOT_MEANINGFUL" | "INSUFFICIENT_DATA";
+  reason: string | null;
+}
+
+export interface DividendYear {
+  fiscal_year: number;
+  status: "PAID" | "NO_DIVIDEND" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  inputs: Record<string, string | null>;
+  payout_ratio: DividendMetric;
+  cash_coverage: DividendMetric;
+}
+
+export interface DividendSafetyBlock {
+  version: string;
+  /** "from dividends paid (derived)": the cash paid in the year, not the dividend declared. */
+  label: string;
+  status: "AVAILABLE" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  latest: DividendYear | null;
+  years: DividendYear[];
+  payout_formula: string;
+  coverage_formula: string;
+  source_tier: SourceTier;
+  provisional: boolean;
+  sources: Provenance[];
 }
 
 // ─── Industry peers (GET/PUT /api/industry/companies/{id}[…]) ─
@@ -1063,7 +1140,22 @@ export interface CompanyOverviewRow {
   stance: { stance: 'buy' | 'hold' | 'reduce'; confidence: number; reasons: string[] } | null
   latest_price: { close: string; date: string } | null
   gross_margin: { value: string | null; status: string; reason: string | null } | null
+  /** Only with `forming=true`: shapes forming at the last session (R47 P7). */
+  forming?: FormingSummary[]
 }
+
+/** One forming shape as the Companies table shows it (no points or lines). */
+export interface FormingSummary {
+  pattern: string
+  expected: 'up' | 'down' | null
+  known_date: string
+  sessions_left: number
+  confirm_above: string | null
+  confirm_below: string | null
+}
+
+/** Companies filter choices: any forming shape, or by its expected break. */
+export type FormingFilter = 'any' | 'up' | 'down'
 
 export interface CompaniesOverviewResponse {
   items: Record<string, CompanyOverviewRow>
@@ -1173,3 +1265,216 @@ export interface DisclosureComparison {
     reason?: string | null;
   };
 }
+
+// ---- Price history chart (R47 P1-P5) ----
+
+/** GET /api/companies/{id}/prices/latest: the newest stored session and its change vs the one before. */
+export interface LatestPriceMissing {
+  status: "INSUFFICIENT_DATA";
+  company_id: string;
+  reason: string;
+  date: null;
+  close: null;
+}
+
+export interface LatestPriceAvailable extends DailyPrice {
+  status: "AVAILABLE";
+  previous_close: string | null;
+  previous_date: string | null;
+  change: string | null;
+  /** Percent, already x100 ("0.48" is 0.48%). */
+  change_pct: string | null;
+  change_reason: string | null;
+}
+
+export type LatestPrice = LatestPriceAvailable | LatestPriceMissing;
+
+/** One horizon of the volatility cone; prices are 4-dp strings. */
+export interface ConeHorizon {
+  days: number;
+  approx_date: string;
+  p05: string;
+  p25: string;
+  p50: string;
+  p75: string;
+  p95: string;
+}
+
+export interface ConeCalibrationHorizon {
+  days: number;
+  status: "AVAILABLE" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  n_cases: number;
+  first_case: string | null;
+  last_case: string | null;
+  /** Shares as decimals (0.5794 is 57.9%). */
+  inside_50: number | null;
+  inside_50_low: number | null;
+  inside_50_high: number | null;
+  inside_90: number | null;
+  inside_90_low: number | null;
+  inside_90_high: number | null;
+}
+
+export interface ConeCalibration {
+  version: string;
+  cone_version: string;
+  status: "AVAILABLE" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  n_closes: number;
+  horizons: ConeCalibrationHorizon[];
+  step_sessions: number;
+  min_cases: number;
+  nominal_50: number;
+  nominal_90: number;
+  interval: string;
+  note: string;
+}
+
+/** GET /api/technical/companies/{id}/volatility-cone: a range of typical moves, not a prediction. */
+export interface VolatilityConeResponse {
+  company_id: string;
+  version: string;
+  status: "AVAILABLE" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  as_of: string | null;
+  last_close: string | null;
+  sigma_daily: number | null;
+  sigma_annual: number | null;
+  n_returns: number;
+  window_start: string | null;
+  horizons: ConeHorizon[];
+  z_50: number;
+  z_90: number;
+  drift: string;
+  calendar_note: string;
+  note: string;
+  calibration: ConeCalibration;
+}
+
+export interface ChartPatternPoint {
+  label: string;
+  date: string;
+  price: string;
+}
+
+export interface ChartPatternLine {
+  label: string;
+  start: ChartPatternPoint;
+  end: ChartPatternPoint;
+}
+
+/** One confirmed pattern occurrence (detected with the prices known at its confirmation session). */
+export interface ChartPattern {
+  pattern: string;
+  stats_key: string;
+  direction: "up" | "down";
+  start_date: string;
+  end_date: string;
+  known_date: string;
+  confirmation_date: string;
+  confirmation_close: string;
+  break_level: string;
+  points: ChartPatternPoint[];
+  lines: ChartPatternLine[];
+  target: { price: string; label: string } | null;
+}
+
+export interface PatternStatsOk {
+  status: "OK";
+  n: number;
+  n_companies: number;
+  hits: number;
+  /** Shares as decimals. */
+  hit_rate: number;
+  base_rate: number;
+  difference: number;
+  wilson_low: number;
+  wilson_high: number;
+  median_return: number;
+  interval_excludes_base: boolean;
+}
+
+export interface PatternStatsMissing {
+  status: "INSUFFICIENT_DATA";
+  value: null;
+  reason: string;
+  n: number;
+  n_companies: number;
+}
+
+export type PatternStats = PatternStatsOk | PatternStatsMissing;
+
+/** GET /api/technical/companies/{id}/patterns: display only, nothing feeds the stance. */
+export interface PatternsResponse {
+  company_id: string;
+  version: string;
+  as_of: string | null;
+  status: "OK" | "INSUFFICIENT_DATA";
+  reason: string | null;
+  /** Newest confirmation first. */
+  patterns: ChartPattern[];
+  note: string;
+  /** stats_key -> horizon in sessions ("20" | "60") -> measured odds. */
+  stats: Record<string, Partial<Record<"20" | "60", PatternStats>>>;
+  universe: {
+    companies: number;
+    stock_days: number;
+    period_start: string | null;
+    period_end: string | null;
+    horizons: number[];
+    min_cases: number;
+  };
+  overlap_note: string;
+  /** Shapes still forming at the last session (R47 P6), most recently known first. */
+  forming: FormingChartPattern[];
+  forming_note: string;
+  /** Pattern type -> odds measured from the forming stage. */
+  forming_stats: Record<string, FormingStats>;
+}
+
+/** A shape with no breakout yet: the closes that would confirm or invalidate it, at the last session. */
+export interface FormingChartPattern {
+  pattern: string;
+  /** Expected break; null for a symmetrical triangle (either way). */
+  expected: "up" | "down" | null;
+  start_date: string;
+  end_date: string;
+  known_date: string;
+  sessions_left: number;
+  confirm_above: string | null;
+  confirm_below: string | null;
+  invalid_above: string | null;
+  invalid_below: string | null;
+  points: ChartPatternPoint[];
+  lines: ChartPatternLine[];
+}
+
+interface FormingStatsBase {
+  expected: "up" | "down" | null;
+  n: number;
+  n_companies: number;
+  /** Empty for a symmetrical triangle (no expected direction before the break). */
+  horizons: Partial<Record<"20" | "60", PatternStats>>;
+}
+
+export interface FormingStatsOk extends FormingStatsBase {
+  status: "OK";
+  confirmed: number;
+  failed: number;
+  expired: number;
+  confirm_rate: number;
+  confirm_wilson_low: number;
+  confirm_wilson_high: number;
+  /** Share of confirmed breaks that went up; null when none confirmed. */
+  up_break_share: number | null;
+}
+
+export interface FormingStatsMissing extends FormingStatsBase {
+  status: "INSUFFICIENT_DATA";
+  value: null;
+  reason: string;
+}
+
+export type FormingStats = FormingStatsOk | FormingStatsMissing;
+

@@ -42,7 +42,9 @@ FULL_YEAR: dict[str, Decimal] = {
 }
 
 
-async def make_company(session: AsyncSession, industry: str | None = None) -> Company:
+async def make_company(
+    session: AsyncSession, industry: str | None = None, sector: str | None = None
+) -> Company:
     company = Company(
         id=uuid.uuid4(),
         ticker=f"R43_{uuid.uuid4().hex[:6].upper()}",
@@ -50,6 +52,8 @@ async def make_company(session: AsyncSession, industry: str | None = None) -> Co
         name="R43 Test Co",
         currency="EGP",
         industry=industry,
+        # A permitted-by-default EGX sector, so the Shariah activity tag resolves (R44 D-9).
+        sector=sector or ("Basic Resources" if industry is not None else None),
         status=CompanyStatus.ACTIVE,
     )
     session.add(company)

@@ -9,7 +9,7 @@
  * render as <Missing> with the reason, never as zero.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCompanies, useCompaniesOverview, useSignals, useStanceRadar } from "../api/client";
 import DataTable, { type Column } from "../components/ui/DataTable";
@@ -20,7 +20,9 @@ import { EmptyState, ErrorState } from "../components/ui/States";
 import { useLang } from "../i18n/useLang";
 import { fmtDate, fmtInt, fmtPct, fmtPrice } from "../lib/format";
 import { useMediaQuery } from "../lib/useMediaQuery";
-import type { Company, MarketSignal } from "../types";
+import { FORMING_NAME_KEY } from "../lib/priceOverlays";
+import { Segmented } from "../components/ui/Segmented";
+import type { Company, FormingFilter, FormingSummary, MarketSignal } from "../types";
 import {
   Pagination,
   RichText,
@@ -46,6 +48,11 @@ function isLine(line: string): line is keyof typeof LINE_KEY {
 }
 const SEARCH_DEBOUNCE_MS = 250;
 
+const FORMING_CHOICES = ["any", "up", "down"] as const satisfies readonly FormingFilter[];
+function parseForming(value: string | null): FormingFilter | null {
+  return FORMING_CHOICES.find((c) => c === value) ?? null;
+}
+
 export default function Companies() {
   const { t, locale } = useLang();
   const narrow = useMediaQuery("(max-width: 767px)");
@@ -53,6 +60,7 @@ export default function Companies() {
   // `search` is the older parameter name still used by "company not found" links.
   const q = params.get("q") ?? params.get("search") ?? "";
   const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
+  const forming = parseForming(params.get("forming"));
 
   const update = (patch: Record<string, string | null>): void => {
     setParams(
@@ -85,12 +93,12 @@ export default function Companies() {
     update({ q: null, page: null });
   };
 
-  const list = useCompanies({ page, page_size: PAGE_SIZE, search: q || undefined });
+  const list = useCompanies({ page, page_size: PAGE_SIZE, search: q || undefined, forming: forming ?? undefined });
   const universe = useCompanies({ page_size: 1 });
   const universeTotal = universe.data?.total ?? (q ? undefined : list.data?.total);
 
   const tickers = useMemo(() => (list.data?.items ?? []).map((c) => c.ticker), [list.data]);
-  const overview = useCompaniesOverview(tickers);
+  const overview = useCompaniesOverview(tickers, forming !== null);
   const signals = useSignals({ limit: 500 });
   const radar = useStanceRadar(50);
   const rules = radar.data?.rules_version ?? null;
@@ -102,11 +110,55 @@ export default function Companies() {
   }, [signals.data]);
 
   const marketDate = overview.data?.price_date ?? null;
+  // With the forming filter on, a company opens with its chart patterns shown.
+  const companyHref = useCallback(
+    (ticker: string): string => `/companies/${ticker}${forming !== null ? "?patterns=1" : ""}`,
+    [forming],
+  );
+  const formingOptions = [
+    { value: "all" as const, label: t("comp_forming_all") },
+    ...FORMING_CHOICES.map((c) => ({ value: c, label: t(`comp_forming_${c}` as const) })),
+  ];
   const overviewPending = overview.isLoading;
 
   const columns = useMemo<Column<Company>[]>(() => {
     const pending = <span className="skeleton-bar" />;
     const lineLabel = (line: string): string => (isLine(line) ? t(LINE_KEY[line]) : line.replace(/_/g, " "));
+    const shapeText = (f: FormingSummary): string => {
+      const nameKey = FORMING_NAME_KEY[f.pattern];
+      const name = nameKey ? t(nameKey) : f.pattern.replace(/_/g, " ");
+      const above = fmtPrice(locale, f.confirm_above);
+      const below = fmtPrice(locale, f.confirm_below);
+      const level =
+        above !== null && below !== null
+          ? t("comp_forming_either", { above, below })
+          : above !== null
+            ? t("comp_forming_above", { price: above })
+            : t("comp_forming_below", { price: below ?? "" });
+      return `${name} · ${level} · ${t("comp_forming_left", { n: fmtInt(locale, f.sessions_left) ?? "" })}`;
+    };
+    const formingColumn: Column<Company>[] =
+      forming === null
+        ? []
+        : [
+            {
+              id: "forming",
+              header: t("comp_col_forming"),
+              cell: (c) => {
+                if (overviewPending) return pending;
+                const shapes = overview.data?.items[c.ticker]?.forming ?? [];
+                return shapes.length === 0 ? (
+                  <Missing localized={t("comp_forming_none")} />
+                ) : (
+                  <span className="forming-cell">
+                    {shapes.map((f) => (
+                      <span key={f.pattern}>{shapeText(f)}</span>
+                    ))}
+                  </span>
+                );
+              },
+            },
+          ];
     return stockFirst<Company>(
       [
         {
@@ -115,8 +167,9 @@ export default function Companies() {
           sortable: true,
           sticky: true,
           sortValue: (c) => c.ticker,
-          cell: (c) => <Stock ticker={c.ticker} name={c.name} nameAr={c.name_ar} href={`/companies/${c.ticker}`} cardLinked />,
+          cell: (c) => <Stock ticker={c.ticker} name={c.name} nameAr={c.name_ar} href={companyHref(c.ticker)} cardLinked />,
         },
+        ...formingColumn,
         {
           id: "close",
           header: t("comp_col_close"),
@@ -200,7 +253,7 @@ export default function Companies() {
       ],
       narrow,
     );
-  }, [t, locale, narrow, overview.data, overviewPending, marketDate, signalByTicker, signals.isLoading, rules]);
+  }, [t, locale, narrow, overview.data, overviewPending, marketDate, signalByTicker, signals.isLoading, rules, forming, companyHref]);
 
   const data = list.data;
   const total = data?.total ?? 0;
@@ -214,11 +267,17 @@ export default function Companies() {
       to: fmtInt(locale, to) ?? "",
       total: fmtInt(locale, total) ?? "",
     });
-    const date = fmtDate(locale, marketDate);
-    return date ? `${range} · ${t("prices_as_of_short", { date })}` : range;
+    return range;
   })();
 
-  const empty = q ? (
+  const empty = forming !== null ? (
+    <div className="state">
+      <p>{t("comp_forming_none")}</p>
+      <button type="button" className="link-btn" onClick={() => update({ forming: null, page: null })}>
+        {t("clear_filters")}
+      </button>
+    </div>
+  ) : q ? (
     <div className="state">
       <p>{t("comp_no_match", { q })}</p>
       <button type="button" className="link-btn" onClick={clearSearch}>
@@ -235,6 +294,7 @@ export default function Companies() {
       <PageHeader
         title={t("comp_title")}
         subtitle={universeTotal !== undefined ? t("comp_subtitle", { n: fmtInt(locale, universeTotal) ?? "" }) : undefined}
+        pricesAsOf={fmtDate(locale, marketDate)}
       />
       <p className="muted">
         <RichText
@@ -255,7 +315,14 @@ export default function Companies() {
           value={draft}
           onChange={(e) => onSearch(e.target.value)}
         />
+        <Segmented
+          label={t("comp_forming_label")}
+          options={formingOptions}
+          value={forming ?? "all"}
+          onChange={(v) => update({ forming: v === "all" ? null : v, page: null })}
+        />
       </div>
+      {forming !== null && <p className="muted">{t("comp_forming_note")}</p>}
 
       {list.isError ? (
         <ErrorState thing={t("comp_thing")} onRetry={() => void list.refetch()} />
@@ -270,8 +337,8 @@ export default function Companies() {
             loadingThing={t("comp_thing")}
             meta={meta}
             empty={empty}
-            cardFields={["close", "asof", "stance", "tier"]}
-            rowHref={(c) => `/companies/${c.ticker}`}
+            cardFields={forming === null ? ["close", "asof", "stance", "tier"] : ["forming", "close", "stance", "tier"]}
+            rowHref={(c) => companyHref(c.ticker)}
             footnote={t("comp_footnote")}
           />
           <Pagination

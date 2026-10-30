@@ -32,6 +32,7 @@ TECHNICAL_METHODOLOGY_VERSION = "technical-1.0"
 
 class TechnicalInput(NamedTuple):
     """Input data for technical analysis."""
+
     company_id: str
     ticker: str
     prices: list[Decimal]
@@ -42,6 +43,7 @@ class TechnicalInput(NamedTuple):
 
 class TechnicalOutput(NamedTuple):
     """Output of technical analysis."""
+
     company_id: str
     ticker: str
     indicators: list[IndicatorResult]
@@ -132,12 +134,16 @@ class TechnicalService:
         if company is None:
             raise LookupError(f"company {company_id} not found")
         bars = (
-            await self.session.execute(
-                select(DailyPrice)
-                .where(DailyPrice.company_id == company_id)
-                .order_by(DailyPrice.date.asc())
+            (
+                await self.session.execute(
+                    select(DailyPrice)
+                    .where(DailyPrice.company_id == company_id)
+                    .order_by(DailyPrice.date.asc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         price_as_of = bars[-1].date if bars else None
         output = await self.calculate_indicators(
             TechnicalInput(
