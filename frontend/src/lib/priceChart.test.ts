@@ -1,23 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
-  coneGeometry,
+  addTradingDays,
+  candleData,
+  coneOverlay,
   coneValues,
   dateIndex,
-  gridValues,
-  horizonX,
-  linePath,
-  monthTicks,
-  nearestIndex,
-  patternGeometry,
+  futureTradingDates,
+  isCandle,
+  lineData,
   patternInView,
+  patternOverlay,
   patternValues,
-  periodTicks,
+  priceExtent,
   rangeStart,
-  scaleY,
   sliceRange,
-  splitX,
-  tickUnit,
-  yDomain,
+  tickLabel,
+  tickUnitFor,
+  timeToIso,
   type ChartBar,
   type ConeShape,
   type PatternShape,
@@ -44,59 +43,6 @@ describe("sliceRange", () => {
   });
   it("returns nothing for no bars", () => {
     expect(sliceRange([], "1Y")).toEqual([]);
-  });
-});
-
-describe("yDomain", () => {
-  it("covers closes and reference lines with headroom", () => {
-    const d = yDomain([10, 14], [8, 20]);
-    expect(d).not.toBeNull();
-    expect(d!.min).toBeLessThan(8);
-    expect(d!.max).toBeGreaterThan(20);
-  });
-  it("widens a flat series so it can be drawn", () => {
-    const d = yDomain([5, 5], []);
-    expect(d!.max).toBeGreaterThan(d!.min);
-  });
-  it("is null with no usable values", () => {
-    expect(yDomain([], [])).toBeNull();
-    expect(yDomain([Number.NaN], [])).toBeNull();
-  });
-});
-
-describe("scales", () => {
-  it("maps the domain onto the pixel box, high values up", () => {
-    const d = { min: 0, max: 10 };
-    expect(scaleY(0, d, 10, 110)).toBe(110);
-    expect(scaleY(10, d, 10, 110)).toBe(10);
-  });
-  it("gives four gridlines inside the domain", () => {
-    const g = gridValues({ min: 0, max: 100 });
-    expect(g).toHaveLength(4);
-    expect(g[0]).toBeGreaterThan(0);
-    expect(g[3]).toBeLessThan(100);
-  });
-  it("draws one move then lines", () => {
-    const path = linePath(bars, { min: 9, max: 15 }, { left: 0, right: 300, top: 0, bottom: 100 });
-    expect(path.startsWith("M0.0 ")).toBe(true);
-    expect(path.match(/L/g)).toHaveLength(3);
-  });
-});
-
-describe("monthTicks", () => {
-  it("marks the first bar of each month and thins crowded ticks", () => {
-    expect(monthTicks(bars, 0, 300, 10).map((t) => t.index)).toEqual([0, 1, 2, 3]);
-    expect(monthTicks(bars, 0, 300, 120).map((t) => t.index)).toEqual([0, 2]);
-  });
-});
-
-describe("nearestIndex", () => {
-  it("snaps a pixel to the closest bar and clamps", () => {
-    expect(nearestIndex(0, 4, 0, 300)).toBe(0);
-    expect(nearestIndex(160, 4, 0, 300)).toBe(2);
-    expect(nearestIndex(999, 4, 0, 300)).toBe(3);
-    expect(nearestIndex(-50, 4, 0, 300)).toBe(0);
-    expect(nearestIndex(10, 1, 0, 300)).toBe(0);
   });
 });
 
@@ -131,50 +77,90 @@ describe("ranges: week, month, YTD, 5 years", () => {
   });
 });
 
-describe("periodTicks", () => {
-  const daily: ChartBar[] = [
-    { date: "2026-10-25", close: 1 },
-    { date: "2026-10-26", close: 1 },
-    { date: "2026-10-27", close: 1 },
-    { date: "2026-11-01", close: 1 },
+describe("series data", () => {
+  const ohlc: ChartBar[] = [
+    { date: "2026-10-20", open: 10, high: 12, low: 9, close: 11 },
+    { date: "2026-10-21", open: 11, high: 13, low: 10, close: 12 },
+    { date: "2026-10-22", close: 12.5 },
   ];
-  it("picks the unit from the range", () => {
-    expect(tickUnit("1W")).toBe("day");
-    expect(tickUnit("1M")).toBe("day");
-    expect(tickUnit("YTD")).toBe("month");
-    expect(tickUnit("1Y")).toBe("month");
-    expect(tickUnit("5Y")).toBe("year");
+  it("maps each bar to a line point on its ISO date", () => {
+    expect(lineData(ohlc)).toEqual([
+      { time: "2026-10-20", value: 11 },
+      { time: "2026-10-21", value: 12 },
+      { time: "2026-10-22", value: 12.5 },
+    ]);
+    expect(lineData([])).toEqual([]);
   });
-  it("marks every day, month or year and thins crowded labels", () => {
-    expect(periodTicks(daily, "day", 0, 300, 10).map((t) => t.index)).toEqual([0, 1, 2, 3]);
-    expect(periodTicks(daily, "day", 0, 300, 150).map((t) => t.index)).toEqual([0, 2]);
-    expect(periodTicks(daily, "month", 0, 300, 10).map((t) => t.index)).toEqual([0, 3]);
-    expect(periodTicks(bars, "year", 0, 300, 10).map((t) => t.index)).toEqual([0]);
+  it("draws a candle only from a bar with open, high and low", () => {
+    expect(candleData(ohlc).map((c) => c.time)).toEqual(["2026-10-20", "2026-10-21"]);
+    expect(candleData(ohlc)[0]).toEqual({ time: "2026-10-20", open: 10, high: 12, low: 9, close: 11 });
   });
-  it("gives no label to a leading partial year", () => {
-    const fiveYears: ChartBar[] = [
-      { date: "2021-10-31", close: 1 },
-      { date: "2022-01-02", close: 1 },
-      { date: "2023-01-01", close: 1 },
-    ];
-    expect(periodTicks(fiveYears, "year", 0, 300, 10).map((t) => t.date)).toEqual(["2022-01-02", "2023-01-01"]);
+  it("leaves out a bar whose high or low contradicts its open and close, never repairs it", () => {
+    expect(isCandle({ date: "d", open: 10, high: 9, low: 8, close: 9.5 })).toBe(false);
+    expect(isCandle({ date: "d", open: 10, high: 12, low: 11, close: 11.5 })).toBe(false);
+    expect(isCandle({ date: "d", open: Number.NaN, high: 12, low: 9, close: 11 })).toBe(false);
+    expect(isCandle({ date: "d", open: 10, high: 12, low: 9, close: 11 })).toBe(true);
   });
 });
 
-describe("forecast zone", () => {
-  const box = { left: 0, right: 400, top: 0, bottom: 200 };
-  it("gives the right share of the plot to the forecast", () => {
-    expect(splitX(box, 0)).toBe(400);
-    expect(splitX(box, 0.25)).toBe(300);
-    expect(splitX(box, 5)).toBe(40);
+describe("trading calendar", () => {
+  it("steps over Friday and Saturday only", () => {
+    // 2026-10-22 is a Thursday: the next trading day is Sunday the 25th.
+    expect(addTradingDays("2026-10-22", 1)).toBe("2026-10-25");
+    expect(addTradingDays("2026-10-25", 5)).toBe("2026-11-01");
+    expect(addTradingDays("2026-10-22", 0)).toBe("2026-10-22");
   });
-  it("places horizons linearly, the longest at the right edge", () => {
-    expect(horizonX(126, 126, 300, 400)).toBe(400);
-    expect(horizonX(63, 126, 300, 400)).toBe(350);
-    expect(horizonX(0, 126, 300, 400)).toBe(300);
-    expect(horizonX(500, 126, 300, 400)).toBe(400);
-    expect(horizonX(10, 0, 300, 400)).toBe(300);
+  it("gives one date per session to the longest horizon", () => {
+    const dates = futureTradingDates("2026-10-22", 126);
+    expect(dates).toHaveLength(126);
+    expect(dates[20]).toBe(addTradingDays("2026-10-22", 21));
+    expect(dates[125]).toBe(addTradingDays("2026-10-22", 126));
   });
+  it("lists ascending dates with no weekend day", () => {
+    const dates = futureTradingDates("2026-10-22", 12);
+    expect(dates[0]).toBe("2026-10-25");
+    expect([...dates].sort()).toEqual(dates);
+    for (const d of dates) expect([5, 6]).not.toContain(new Date(`${d}T00:00:00Z`).getUTCDay());
+    expect(futureTradingDates("2026-10-22", 0)).toEqual([]);
+  });
+});
+
+describe("time-axis labels", () => {
+  it("reads an ISO date from a chart time", () => {
+    expect(timeToIso("2026-10-22")).toBe("2026-10-22");
+    expect(timeToIso({ year: 2026, month: 3, day: 9 })).toBe("2026-03-09");
+    expect(timeToIso(Date.UTC(2026, 9, 22) / 1000)).toBe("2026-10-22");
+    expect(timeToIso(Number.NaN)).toBeNull();
+  });
+  it("maps the library's tick types to day, month and year labels", () => {
+    expect(tickUnitFor(0)).toBe("year");
+    expect(tickUnitFor(1)).toBe("month");
+    expect(tickUnitFor(2)).toBe("day");
+    expect(tickUnitFor(3)).toBe("day");
+  });
+  it("formats English labels", () => {
+    expect(tickLabel("en", "2026-10-22", "day")).toBe("22 Oct");
+    expect(tickLabel("en", "2026-10-22", "month")).toBe("Oct");
+    expect(tickLabel("en", "2026-10-22", "year")).toBe("2026");
+  });
+  it("keeps Latin digits in Arabic", () => {
+    expect(tickLabel("ar-EG-u-nu-latn", "2026-10-22", "day")).toMatch(/22/);
+    expect(tickLabel("ar-EG-u-nu-latn", "2026-10-22", "year")).toBe("2026");
+  });
+});
+
+describe("priceExtent", () => {
+  it("is the lowest and highest finite value", () => {
+    expect(priceExtent([3, 9, Number.NaN, 1])).toEqual({ min: 1, max: 9 });
+    expect(priceExtent([5])).toEqual({ min: 5, max: 5 });
+  });
+  it("is null with no usable values", () => {
+    expect(priceExtent([])).toBeNull();
+    expect(priceExtent([Number.NaN, Infinity])).toBeNull();
+  });
+});
+
+describe("forecast cone on real dates", () => {
   const cone: ConeShape = {
     lastClose: 100,
     levels: [
@@ -182,31 +168,35 @@ describe("forecast zone", () => {
       { days: 126, p05: 70, p25: 85, p75: 118, p95: 140 },
     ],
   };
-  it("lists every price the cone reaches for the y domain", () => {
+  it("lists every price the cone reaches for the price scale", () => {
     const values = coneValues(cone);
     expect(Math.min(...values)).toBe(70);
     expect(Math.max(...values)).toBe(140);
     expect(values).toContain(100);
   });
+  it("extends the time axis over every trading day to the longest horizon", () => {
+    const overlay = coneOverlay(cone, "2026-10-22")!;
+    expect(overlay.futureDates).toHaveLength(126);
+    expect(overlay.futureDates[0]).toBe("2026-10-25");
+    expect(overlay.horizons).toEqual([
+      { days: 21, date: addTradingDays("2026-10-22", 21) },
+      { days: 126, date: overlay.futureDates[125] },
+    ]);
+  });
   it("draws two closed bands that start at the last close and widen to each horizon", () => {
-    const geo = coneGeometry(cone, { min: 60, max: 150 }, box, 300);
-    expect(geo.band90.startsWith("M300.0 ")).toBe(true);
-    expect(geo.band90.endsWith("Z")).toBe(true);
-    expect(geo.band50.match(/L/g)).toHaveLength(4);
-    expect(geo.marks.map((m) => m.days)).toEqual([21, 126]);
-    expect(geo.marks[0]!.x).toBeCloseTo(316.67, 1);
-    expect(geo.marks[1]!.x).toBe(400);
-    // At the last horizon the 90% band reaches higher on screen (a smaller y) than the 50% band.
-    const topAtEnd = (path: string): number =>
-      Math.min(...[...path.matchAll(/L400\.0 ([\d.]+)/g)].map((m) => Number(m[1])));
-    expect(topAtEnd(geo.band90)).toBeLessThan(topAtEnd(geo.band50));
+    const overlay = coneOverlay(cone, "2026-10-22")!;
+    expect(overlay.band90[0]).toEqual({ date: "2026-10-22", price: 100 });
+    // Start, the upper edge at each horizon, then the lower edge back again.
+    expect(overlay.band90.map((p) => p.price)).toEqual([100, 110, 140, 70, 90]);
+    expect(overlay.band50.map((p) => p.price)).toEqual([100, 105, 118, 85, 95]);
+    expect(overlay.band90[2]!.date).toBe(overlay.futureDates[125]);
+    expect(overlay.band90[3]!.date).toBe(overlay.futureDates[125]);
+    // At the last horizon the 90% band reaches wider than the 50% band.
+    expect(overlay.band90[2]!.price).toBeGreaterThan(overlay.band50[2]!.price);
+    expect(overlay.band90[3]!.price).toBeLessThan(overlay.band50[3]!.price);
   });
   it("draws nothing without horizons", () => {
-    expect(coneGeometry({ lastClose: 1, levels: [] }, { min: 0, max: 2 }, box, 300)).toEqual({
-      band90: "",
-      band50: "",
-      marks: [],
-    });
+    expect(coneOverlay({ lastClose: 1, levels: [] }, "2026-10-22")).toBeNull();
   });
 });
 
@@ -245,25 +235,44 @@ describe("pattern overlays", () => {
     expect(patternInView({ ...shape, confirmationDate: "2026-09-01" }, history)).toBe(false);
     expect(patternInView(shape, [])).toBe(false);
   });
-  it("includes points, lines, break level and target in the y domain values", () => {
+  it("includes points, lines, break level and target in the price scale values", () => {
     expect(patternValues(shape)).toEqual(expect.arrayContaining([130.1, 126.89, 136.7, 144.9]));
     expect(patternValues({ ...shape, target: null })).not.toContain(144.9);
   });
-  it("maps dates and prices to pixels inside the history zone", () => {
-    const box = { left: 0, right: 300, top: 0, bottom: 100 };
-    const domain = { min: 120, max: 150 };
-    const geo = patternGeometry(shape, history, domain, box, 240);
-    expect(geo.points).toHaveLength(3);
-    expect(geo.points[0]!.x).toBe(0);
-    expect(geo.points[2]!.x).toBeGreaterThan(geo.points[1]!.x);
-    expect(geo.points.every((p) => p.x <= 240)).toBe(true);
-    expect(geo.outline.startsWith("M0.0 ")).toBe(true);
-    expect(geo.lines).toHaveLength(1);
-    expect(geo.breakMark.x).toBe(geo.lines[0]!.x2);
-    // Higher prices are higher on screen: the target sits above the break level.
-    expect(geo.targetLine!.y).toBeLessThan(geo.breakMark.y);
-    expect(geo.targetLine!.x1).toBe(0);
-    expect(geo.targetLine!.x2).toBe(geo.breakMark.x);
-    expect(patternGeometry({ ...shape, target: null }, history, domain, box, 240).targetLine).toBeNull();
+  it("puts a confirmed pattern on bar dates: points, lines, break mark and target", () => {
+    const o = patternOverlay(shape, history);
+    expect(o.forming).toBe(false);
+    expect(o.points.map((p) => p.date)).toEqual(["2026-06-08", "2026-06-21", "2026-06-29"]);
+    expect(o.outline).toEqual(o.points);
+    // 2026-07-07 is a bar: the confirming close sits on it, at the break level.
+    expect(o.breakMark).toEqual({ date: "2026-07-07", price: 136.7 });
+    expect(o.target).toEqual({ startDate: "2026-06-08", endDate: "2026-07-07", price: 144.9 });
+    expect(o.lines).toHaveLength(1);
+    expect(o.levels).toEqual([]);
+  });
+  it("moves a date that is not a bar to the next bar", () => {
+    const o = patternOverlay({ ...shape, points: [{ date: "2026-06-10", price: 130 }] }, history);
+    expect(o.points[0]!.date).toBe("2026-06-21");
+  });
+  it("has no target when the shape has none", () => {
+    expect(patternOverlay({ ...shape, target: null }, history).target).toBeNull();
+  });
+  it("draws a forming shape's confirming levels from the last key point to the latest bar", () => {
+    const forming: PatternShape = {
+      ...shape,
+      id: "forming:double_top:2026-06-08",
+      target: null,
+      forming: { above: 140, below: 125 },
+    };
+    const o = patternOverlay(forming, history);
+    expect(o.forming).toBe(true);
+    expect(o.breakMark).toBeNull();
+    expect(o.target).toBeNull();
+    expect(o.levels).toEqual([
+      { startDate: "2026-06-29", endDate: "2026-08-02", price: 140, side: "above" },
+      { startDate: "2026-06-29", endDate: "2026-08-02", price: 125, side: "below" },
+    ]);
+    const oneSided = patternOverlay({ ...forming, forming: { above: 140, below: null } }, history);
+    expect(oneSided.levels.map((l) => l.side)).toEqual(["above"]);
   });
 });

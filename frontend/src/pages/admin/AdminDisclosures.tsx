@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseFiling, registerFiling, uploadFiling, useFacts, useFilings } from "../../api/client";
 import { Tag } from "../../components/ui/Badges";
@@ -113,10 +115,10 @@ function RegisterForm({ company, onDone }: { company: Company; onDone: () => Pro
       <p className="panel-lead">{t("adm_register_lead")}</p>
       <div className="fld-row">
         <Field label={t("adm_filing_url")}>
-          <input type="url" dir="ltr" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />
+          <Input type="url" dir="ltr" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />
         </Field>
         <Field label={t("adm_report_date")}>
-          <input type="date" dir="ltr" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input type="date" dir="ltr" required value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
       <details className="fold">
@@ -125,10 +127,10 @@ function RegisterForm({ company, onDone }: { company: Company; onDone: () => Pro
           <div className="fld-row">
             <TypeBasisFields type={type} basis={basis} onType={setType} onBasis={setBasis} />
             <Field label={t("adm_bulletin")}>
-              <input dir="ltr" value={bulletin} onChange={(e) => setBulletin(e.target.value)} />
+              <Input dir="ltr" value={bulletin} onChange={(e) => setBulletin(e.target.value)} />
             </Field>
             <Field label={t("adm_hash")}>
-              <input dir="ltr" value={hash} onChange={(e) => setHash(e.target.value)} />
+              <Input dir="ltr" value={hash} onChange={(e) => setHash(e.target.value)} />
             </Field>
           </div>
         </div>
@@ -136,9 +138,9 @@ function RegisterForm({ company, onDone }: { company: Company; onDone: () => Pro
       {error && <ErrorMessage view={error} />}
       {ok && <FormMessage kind="success" text={ok} />}
       <div>
-        <button type="submit" className="btn btn-primary" disabled={busy || url.trim() === "" || date === ""}>
+        <Button type="submit" disabled={busy || url.trim() === "" || date === ""}>
           {busy ? t("adm_registering") : t("adm_register")}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -207,7 +209,7 @@ function UploadForm({ company, onDone }: { company: Company; onDone: () => Promi
           />
         </Field>
         <Field label={t("adm_report_date")}>
-          <input type="date" dir="ltr" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <Input type="date" dir="ltr" required value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
       <details className="fold">
@@ -216,7 +218,7 @@ function UploadForm({ company, onDone }: { company: Company; onDone: () => Promi
           <div className="fld-row">
             <TypeBasisFields type={type} basis={basis} onType={setType} onBasis={setBasis} />
             <Field label={t("adm_bulletin")}>
-              <input dir="ltr" value={bulletin} onChange={(e) => setBulletin(e.target.value)} />
+              <Input dir="ltr" value={bulletin} onChange={(e) => setBulletin(e.target.value)} />
             </Field>
           </div>
         </div>
@@ -224,9 +226,9 @@ function UploadForm({ company, onDone }: { company: Company; onDone: () => Promi
       {error && <ErrorMessage view={error} />}
       {notice && <FormMessage kind="success" text={notice.text} detail={notice.detail} />}
       <div>
-        <button type="submit" className="btn btn-primary" disabled={busy || !file || date === ""}>
+        <Button type="submit" disabled={busy || !file || date === ""}>
           {busy ? t("adm_uploading") : t("adm_upload")}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -310,14 +312,14 @@ export default function AdminDisclosures({ company }: { company: Company }) {
         header: t("adm_col_action"),
         cell: (f) =>
           filingParseState(f, factRows) === "no_facts" ? (
-            <button
-              type="button"
-              className="link-btn"
+            <Button
+             
+              variant="link"
               disabled={parsingId === f.id}
               onClick={() => void parseAgain(f)}
             >
               {parsingId === f.id ? t("adm_parsing") : t("adm_parse_again")}
-            </button>
+            </Button>
           ) : null,
       },
     ],

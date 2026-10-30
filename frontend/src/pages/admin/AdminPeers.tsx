@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@/components/shadcn/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { putPeerOverride, useIndustrySnapshot } from "../../api/client";
 import { Tag } from "../../components/ui/Badges";
@@ -108,9 +109,9 @@ export default function AdminPeers({ company }: { company: Company }) {
       {error && <ErrorMessage view={error} />}
       {saved && <FormMessage kind="success" text={t("adm_saved")} />}
       <div>
-        <button type="button" className="btn btn-primary" disabled={saving || !dirty} onClick={() => void save()}>
+        <Button disabled={saving || !dirty} onClick={() => void save()}>
           {saving ? t("adm_saving") : t("adm_peers_save")}
-        </button>
+        </Button>
       </div>
     </section>
   );

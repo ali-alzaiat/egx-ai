@@ -2,6 +2,8 @@ import "./shared/fields.css";
 import "./Events.css";
 
 import { useMemo, useState } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { exportEvents, useEvents } from "../api/client";
 import { Tag } from "../components/ui/Badges";
 import CompanySearch from "../components/ui/CompanySearch";
@@ -79,9 +81,9 @@ export default function Events() {
         title={t("nav_events")}
         subtitle={t("ev_subtitle")}
         actions={
-          <button type="button" className="btn btn-secondary" onClick={() => void handleExport()} disabled={exporting}>
+          <Button variant="outline" onClick={() => void handleExport()} disabled={exporting}>
             {exporting ? t("ev_exporting") : t("ev_export")}
-          </button>
+          </Button>
         }
       />
 
@@ -101,7 +103,7 @@ export default function Events() {
           </select>
         </Field>
         <Field label={t("ev_from")}>
-          <input
+          <Input
             type="date"
             dir="ltr"
             value={filters.date_from}
@@ -110,7 +112,7 @@ export default function Events() {
           />
         </Field>
         <Field label={t("ev_to")}>
-          <input
+          <Input
             type="date"
             dir="ltr"
             value={filters.date_to}
@@ -120,9 +122,9 @@ export default function Events() {
         </Field>
         {filtered && (
           <div>
-            <button type="button" className="btn btn-secondary" onClick={clear}>
+            <Button variant="outline" onClick={clear}>
               {t("clear_filters")}
-            </button>
+            </Button>
           </div>
         )}
       </form>

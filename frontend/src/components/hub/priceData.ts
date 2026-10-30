@@ -17,13 +17,24 @@ export function realBarsNewestFirst(items: readonly DailyPrice[]): DailyPrice[] 
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
-/** Ascending close series for the chart. */
+/** Ascending series for the chart: the close, plus open/high/low where the API has them (for candles). */
 export function chartBars(newestFirst: readonly DailyPrice[]): ChartBar[] {
   const out: ChartBar[] = [];
   for (let i = newestFirst.length - 1; i >= 0; i--) {
     const bar = newestFirst[i]!;
     const close = toNumber(bar.close);
-    if (close !== null) out.push({ date: bar.date, close });
+    if (close === null) continue;
+    // Open/high/low are optional: a candle is drawn only when all three are usable.
+    const open = toNumber(bar.open);
+    const high = toNumber(bar.high);
+    const low = toNumber(bar.low);
+    out.push({
+      date: bar.date,
+      close,
+      ...(open !== null && { open }),
+      ...(high !== null && { high }),
+      ...(low !== null && { low }),
+    });
   }
   return out;
 }

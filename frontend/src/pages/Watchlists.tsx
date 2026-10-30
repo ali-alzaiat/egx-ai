@@ -2,6 +2,8 @@ import "./shared/fields.css";
 import "./Watchlists.css";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -68,20 +70,20 @@ function EditEntry({
       <h3>{t("wl_edit_title", { ticker: entry.company_ticker ?? t("trk_unknown_company") })}</h3>
       <div className="fld-row">
         <Field label={t("wl_group")}>
-          <input value={group} maxLength={100} onChange={(e) => setGroup(e.target.value)} placeholder={t("wl_group_placeholder")} />
+          <Input value={group} maxLength={100} onChange={(e) => setGroup(e.target.value)} placeholder={t("wl_group_placeholder")} />
         </Field>
         <Field label={t("wl_note")}>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("wl_note_placeholder")} />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("wl_note_placeholder")} />
         </Field>
       </div>
       {error && <ErrorMessage view={error} />}
       <div className="fld-actions">
-        <button type="submit" className="btn btn-primary" disabled={saving}>
+        <Button type="submit" disabled={saving}>
           {saving ? t("wl_saving") : t("wl_save")}
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={saving}>
+        </Button>
+        <Button variant="outline" onClick={onCancel} disabled={saving}>
           {t("wl_cancel")}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -134,12 +136,12 @@ function AddCompany({ watchlistId, onAdded }: { watchlistId: string; onAdded: ()
           />
         </FieldGroup>
         <Field label={t("wl_note_optional")}>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("wl_note_placeholder")} />
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("wl_note_placeholder")} />
         </Field>
         <div>
-          <button type="submit" className="btn btn-primary" disabled={adding || !company}>
+          <Button type="submit" disabled={adding || !company}>
             {adding ? t("wl_adding") : t("wl_add")}
-          </button>
+          </Button>
         </div>
       </div>
       {error && <ErrorMessage view={error} />}
@@ -177,11 +179,11 @@ function NewList({ onCreated }: { onCreated: (id: string) => void }) {
   return (
     <form className="wl-new" onSubmit={(e) => void submit(e)}>
       <Field label={t("wl_new_list")}>
-        <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder={t("wl_new_list_placeholder")} />
+        <Input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder={t("wl_new_list_placeholder")} />
       </Field>
-      <button type="submit" className="btn btn-secondary" disabled={creating || name.trim() === ""}>
+      <Button type="submit" variant="outline" disabled={creating || name.trim() === ""}>
         {creating ? t("wl_creating") : t("wl_create")}
-      </button>
+      </Button>
       {error && <ErrorMessage view={error} />}
     </form>
   );
@@ -331,35 +333,35 @@ export default function Watchlists() {
         cell: (e) =>
           confirmId === e.id ? (
             <span className="wl-actions">
-              <button type="button" className="link-btn" disabled={busyId === e.id} onClick={() => void remove(e)}>
+              <Button variant="link" disabled={busyId === e.id} onClick={() => void remove(e)}>
                 {busyId === e.id ? t("wl_removing") : t("wl_confirm_remove")}
-              </button>
-              <button type="button" className="link-btn" onClick={() => setConfirmId(null)}>
+              </Button>
+              <Button variant="link" onClick={() => setConfirmId(null)}>
                 {t("wl_cancel")}
-              </button>
+              </Button>
             </span>
           ) : (
             <span className="wl-actions">
-              <button
-                type="button"
-                className="link-btn"
+              <Button
+               
+                variant="link"
                 onClick={() => {
                   setEditingId(e.id);
                   setConfirmId(null);
                 }}
               >
                 {t("wl_edit")}
-              </button>
-              <button
-                type="button"
-                className="link-btn"
+              </Button>
+              <Button
+               
+                variant="link"
                 onClick={() => {
                   setConfirmId(e.id);
                   setEditingId(null);
                 }}
               >
                 {t("wl_remove")}
-              </button>
+              </Button>
             </span>
           ),
       },

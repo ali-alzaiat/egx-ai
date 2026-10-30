@@ -41,10 +41,19 @@
   --color-warn-bg: var(--warn-bg);
   --color-brand-bg: var(--accent-bg);
   --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-neutral: var(--neutral);
   --color-transparent: transparent;
   --color-current: currentColor;
   --shadow-pop: var(--shadow-pop);
   --shadow-card: var(--shadow-card);
+  /* Type scale: text-ui / text-table / text-meta carry our size and line-height tokens */
+  --text-ui: var(--fs-ui);
+  --text-ui--line-height: var(--lh-ui);
+  --text-table: var(--fs-table);
+  --text-table--line-height: var(--lh-table);
+  --text-meta: var(--fs-meta);
+  --text-meta--line-height: var(--lh-meta);
   --font-sans: var(--font-ui);
   --font-mono: var(--font-code);
 }

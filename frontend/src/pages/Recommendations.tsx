@@ -8,6 +8,7 @@
  */
 
 import { useMemo, type ReactNode } from "react";
+import { Input } from "@/components/shadcn/input";
 import { useSearchParams } from "react-router-dom";
 import { useCompaniesOverview, useStanceRadar } from "../api/client";
 import { StanceBadge, Tag, ShariahPair, type StanceCode } from "../components/ui/Badges";
@@ -232,9 +233,9 @@ export default function Recommendations() {
           />
           {t("reco_shariah_only")}
         </label>
-        <input
+        <Input
           type="search"
-          className="filter-input"
+          className="min-w-[200px] flex-1"
           aria-label={t("reco_filter_text")}
           placeholder={t("reco_filter_text")}
           value={text}

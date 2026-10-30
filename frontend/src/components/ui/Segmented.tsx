@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/shadcn/toggle-group";
 
 export interface SegmentedOption<V extends string> {
   value: V;
@@ -7,62 +7,41 @@ export interface SegmentedOption<V extends string> {
   lang?: string;
 }
 
-/** Radio-group segmented control, control-h tall (spec 3.10). */
+/**
+ * Single-choice segmented control on the shadcn ToggleGroup (spec 3.10). Arrow keys move the choice, like a
+ * radio group, and follow the reading direction. The `segmented` class is only a hook for page-level overrides.
+ */
 export function Segmented<V extends string>({
   options,
   value,
   onChange,
   label,
+  size,
 }: {
   options: readonly SegmentedOption<V>[];
   value: V;
   onChange: (value: V) => void;
   label: string;
+  size?: "default" | "sm";
 }) {
-  const refs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  const move = (from: number, step: number): void => {
-    const next = (from + step + options.length) % options.length;
-    const opt = options[next];
-    if (!opt) return;
-    onChange(opt.value);
-    refs.current[next]?.focus();
-  };
-
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number): void => {
-    // Arrow keys follow the visual direction, which flips in RTL.
-    const rtl = document.documentElement.dir === "rtl";
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      move(index, e.key === "ArrowRight" && rtl ? -1 : 1);
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      move(index, e.key === "ArrowLeft" && rtl ? 1 : -1);
-    }
+  const select = (next: string): void => {
+    const opt = options.find((o) => o.value === next);
+    if (opt) onChange(opt.value);
   };
 
   return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((opt, i) => {
-        const checked = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            tabIndex={checked ? 0 : -1}
-            lang={opt.lang}
-            onClick={() => onChange(opt.value)}
-            onKeyDown={(e) => onKeyDown(e, i)}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <ToggleGroup className="segmented" aria-label={label} size={size} value={value} onValueChange={select}>
+      {options.map((opt) => (
+        <ToggleGroupItem
+          key={opt.value}
+          value={opt.value}
+          lang={opt.lang}
+          // Arrow keys move focus; selecting on focus makes them move the choice, as a radio group does.
+          onFocus={() => select(opt.value)}
+        >
+          {opt.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   );
 }

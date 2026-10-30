@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { Button } from "@/components/shadcn/button";
 import { PageHeader } from "../components/ui/PageHeader";
 import { PageTitle } from "../components/ui/PageTitle";
 import { useLang } from "../i18n/useLang";
@@ -23,9 +24,9 @@ export default function NotFound({ nested = false }: { nested?: boolean }) {
         <PageHeader title={t("not_found_title")} subtitle={t("not_found_body")} />
       )}
       <div className="company-actions">
-        <Link to="/" className="btn btn-secondary">
-          {t("not_found_home")}
-        </Link>
+        <Button asChild variant="outline">
+          <Link to="/">{t("not_found_home")}</Link>
+        </Button>
       </div>
     </div>
   );

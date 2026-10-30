@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "@/components/shadcn/badge";
 import { useLang } from "../../i18n/useLang";
 import { fmtCycle } from "../../lib/format";
 import type { ShariahStatus } from "../../types";
@@ -6,11 +7,7 @@ import { BarIcon, TriangleDownIcon, TriangleUpIcon } from "./icons";
 
 /** Neutral tag: "Provisional", "Low liquidity", "EGX33 member", tiers (spec 3.7). */
 export function Tag({ children, title }: { children: ReactNode; title?: string }) {
-  return (
-    <span className="tag" title={title}>
-      {children}
-    </span>
-  );
+  return <Badge title={title}>{children}</Badge>;
 }
 
 export type StanceCode = "buy" | "hold" | "reduce";
@@ -29,9 +26,9 @@ export function isNotAssessed(
 }
 
 const STANCE_VIEW = {
-  buy: { key: "stance_buy", cls: "badge-gain", Icon: TriangleUpIcon },
-  hold: { key: "stance_hold", cls: "badge-neutral", Icon: BarIcon },
-  reduce: { key: "stance_reduce", cls: "badge-loss", Icon: TriangleDownIcon },
+  buy: { key: "stance_buy", variant: "gain", Icon: TriangleUpIcon },
+  hold: { key: "stance_hold", variant: "neutral", Icon: BarIcon },
+  reduce: { key: "stance_reduce", variant: "loss", Icon: TriangleDownIcon },
 } as const;
 
 /**
@@ -52,26 +49,26 @@ export function StanceBadge({
   const { t } = useLang();
   if (!stance || isNotAssessed(stance, confidence, reasonsCount)) {
     return (
-      <span className="badge badge-none" title={t("stance_not_assessed_tooltip")}>
+      <Badge variant="none" title={t("stance_not_assessed_tooltip")}>
         {t("stance_not_assessed")}
-      </span>
+      </Badge>
     );
   }
   const view = STANCE_VIEW[stance];
   const title = t("stance_tooltip", { rules: rules ?? "", c: confidence ?? 0 });
   return (
-    <span className={`badge ${view.cls}`} title={title}>
+    <Badge variant={view.variant} title={title}>
       <view.Icon size={12} />
       {t(view.key)}
-    </span>
+    </Badge>
   );
 }
 
 const VERDICT_VIEW = {
-  COMPLIANT: { key: "shariah_compliant", cls: "badge-accent" },
-  NON_COMPLIANT: { key: "shariah_non_compliant", cls: "badge-warn" },
-  INSUFFICIENT_DATA: { key: "shariah_insufficient", cls: "badge-muted" },
-  NOT_SCREENED: { key: "shariah_not_screened", cls: "badge-outline" },
+  COMPLIANT: { key: "shariah_compliant", variant: "accent" },
+  NON_COMPLIANT: { key: "shariah_non_compliant", variant: "warn" },
+  INSUFFICIENT_DATA: { key: "shariah_insufficient", variant: "muted" },
+  NOT_SCREENED: { key: "shariah_not_screened", variant: "outline" },
 } as const;
 
 /** Our verdict. Never gain/loss colours, so a pass is not read as a price gain (spec 5.2). */
@@ -86,7 +83,7 @@ export function ShariahBadge({
   const view = VERDICT_VIEW[verdict];
   return (
     <span className="shariah-pair">
-      <span className={`badge ${view.cls}`}>{t(view.key)}</span>
+      <Badge variant={view.variant}>{t(view.key)}</Badge>
       {provisional && <Tag>{t("shariah_provisional")}</Tag>}
     </span>
   );

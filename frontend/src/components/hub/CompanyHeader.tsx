@@ -8,6 +8,7 @@ import { CompanyName } from "../ui/CompanyName";
 import { TriangleDownIcon, TriangleUpIcon } from "../ui/icons";
 import { Missing } from "../ui/Missing";
 import { StatStrip, type StatItem } from "../ui/StatStrip";
+import { ValueSkeleton } from "../ui/States";
 
 /** Placeholder bars (O=H=L=C and zero volume) are not trading days. */
 function isPlaceholderBar(p: DailyPrice): boolean {
@@ -30,10 +31,6 @@ function fundamentalsText(f: FundamentalsFreshness | undefined, t: ReturnType<ty
   if (f.source_tier === "vendor") return t(f.provisional ? "rx_fund_vendor_prov" : "rx_fund_vendor", { year });
   if (f.source_tier === "filing") return t("rx_fund_filing", { year });
   return t("rx_fund_plain", { year });
-}
-
-function Skeleton() {
-  return <span className="skeleton-bar" style={{ width: "6ch" }} />;
 }
 
 /**
@@ -72,7 +69,7 @@ export default function CompanyHeader({ company }: { company: Company }) {
       hero: true,
       numeric: true,
       value: prices.isLoading ? (
-        <Skeleton />
+        <ValueSkeleton />
       ) : lastClose ? (
         <>
           {lastClose} <span className="stat-sub">{t("egp")}</span>
@@ -86,7 +83,7 @@ export default function CompanyHeader({ company }: { company: Company }) {
       label: t("hub_change"),
       numeric: true,
       value: prices.isLoading ? (
-        <Skeleton />
+        <ValueSkeleton />
       ) : changeText ? (
         <span className="hub-change" data-dir={dir}>
           {dir === "up" && <TriangleUpIcon size={12} />}
@@ -101,7 +98,7 @@ export default function CompanyHeader({ company }: { company: Company }) {
       id: "stance",
       label: t("hub_stance"),
       value: stance.isLoading ? (
-        <Skeleton />
+        <ValueSkeleton />
       ) : s ? (
         <StanceBadge stance={s.stance} confidence={s.confidence} reasonsCount={s.reasons.length} rules={s.rules_version} />
       ) : (
@@ -112,7 +109,7 @@ export default function CompanyHeader({ company }: { company: Company }) {
     {
       id: "shariah",
       label: t("hub_shariah"),
-      value: stance.isLoading ? <Skeleton /> : s ? <ShariahPair shariah={s.shariah} /> : <Missing />,
+      value: stance.isLoading ? <ValueSkeleton /> : s ? <ShariahPair shariah={s.shariah} /> : <Missing />,
     },
   ];
 

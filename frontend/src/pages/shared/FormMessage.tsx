@@ -1,3 +1,4 @@
+import { Alert } from "@/components/shadcn/alert";
 import type { ErrorView } from "./apiError";
 import { useLang } from "../../i18n/useLang";
 
@@ -17,10 +18,7 @@ export function FormMessage({
   const { lang } = useLang();
   const foreign = lang === "ar" && !!detail;
   return (
-    <div
-      className={kind === "error" ? "alert alert-error" : "alert alert-success"}
-      role={kind === "error" ? "alert" : "status"}
-    >
+    <Alert variant={kind === "error" ? "destructive" : "success"} role={kind === "error" ? "alert" : "status"}>
       <p>
         {text}
         {detail ? (
@@ -30,7 +28,7 @@ export function FormMessage({
           </>
         ) : null}
       </p>
-    </div>
+    </Alert>
   );
 }
 

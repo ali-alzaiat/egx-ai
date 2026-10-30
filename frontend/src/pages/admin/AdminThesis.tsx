@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { updateThesis, useThesis } from "../../api/client";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
@@ -82,7 +84,7 @@ function UpdateForm({
       </Field>
       <div className="fld-row">
         <Field label={t("adm_reviewer")}>
-          <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
+          <Input value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
         </Field>
         <Field label={t("adm_classification")}>
           <select value={classification} onChange={(e) => setClassification(e.target.value)}>
@@ -148,9 +150,9 @@ function UpdateForm({
       {error && <ErrorMessage view={error} />}
       {saved && <FormMessage kind="success" text={t("adm_saved")} />}
       <div>
-        <button type="submit" className="btn btn-primary" disabled={busy || blank}>
+        <Button type="submit" disabled={busy || blank}>
           {busy ? t("adm_saving") : t("adm_record_update")}
-        </button>
+        </Button>
         {blank && <p className="fld-hint">{t("adm_rationale_first")}</p>}
       </div>
     </form>

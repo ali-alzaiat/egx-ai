@@ -10,6 +10,7 @@ import { Egx33Note, ShariahBadge, StanceBadge, Tag } from "../components/ui/Badg
 import { BackendText } from "../components/ui/BackendText";
 import { Missing } from "../components/ui/Missing";
 import { StatStrip, type StatItem } from "../components/ui/StatStrip";
+import { ValueSkeleton } from "../components/ui/States";
 import { useLang } from "../i18n/useLang";
 import { fmtDate, fmtEgpCompact, fmtInt, fmtPct, fmtPrice, toNumber } from "../lib/format";
 import { visibleReasons } from "../lib/stanceModel";
@@ -21,10 +22,6 @@ const DQ_SHORT = {
   company_profile: "ov_dq_profile",
   financial_statements: "ov_dq_statements",
 } as const;
-
-function Skeleton() {
-  return <span className="skeleton-bar" style={{ width: "6ch" }} />;
-}
 
 /** Free float arrives as a fraction (0.25) or already a percent (25); show a percent either way. */
 function freeFloatText(locale: string, value: string | null): string | null {
@@ -89,7 +86,7 @@ export default function CompanyDetail() {
   const week52 = fiftyTwoWeekRange(bars);
   const s = stance.data;
   const loading = query.isLoading;
-  const num = (text: string | null) => (loading ? <Skeleton /> : (text ?? <Missing localized={t("ov_not_in_data")} />));
+  const num = (text: string | null) => (loading ? <ValueSkeleton /> : (text ?? <Missing localized={t("ov_not_in_data")} />));
 
   const items: StatItem[] = [
     { id: "open", label: t("ov_open"), numeric: true, value: num(latest ? fmtPrice(locale, latest.open) : null) },
@@ -108,7 +105,7 @@ export default function CompanyDetail() {
       label: t("ov_avg_value", { n: s?.liquidity.window ?? 20 }),
       numeric: true,
       value: stance.isLoading ? (
-        <Skeleton />
+        <ValueSkeleton />
       ) : (
         (fmtEgpCompact(locale, s?.liquidity.avg_value_traded) ?? <Missing localized={t("ov_not_in_data")} />)
       ),
@@ -134,7 +131,7 @@ export default function CompanyDetail() {
           <article className="glance-item card-surface">
             <h3>{t("ov_glance_stance")}</h3>
             {stance.isLoading ? (
-              <Skeleton />
+              <ValueSkeleton />
             ) : s ? (
               <>
                 <p className="glance-main">
@@ -152,7 +149,7 @@ export default function CompanyDetail() {
           <article className="glance-item card-surface">
             <h3>{t("ov_glance_shariah")}</h3>
             {stance.isLoading ? (
-              <Skeleton />
+              <ValueSkeleton />
             ) : s ? (
               <div className="shariah-full">
                 <ShariahBadge verdict={s.shariah.verdict} />
@@ -167,7 +164,7 @@ export default function CompanyDetail() {
           <article className="glance-item card-surface">
             <h3>{t("ov_glance_fair_value")}</h3>
             {fairValue.isLoading ? (
-              <Skeleton />
+              <ValueSkeleton />
             ) : fv ? (
               <>
                 <p className="glance-text">
@@ -190,7 +187,7 @@ export default function CompanyDetail() {
       <section>
         <h2 className="section-title">{t("ov_data_quality")}</h2>
         {quality.isLoading ? (
-          <Skeleton />
+          <ValueSkeleton />
         ) : quality.data ? (
           <DataQualityLine items={quality.data.items} to={`${base}/financials/quality`} />
         ) : (

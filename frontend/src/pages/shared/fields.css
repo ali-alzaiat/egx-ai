@@ -3,7 +3,6 @@
 .fld { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .fld-label { font-size: var(--fs-table); color: var(--text-2); font-weight: 500; }
 .fld-hint { font-size: var(--fs-meta); color: var(--text-3); }
-.fld > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .fld > select,
 .fld > textarea {
   width: 100%; min-height: var(--control-h); padding-inline: var(--space-3);

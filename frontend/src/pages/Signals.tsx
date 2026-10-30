@@ -164,7 +164,7 @@ function ReferenceLevels({ s }: { s: StanceResult }) {
           </tbody>
         </table>
         <div className="card-surface levels-chart">
-          <PriceChart bars={series} range="3M" refLines={refLines} source={source} height={200} />
+          <PriceChart bars={series} range="3M" refLines={refLines} source={source} height={200} showHint={false} />
         </div>
       </div>
       <p className="table-footnote">{t("px_levels_caption")}</p>

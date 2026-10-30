@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Badge } from "@/components/shadcn/badge";
 import type { CopyKey } from "../../i18n";
 import { useLang } from "../../i18n/useLang";
 import { fmtEgpCompact, fmtInt, fmtPct, fmtRatio } from "../../lib/format";
@@ -99,9 +100,9 @@ function PiotroskiReason({ reason }: { reason: string }) {
 
 function ResultBadge({ status }: { status: PiotroskiCheck["status"] }) {
   const { t } = useLang();
-  if (status === "PASS") return <span className="badge badge-gain">{t("rx_pass")}</span>;
-  if (status === "FAIL") return <span className="badge badge-loss">{t("rx_fail")}</span>;
-  return <span className="badge badge-muted">{t("rx_insufficient")}</span>;
+  if (status === "PASS") return <Badge variant="gain">{t("rx_pass")}</Badge>;
+  if (status === "FAIL") return <Badge variant="loss">{t("rx_fail")}</Badge>;
+  return <Badge variant="muted">{t("rx_insufficient")}</Badge>;
 }
 
 function CheckItem({ check }: { check: PiotroskiCheck }) {

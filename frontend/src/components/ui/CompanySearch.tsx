@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type Ref } from "react";
+import { Button } from "@/components/shadcn/button";
 import { useNavigate } from "react-router-dom";
 import { useCompanies } from "../../api/client";
 import { useLang } from "../../i18n/useLang";
@@ -56,9 +57,9 @@ function Results({ q, listId, active, onResults, onPick, onHover }: ResultsProps
     return (
       <div className="combobox-list combobox-status" role="alert">
         <span>{t("search_error")}</span>
-        <button type="button" className="link-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => void refetch()}>
+        <Button variant="link" onMouseDown={(e) => e.preventDefault()} onClick={() => void refetch()}>
           {t("search_retry")}
-        </button>
+        </Button>
       </div>
     );
   }

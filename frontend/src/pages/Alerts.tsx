@@ -2,6 +2,8 @@ import "./shared/fields.css";
 import "./Alerts.css";
 
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -119,7 +121,7 @@ function BuildRule({ watchlists, onCreated }: { watchlists: readonly Watchlist[]
       {family === "price" && (
         <>
           <Field label={t("al_threshold_price")}>
-            <input
+            <Input
               type="number"
               dir="ltr"
               inputMode="decimal"
@@ -139,7 +141,7 @@ function BuildRule({ watchlists, onCreated }: { watchlists: readonly Watchlist[]
       )}
       {family === "valuation_gap" && (
         <Field label={t("al_gap_pct")}>
-          <input
+          <Input
             type="number"
             dir="ltr"
             inputMode="decimal"
@@ -152,7 +154,7 @@ function BuildRule({ watchlists, onCreated }: { watchlists: readonly Watchlist[]
       )}
       {family === "score_change" && (
         <Field label={t("al_threshold_pct")}>
-          <input
+          <Input
             type="number"
             dir="ltr"
             inputMode="decimal"
@@ -221,9 +223,9 @@ function BuildRule({ watchlists, onCreated }: { watchlists: readonly Watchlist[]
       {failure && <ErrorMessage view={failure} />}
       {created && <FormMessage kind="success" text={t("al_created")} />}
       <div>
-        <button type="submit" className="btn btn-primary" disabled={creating}>
+        <Button type="submit" disabled={creating}>
           {creating ? t("al_creating") : t("al_create")}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -259,22 +261,22 @@ function RuleList({ rules, scopeOf, pendingId, confirmId, onToggle, onAskDelete,
             </div>
           </div>
           <div className="al-actions">
-            <button type="button" className="btn btn-secondary" disabled={pendingId === rule.id} onClick={() => onToggle(rule)}>
+            <Button variant="outline" disabled={pendingId === rule.id} onClick={() => onToggle(rule)}>
               {rule.enabled ? t("al_disable") : t("al_enable")}
-            </button>
+            </Button>
             {confirmId === rule.id ? (
               <>
-                <button type="button" className="btn btn-primary" disabled={pendingId === rule.id} onClick={() => onDelete(rule)}>
+                <Button disabled={pendingId === rule.id} onClick={() => onDelete(rule)}>
                   {t("al_confirm_delete")}
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => onAskDelete(null)}>
+                </Button>
+                <Button variant="outline" onClick={() => onAskDelete(null)}>
                   {t("al_cancel")}
-                </button>
+                </Button>
               </>
             ) : (
-              <button type="button" className="btn btn-secondary" disabled={pendingId === rule.id} onClick={() => onAskDelete(rule)}>
+              <Button variant="outline" disabled={pendingId === rule.id} onClick={() => onAskDelete(rule)}>
                 {t("al_delete")}
-              </button>
+              </Button>
             )}
           </div>
         </li>
@@ -499,14 +501,14 @@ export default function Alerts() {
                       </div>
                       {!acked && (
                         <div className="al-actions">
-                          <button
-                            type="button"
-                            className="btn btn-primary"
+                          <Button
+                           
+                           
                             disabled={pendingId === row.id}
                             onClick={() => void acknowledge(row)}
                           >
                             {t("al_acknowledge")}
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </li>

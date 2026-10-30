@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { Button } from "@/components/shadcn/button";
 import { useMemo, useState, type ReactNode } from "react";
 import { useCompanyByTicker } from "../../api/client";
 import { useLang } from "../../i18n/useLang";
@@ -61,25 +62,25 @@ export default function DailyPrices() {
       />
       {totalPages > 1 && (
         <nav className="pagination" aria-label={t("page_aria")}>
-          <button type="button" className="pagination-btn pagination-prev" disabled={current <= 1} onClick={() => setPage(current - 1)}>
+          <Button className="pagination-prev" variant="outline" disabled={current <= 1} onClick={() => setPage(current - 1)}>
             <ChevronIcon size={12} />
             {t("page_prev")}
-          </button>
+          </Button>
           <span className="pagination-info">
             {t("px_prices_page_info", {
               page: new Intl.NumberFormat(locale).format(current),
               pages: new Intl.NumberFormat(locale).format(totalPages),
             })}
           </span>
-          <button
-            type="button"
-            className="pagination-btn pagination-next"
+          <Button
+           
+            className="pagination-next" variant="outline"
             disabled={current >= totalPages}
             onClick={() => setPage(current + 1)}
           >
             {t("page_next")}
             <ChevronIcon size={12} />
-          </button>
+          </Button>
         </nav>
       )}
     </section>

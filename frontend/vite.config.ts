@@ -13,6 +13,18 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+    build: {
+      rollupOptions: {
+        output: {
+          // The shadcn stack (R48 U2: Radix, Floating UI, tailwind-merge, cva) is ~120 kB: its own cacheable chunk keeps the app chunk under Vite's 500 kB warning.
+          manualChunks(id: string) {
+            if (/node_modules[\\/](radix-ui|@radix-ui|@floating-ui|tailwind-merge|class-variance-authority|clsx)[\\/]/.test(id)) return 'ui-kit'
+            if (/node_modules[\\/]lightweight-charts[\\/]/.test(id)) return 'charts'
+            return undefined
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {

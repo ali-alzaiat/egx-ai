@@ -24,22 +24,7 @@
 .page { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 .section-title { font-size: var(--fs-h3); line-height: var(--lh-h3); margin-bottom: var(--space-3); }
 
-/* ─── Buttons + controls ────────────────────────────────────────────── */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  min-height: var(--control-h); padding-inline: var(--space-4);
-  border-radius: var(--radius-sm); border: 1px solid transparent;
-  font-size: var(--fs-ui); font-weight: 600; text-decoration: none; white-space: nowrap;
-}
-.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn-primary:hover { opacity: 0.88; }
-.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-.btn-secondary:hover { background: var(--surface-2); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.link-btn {
-  background: none; border: 0; padding: 0; color: var(--accent);
-  font: inherit; text-decoration: underline; cursor: pointer;
-}
+/* ─── Links + filters (buttons, inputs, badges, notices are shadcn components: components/shadcn) ── */
 .back-link { color: var(--text-2); text-decoration: none; font-size: var(--fs-ui); }
 .back-link:hover { color: var(--text); }
 
@@ -48,28 +33,14 @@
   display: flex; align-items: center; gap: var(--space-2);
   font-size: var(--fs-table); color: var(--text-2); font-weight: 500; white-space: nowrap;
 }
-.filter-input, .filters select, .filter-select, .text-field {
+.filters select, .filter-select {
   min-height: var(--control-h); padding-inline: var(--space-3);
   background: var(--surface); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); color: var(--text); font-size: var(--fs-ui);
 }
-.filter-input { flex: 1; min-width: 200px; }
 input[type="number"], input[type="date"] { direction: ltr; }
 
 /* ─── Notice + states ───────────────────────────────────────────────── */
-.notice, .alert {
-  display: flex; gap: var(--space-3); align-items: flex-start;
-  padding: var(--card-pad);
-  border: 1px solid var(--border); border-radius: var(--radius-md);
-  background: var(--surface); color: var(--text); font-size: var(--fs-ui);
-}
-.notice svg { flex: none; margin-top: 2px; color: var(--text-2); }
-.notice-warning, .alert-warning { border-color: var(--warn); }
-.notice-warning { background: var(--warn-bg); }
-.notice-warning svg { color: var(--warn); }
-.alert-error { border-color: var(--loss); color: var(--loss); }
-.alert-success { border-color: var(--gain); color: var(--gain); }
-
 .state { padding: var(--space-8); color: var(--text-2); font-size: var(--fs-ui); text-align: center; }
 .state-error { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
 .empty {
@@ -78,27 +49,6 @@ input[type="number"], input[type="date"] { direction: ltr; }
 }
 .loading { padding: var(--space-8); color: var(--text-2); font-size: var(--fs-ui); text-align: center; }
 
-.skeleton-bar { display: block; height: 12px; border-radius: var(--radius-sm); background: var(--surface-2); }
-@media (prefers-reduced-motion: no-preference) {
-  .skeleton-bar { animation: skeleton-pulse 1.4s ease-in-out infinite; }
-}
-@keyframes skeleton-pulse { 50% { opacity: 0.55; } }
-
-/* ─── Badges ────────────────────────────────────────────────────────── */
-.badge, .tag {
-  display: inline-flex; align-items: center; gap: var(--space-1);
-  height: var(--badge-h); padding: var(--badge-pad); border-radius: var(--badge-radius);
-  font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: 600; white-space: nowrap;
-}
-.tag { background: var(--surface-2); color: var(--text-2); }
-.badge-gain { background: var(--gain-bg); color: var(--gain); }
-.badge-loss { background: var(--loss-bg); color: var(--loss); }
-.badge-neutral { background: var(--surface-2); color: var(--neutral); }
-.badge-none { color: var(--text-3); border: 1px solid var(--border); background: transparent; }
-.badge-accent { background: var(--accent-bg); color: var(--accent); }
-.badge-warn { background: var(--warn-bg); color: var(--warn); }
-.badge-muted { background: var(--surface-2); color: var(--text-3); }
-.badge-outline { background: transparent; color: var(--text-3); border: 1px solid var(--border); }
 .text-note { font-size: var(--fs-meta); color: var(--text-3); }
 .shariah-pair { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .shariah-full { display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }

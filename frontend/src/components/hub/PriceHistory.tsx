@@ -3,10 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { useChartPatterns, useCompanyPrices, useVolatilityCone } from "../../api/client";
 import { useLang } from "../../i18n/useLang";
 import {
+  CHART_MODES,
   OVERVIEW_RANGES,
   patternInView,
   sliceRange,
   type ChartBar,
+  type ChartMode,
   type ChartRange,
   type OverviewRange,
   type PatternShape,
@@ -43,6 +45,7 @@ function fiveYearStart(): string {
 export default function PriceHistory({ companyId }: { companyId: string }) {
   const { t } = useLang();
   const [range, setRange] = useState<OverviewRange>("1Y");
+  const [mode, setMode] = useState<ChartMode>("line");
   const [forecastOn, setForecastOn] = useState(false);
   // `?patterns=1` (from the Companies forming filter) opens with the patterns shown.
   const [searchParams] = useSearchParams();
@@ -99,12 +102,17 @@ export default function PriceHistory({ companyId }: { companyId: string }) {
     value: r,
     label: t(`pxf_range_${r}` as const),
   }));
+  const modeOptions = CHART_MODES.map((m) => ({
+    value: m,
+    label: t(m === "line" ? "pxf_mode_line" : "pxf_mode_candles"),
+  }));
   const panelOn = overlaysActive && (forecastOn || patternsOn);
 
   return (
     <div className="price-history">
       <div className="price-history-controls">
         <Segmented options={options} value={range} onChange={chooseRange} label={t("px_chart_range_aria")} />
+        {overlaysActive && <Segmented options={modeOptions} value={mode} onChange={setMode} label={t("pxf_mode_aria")} />}
         {overlaysActive && (
           <div className="price-history-toggles" role="group" aria-label={t("pxf_overlays_aria")}>
             <button type="button" className="price-toggle" aria-pressed={forecastOn} onClick={() => setForecastOn((v) => !v)}>
@@ -126,7 +134,15 @@ export default function PriceHistory({ companyId }: { companyId: string }) {
       ) : (
         <div className="price-history-body" data-panel={panelOn}>
           <div className="price-history-main">
-            <PriceChart bars={series} range={lineRange} source={year.source} cone={coneDrawn} patterns={drawn} selectedPattern={activeId} />
+            <PriceChart
+              bars={series}
+              range={lineRange}
+              source={year.source}
+              mode={mode}
+              cone={coneDrawn}
+              patterns={drawn}
+              selectedPattern={activeId}
+            />
             {coneDrawn && (
               <p className="price-legend">
                 <strong>{t("pxf_legend_label")}</strong>

@@ -5,6 +5,7 @@
  */
 
 import { Fragment, type ReactNode } from "react";
+import { Button } from "@/components/shadcn/button";
 import { CompanyName } from "../../components/ui/CompanyName";
 import { StanceBadge, Tag, isNotAssessed, type StanceCode } from "../../components/ui/Badges";
 import { StockCell, type Column } from "../../components/ui/DataTable";
@@ -160,22 +161,22 @@ export function Pagination({
   const n = new Intl.NumberFormat(locale);
   return (
     <nav className="pagination" aria-label={t("page_aria")}>
-      <button type="button" className="pagination-btn pagination-prev" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+      <Button className="pagination-prev" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
         <ChevronIcon size={12} />
         {t("page_prev")}
-      </button>
+      </Button>
       <span className="pagination-info">
         {t("page_info", { page: n.format(page), pages: n.format(totalPages), total: n.format(total) })}
       </span>
-      <button
-        type="button"
-        className="pagination-btn pagination-next"
+      <Button
+       
+        className="pagination-next" variant="outline"
         disabled={page >= totalPages}
         onClick={() => onPage(page + 1)}
       >
         {t("page_next")}
         <ChevronIcon size={12} />
-      </button>
+      </Button>
     </nav>
   );
 }

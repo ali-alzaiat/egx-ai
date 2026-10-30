@@ -10,7 +10,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { Link, useSearchParams } from "react-router-dom";
+import { Badge } from "@/components/shadcn/badge";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { useCompanies, useCompaniesOverview, useSignals, useStanceRadar } from "../api/client";
 import DataTable, { type Column } from "../components/ui/DataTable";
 import { Missing } from "../components/ui/Missing";
@@ -122,7 +126,7 @@ export default function Companies() {
   const overviewPending = overview.isLoading;
 
   const columns = useMemo<Column<Company>[]>(() => {
-    const pending = <span className="skeleton-bar" />;
+    const pending = <Skeleton />;
     const lineLabel = (line: string): string => (isLine(line) ? t(LINE_KEY[line]) : line.replace(/_/g, " "));
     const shapeText = (f: FormingSummary): string => {
       const nameKey = FORMING_NAME_KEY[f.pattern];
@@ -191,9 +195,9 @@ export default function Companies() {
             if (text === null || !date) return <Missing localized={t("no_stored_price")} />;
             const stale = marketDate !== null && date < marketDate;
             return stale ? (
-              <span className="badge badge-warn" title={t("comp_stale_title")}>
+              <Badge variant="warn" title={t("comp_stale_title")}>
                 {text}
-              </span>
+              </Badge>
             ) : (
               text
             );
@@ -273,16 +277,16 @@ export default function Companies() {
   const empty = forming !== null ? (
     <div className="state">
       <p>{t("comp_forming_none")}</p>
-      <button type="button" className="link-btn" onClick={() => update({ forming: null, page: null })}>
+      <Button variant="link" onClick={() => update({ forming: null, page: null })}>
         {t("clear_filters")}
-      </button>
+      </Button>
     </div>
   ) : q ? (
     <div className="state">
       <p>{t("comp_no_match", { q })}</p>
-      <button type="button" className="link-btn" onClick={clearSearch}>
+      <Button variant="link" onClick={clearSearch}>
         {t("clear_filters")}
-      </button>
+      </Button>
     </div>
   ) : (
     <EmptyState>{t("comp_empty")}</EmptyState>
@@ -307,9 +311,9 @@ export default function Companies() {
       </p>
 
       <div className="filters">
-        <input
+        <Input
           type="search"
-          className="filter-input"
+          className="min-w-[200px] flex-1"
           aria-label={t("comp_search_label")}
           placeholder={t("comp_search_label")}
           value={draft}

@@ -9,6 +9,8 @@ import "./Rankings.css";
  */
 
 import { useMemo, useState } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import { useSearchParams } from "react-router-dom";
 import { useScoringModel, useSignals, useUnscorable } from "../api/client";
 import DataTable, { type Column } from "../components/ui/DataTable";
@@ -238,9 +240,9 @@ export default function Rankings() {
         <>
           {" · "}
           {countText(t, locale, coverage.unscorable, "no_history_count")} (
-          <button type="button" className="link-btn" aria-expanded={showExcluded} onClick={() => setShowExcluded((v) => !v)}>
+          <Button variant="link" aria-expanded={showExcluded} onClick={() => setShowExcluded((v) => !v)}>
             {showExcluded ? t("rank_hide_excluded") : t("rank_show_excluded")}
-          </button>
+          </Button>
           )
         </>
       )}
@@ -273,7 +275,7 @@ export default function Rankings() {
         <Segmented label={t("rank_tier_label")} options={tierOptions} value={tier} onChange={(v) => update({ tier: v === "all" ? null : v })} />
         <label>
           {t("rank_min_score")}
-          <input
+          <Input
             type="number"
             min={0}
             max={100}

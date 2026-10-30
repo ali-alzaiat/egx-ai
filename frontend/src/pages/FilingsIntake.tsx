@@ -11,6 +11,8 @@ import "./admin/Admin.css";
  */
 
 import { useMemo, useState } from "react";
+import { Input } from "@/components/shadcn/input";
+import { Button } from "@/components/shadcn/button";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { recordManualFiling, useFilingsIntake } from "../api/client";
@@ -103,9 +105,9 @@ export default function FilingsIntake() {
         header: t("intake_col_action"),
         cell: (i) => (
           <span className="adm-actions">
-            <button type="button" className="link-btn" onClick={() => setSelected(i)}>
+            <Button variant="link" onClick={() => setSelected(i)}>
               {t("intake_enter")}
-            </button>
+            </Button>
             {i.disclosure_url && (
               <a href={i.disclosure_url} target="_blank" rel="noreferrer">
                 {t("intake_disclosures")} <ExternalLinkIcon size={12} />
@@ -228,26 +230,26 @@ function FilingForm({
         <h3>
           {t("intake_form_title")} · <bdi dir="ltr">{item.ticker}</bdi>
         </h3>
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
+        <Button variant="outline" onClick={onClose}>
           {t("intake_close")}
-        </button>
+        </Button>
       </div>
       <div className="fld-row">
         <Field label={t("intake_fiscal_year")}>
-          <input type="number" dir="ltr" required value={fiscalYear} onChange={(e) => setFiscalYear(e.target.value)} />
+          <Input type="number" dir="ltr" required value={fiscalYear} onChange={(e) => setFiscalYear(e.target.value)} />
         </Field>
         <Field label={t("intake_period_end")}>
-          <input type="date" dir="ltr" required value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+          <Input type="date" dir="ltr" required value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
         </Field>
         <Field label={t("intake_publication_date")}>
-          <input type="date" dir="ltr" value={publicationDate} onChange={(e) => setPublicationDate(e.target.value)} />
+          <Input type="date" dir="ltr" value={publicationDate} onChange={(e) => setPublicationDate(e.target.value)} />
         </Field>
         <Field label={t("intake_currency")}>
-          <input dir="ltr" maxLength={3} required value={currency} onChange={(e) => setCurrency(e.target.value)} />
+          <Input dir="ltr" maxLength={3} required value={currency} onChange={(e) => setCurrency(e.target.value)} />
         </Field>
       </div>
       <Field label={t("intake_document_url")}>
-        <input
+        <Input
           type="url"
           dir="ltr"
           required
@@ -297,7 +299,7 @@ function FilingForm({
                       </td>
                       <td className="num" dir="ltr">
                         <div className="fld adm-cell-input">
-                          <input
+                          <Input
                             dir="ltr"
                             inputMode="decimal"
                             aria-label={`${lang === "ar" ? line.label_ar : line.label_en}: ${t("intake_value")}`}
@@ -308,7 +310,7 @@ function FilingForm({
                       </td>
                       <td className="num" dir="ltr">
                         <div className="fld adm-cell-input adm-cell-input-page">
-                          <input
+                          <Input
                             dir="ltr"
                             aria-label={`${lang === "ar" ? line.label_ar : line.label_en}: ${t("intake_page")}`}
                             value={inputs[line.code]?.page ?? ""}
@@ -329,9 +331,9 @@ function FilingForm({
       {error && <ErrorMessage view={error} />}
       {result && <FormMessage kind="success" text={t("intake_saved", { n: fmtInt(locale, result.lines.length) ?? "" })} />}
       <div>
-        <button type="submit" className="btn btn-primary" disabled={saving}>
+        <Button type="submit" disabled={saving}>
           {saving ? t("intake_saving") : t("intake_submit")}
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -2,6 +2,7 @@ import "../shared/fields.css";
 import "./Admin.css";
 
 import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/shadcn/button";
 import { useCompanyByTicker } from "../../api/client";
 import CompanySearch from "../../components/ui/CompanySearch";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/States";
@@ -55,9 +56,9 @@ export default function AdminCompanySection() {
       {body}
       {company.data && (
         <div>
-          <Link to={`/companies/${encodeURIComponent(company.data.ticker)}`} className="btn btn-secondary">
-            {t("admin_open_company")}
-          </Link>
+          <Button asChild variant="outline">
+            <Link to={`/companies/${encodeURIComponent(company.data.ticker)}`}>{t("admin_open_company")}</Link>
+          </Button>
         </div>
       )}
     </section>

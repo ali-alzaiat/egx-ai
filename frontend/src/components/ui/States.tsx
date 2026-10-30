@@ -1,3 +1,5 @@
+import { Button } from "@/components/shadcn/button";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { useLang } from "../../i18n/useLang";
 
 /** Empty: one sentence on why the area is empty and what fills it. No buttons (spec 3.9). */
@@ -12,9 +14,9 @@ export function NoMatch({ things, onClear }: { things: string; onClear?: () => v
     <div className="state">
       <p>{t("no_match_things", { things })}</p>
       {onClear && (
-        <button type="button" className="link-btn" onClick={onClear}>
+        <Button variant="link" onClick={onClear}>
           {t("clear_filters")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -26,9 +28,9 @@ export function ErrorState({ thing, onRetry }: { thing: string; onRetry: () => v
   return (
     <div className="state state-error" role="alert">
       <p>{t("load_error_thing", { thing })}</p>
-      <button type="button" className="btn btn-secondary" onClick={onRetry}>
+      <Button variant="outline" onClick={onRetry}>
         {t("retry")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -41,4 +43,9 @@ export function LoadingState({ thing }: { thing?: string }) {
       {thing ? t("loading_thing", { thing }) : t("loading")}
     </p>
   );
+}
+
+/** Placeholder for a single value that is still loading (about six characters wide). */
+export function ValueSkeleton() {
+  return <Skeleton className="w-[6ch]" />;
 }

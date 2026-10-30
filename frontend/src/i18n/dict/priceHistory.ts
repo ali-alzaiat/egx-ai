@@ -18,6 +18,13 @@ export const PRICE_HISTORY_COPY = {
   pxf_forecast: { en: "Forecast", ar: "التوقّع" },
   pxf_patterns: { en: "Patterns", ar: "الأنماط" },
   pxf_loading_history: { en: "price history", ar: "سجل الأسعار" },
+  pxf_mode_aria: { en: "Chart type", ar: "نوع الرسم" },
+  pxf_mode_line: { en: "Line", ar: "خط" },
+  pxf_mode_candles: { en: "Candles", ar: "شموع" },
+  pxf_zoom_hint: {
+    en: "Drag to pan; scroll or pinch to zoom; double-click an axis to reset.",
+    ar: "اسحب للتحريك؛ مرّر العجلة أو اقرص للتكبير؛ انقر نقرًا مزدوجًا على أحد المحورين لإعادة الضبط.",
+  },
 
   // ---- Day: last session summary ----
   pxf_day_title: { en: "Last session · {date}", ar: "آخر جلسة · {date}" },
@@ -51,8 +58,8 @@ export const PRICE_HISTORY_COPY = {
   pxf_band_50: { en: "50% of the time", ar: "50% من الوقت" },
   pxf_band_90: { en: "90% of the time", ar: "90% من الوقت" },
   pxf_legend_now: {
-    en: "Dashed line: last close",
-    ar: "الخط المتقطع: آخر إغلاق",
+    en: "Dashed line: last close; the time axis continues over the coming trading days",
+    ar: "الخط المتقطع: آخر إغلاق؛ ويمتد محور الزمن على أيام التداول القادمة",
   },
 
   // ---- Forecast panel ----

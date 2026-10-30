@@ -22,11 +22,16 @@ describe("realBarsNewestFirst", () => {
 });
 
 describe("chartBars", () => {
-  it("returns ascending numeric closes", () => {
+  it("returns ascending numeric bars with open, high, low and close", () => {
     expect(chartBars(realBarsNewestFirst(items))).toEqual([
-      { date: "2026-10-20", close: 10.5 },
-      { date: "2026-10-22", close: 11.5 },
+      { date: "2026-10-20", open: 10, high: 11, low: 9.5, close: 10.5 },
+      { date: "2026-10-22", open: 10.5, high: 12, low: 10, close: 11.5 },
     ]);
+  });
+  it("leaves out an open, high or low that is not a number instead of filling it in", () => {
+    const [bar0] = chartBars([bar("2026-10-20", "", "11", "9.5", "10.5", 100)]);
+    expect(bar0).toEqual({ date: "2026-10-20", high: 11, low: 9.5, close: 10.5 });
+    expect(chartBars([bar("2026-10-20", "10", "11", "9.5", "n/a", 100)])).toEqual([]);
   });
 });
 

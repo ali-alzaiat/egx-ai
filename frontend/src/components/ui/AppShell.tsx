@@ -92,7 +92,8 @@ function NavGroups() {
   );
 }
 
-function SidebarFooter() {
+/** `compact` is the pointer-driven desktop sidebar; the touch drawer keeps the full 44px targets. */
+function SidebarFooter({ compact = false }: { compact?: boolean }) {
   const { pathname } = useLocation();
   const { lang, setLang, t } = useLang();
   const { theme, setTheme } = useTheme();
@@ -104,6 +105,7 @@ function SidebarFooter() {
   return (
     <div className="sidebar-footer">
       <Segmented
+        size={compact ? "sm" : "default"}
         label={t("lang_toggle_aria")}
         value={lang}
         onChange={setLang}
@@ -112,7 +114,7 @@ function SidebarFooter() {
           { value: "ar", label: "عربي", lang: "ar" },
         ]}
       />
-      <Segmented label={t("theme_aria")} value={theme} onChange={setTheme} options={themeOptions} />
+      <Segmented size={compact ? "sm" : "default"} label={t("theme_aria")} value={theme} onChange={setTheme} options={themeOptions} />
       <Link
         to={ADMIN_ITEM.to}
         className="sidebar-admin"
@@ -241,7 +243,7 @@ export default function AppShell() {
         </Link>
         <CompanySearch mode="search" inputRef={searchRef} />
         <NavGroups />
-        <SidebarFooter />
+        <SidebarFooter compact />
       </aside>
 
       <header className="topbar">

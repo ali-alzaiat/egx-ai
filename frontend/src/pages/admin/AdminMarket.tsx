@@ -2,6 +2,7 @@ import "../shared/fields.css";
 import "./Admin.css";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/shadcn/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { startMarketRefresh, useSyncStatus } from "../../api/client";
 import { Missing } from "../../components/ui/Missing";
@@ -134,14 +135,14 @@ export default function AdminMarket() {
       <p>{t("admin_market_intro")}</p>
       <StatStrip items={summary} label={t("adm_sync_summary")} />
       <div>
-        <button
-          type="button"
-          className="btn btn-primary"
+        <Button
+         
+         
           onClick={() => void onRefresh()}
           disabled={refreshing || live}
         >
           {refreshing || live ? t("admin_refreshing") : t("admin_refresh")}
-        </button>
+        </Button>
       </div>
       {(refreshing || live) && (
         <p role="status" className="muted">

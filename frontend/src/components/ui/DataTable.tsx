@@ -1,5 +1,7 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Button } from "@/components/shadcn/button";
 import { Link, useSearchParams } from "react-router-dom";
+import { Skeleton } from "@/components/shadcn/skeleton";
 import { useLang } from "../../i18n/useLang";
 import { readStored, writeStored } from "../../lib/storage";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -140,9 +142,9 @@ export default function DataTable<T>({
     <div className="table-toolbar">
       <div className="table-meta">{meta}</div>
       {!hideDensityToggle && !cards && (
-        <button type="button" className="link-btn text-note" onClick={toggleDensity}>
+        <Button className="text-note" variant="link" onClick={toggleDensity}>
           {compact ? t("table_density_comfortable") : t("table_density_compact")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -250,7 +252,7 @@ export default function DataTable<T>({
                   <tr key={`sk-${i}`}>
                     {columns.map((col) => (
                       <td key={col.id} className={col.sticky ? "col-sticky" : undefined}>
-                        <span className="skeleton-bar" />
+                        <Skeleton />
                       </td>
                     ))}
                   </tr>
