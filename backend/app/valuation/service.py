@@ -26,6 +26,7 @@ from app.valuation.assumptions import AssumptionSet, resolve_assumptions
 from app.valuation.constants import (
     BANK_PROFILE_KEY,
     DEFAULT_VALUATION_PROFILE_KEY,
+    FCFE_BASE_YEARS,
     PROFILE_WEIGHTS,
     RANGE_NOTE,
     SENSITIVITY_DISCOUNT_STEPS,
@@ -51,10 +52,10 @@ from app.valuation.models import (
     calculate_ddm,
     calculate_excess_returns,
     calculate_fcfe_2stage,
-    calculate_justified_pb,
-    implied_justified_pb_roe,
+    calculate_residual_income_2stage,
     select_preferred_multiple,
     solve_implied_growth,
+    solve_implied_roe_residual_income,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,11 +65,13 @@ PRIMARY_MODEL_MEMBERS: dict[str, ValuationModel] = {
     "dividend_discount": ValuationModel.DDM,
     "excess_returns": ValuationModel.EXCESS_RETURNS,
     "affo_two_stage": ValuationModel.AFFO_2STAGE,
-    "justified_pb": ValuationModel.JUSTIFIED_PB,
+    "residual_income_2stage": ValuationModel.RESIDUAL_INCOME_2STAGE,
 }
 
 #: Primary models whose cash-flow base is the 3-year FCFE (the base evidence is echoed).
 _FCF_BASED_MODELS = ("fcfe_two_stage", "affo_two_stage")
+#: Models that need a stage-1 growth rate.
+_GROWTH_MODELS = ("fcfe_two_stage", "affo_two_stage", "residual_income_2stage")
 
 #: Why the relative leg is off and what fair value therefore is (R46 V5).
 INTRINSIC_ONLY_NOTE = (
@@ -109,6 +112,11 @@ class FairValueInput(NamedTuple):
     exit_multiple: Decimal | None = None
     #: Evidence behind ``free_cash_flow`` (R46): method, 3 yearly FCFE values, gaps.
     fcfe_base: dict[str, Any] | None = None
+    #: Interest-bearing debt that grows with the firm (parent share, R46 V7) and its evidence.
+    debt: Decimal | None = None
+    debt_detail: dict[str, Any] | None = None
+    #: 3-year ROE evidence for the bank residual-income model (R46 V8).
+    roe_base: dict[str, Any] | None = None
 
 
 @dataclass
@@ -121,6 +129,12 @@ class _ResolvedPipeline:
     stable_growth: Decimal | None
     long_run_ke: Decimal | None
     fcf: Decimal | None
+    #: Parent-share debt that grows with the firm; None = unresolved (never zero-filled).
+    debt: Decimal | None
+    debt_reason: str | None
+    #: 3-year mean ROE for the residual income fallback (R46 V9); None = unresolved.
+    fallback_roe: Decimal | None
+    fallback_roe_reason: str | None
     fcf_scale: Decimal
     dps: Decimal | None
     roe: Decimal | None
@@ -157,7 +171,6 @@ class ResolvedFairValueInputs:
 #: Stored assumption keys each primary model needs (R44 (b) + R45 M5 + F13). The
 #: growth cap (``nominal_gdp_growth``) is only needed by the growth-stage models.
 _INTRINSIC_KEYS: dict[str, tuple[str, ...]] = {
-    "justified_pb": ("risk_free_rate", "equity_risk_premium", "long_run_inflation"),
     "excess_returns": (
         "risk_free_rate",
         "equity_risk_premium",
@@ -214,13 +227,13 @@ def _apply_assumption_gaps(
 
 
 def _fcfe_assumptions(base: Mapping[str, Any]) -> dict[str, str | None]:
-    """Flatten the FCFE base evidence into leg assumptions (``fcfe_FY<year>`` per year)."""
+    """Flatten the cash-flow base evidence into leg assumptions (``flow_FY<year>`` per year)."""
     out: dict[str, str | None] = {
-        "fcfe_base_method": str(base.get("method")),
-        "fcfe_base_mean": base.get("mean"),
+        "flow_base_method": str(base.get("method")),
+        "flow_base_mean": base.get("mean"),
     }
     for year in base.get("years") or []:
-        out[f"fcfe_FY{year['fiscal_year']}"] = year.get("fcfe")
+        out[f"flow_FY{year['fiscal_year']}"] = year.get("flow")
     return out
 
 
@@ -267,13 +280,11 @@ class FairValueService:
         self.data_quality = DataQualityService(session)
 
     def _compute_primary(self, p: _ResolvedPipeline) -> ValuationResult:
-        if p.primary_key == "justified_pb":
-            roe = p.roe + p.roe_shift if p.roe is not None else None
-            return calculate_justified_pb(p.bvps, roe, p.discount_rate, p.terminal_growth)
         if p.long_run_ke is None:
             model = {
                 "excess_returns": ValuationModel.EXCESS_RETURNS,
                 "affo_two_stage": ValuationModel.AFFO_2STAGE,
+                "residual_income_2stage": ValuationModel.RESIDUAL_INCOME_2STAGE,
             }.get(p.primary_key, ValuationModel.FCFE_2STAGE)
             return _insufficient(
                 model, "Missing long-run cost of equity (terminal discount rate)"
@@ -283,6 +294,12 @@ class FairValueService:
             return calculate_excess_returns(
                 p.bvps, roe, p.discount_rate, p.terminal_growth,
                 terminal_discount_rate=p.long_run_ke,
+            )
+        if p.primary_key == "residual_income_2stage":
+            roe = p.roe + p.roe_shift if p.roe is not None else None
+            return calculate_residual_income_2stage(
+                p.bvps, roe, p.discount_rate, p.growth_high, p.stable_growth,
+                p.terminal_growth, terminal_discount_rate=p.long_run_ke,
             )
         if p.primary_key == "affo_two_stage":
             fcf = p.affo * p.fcf_scale if p.affo is not None else None
@@ -296,8 +313,13 @@ class FairValueService:
                 cash_flow_source=p.affo_source,
                 terminal_discount_rate=p.long_run_ke,
             )
+        if p.fcf is not None and p.debt is None:
+            return _insufficient(
+                ValuationModel.FCFE_2STAGE,
+                f"Missing interest-bearing debt: {p.debt_reason or 'not resolved'}",
+            )
         fcf = p.fcf * p.fcf_scale if p.fcf is not None else None
-        return calculate_fcfe_2stage(
+        cash_flow = calculate_fcfe_2stage(
             fcf,
             p.growth_high,
             p.stable_growth,
@@ -305,6 +327,53 @@ class FairValueService:
             p.terminal_growth,
             shares_outstanding=p.shares,
             terminal_discount_rate=p.long_run_ke,
+            debt=p.debt if p.debt is not None else Decimal("0"),
+        )
+        if cash_flow.status == ValuationStatus.INVALID and p.primary_key == "fcfe_two_stage":
+            return self._residual_income_fallback(p, cash_flow)
+        return cash_flow
+
+    @staticmethod
+    def _residual_income_fallback(
+        p: _ResolvedPipeline, cash_flow: ValuationResult
+    ) -> ValuationResult:
+        """Value a company whose cash-flow model is INVALID with residual income (R46 V9).
+
+        Only INVALID falls back (missing data stays missing). The 3-year mean ROE must be
+        positive; otherwise the cash-flow result stays, with the attempt recorded. The
+        result carries ``fallback_from`` / ``fallback_reason`` (the cash-flow model's own
+        reason) in its assumptions.
+        """
+        model = ValuationModel.RESIDUAL_INCOME_2STAGE
+        attempt: ValuationResult
+        if p.fallback_roe is None:
+            attempt = _insufficient(
+                model, f"Missing ROE: {p.fallback_roe_reason or '3-year ROE not resolved'}"
+            )
+        elif p.fallback_roe <= 0:
+            attempt = _insufficient(
+                model, f"3-year mean ROE {p.fallback_roe} is not positive: no residual income value"
+            )
+        else:
+            attempt = calculate_residual_income_2stage(
+                p.bvps, p.fallback_roe + p.roe_shift, p.discount_rate, p.growth_high,
+                p.stable_growth, p.terminal_growth, terminal_discount_rate=p.long_run_ke,
+            )
+        if attempt.value is None:
+            return cash_flow._replace(
+                assumptions={
+                    **cash_flow.assumptions,
+                    "fallback_attempt_model": model.value,
+                    "fallback_attempt_status": attempt.status.value,
+                    "fallback_attempt_reason": attempt.reason,
+                }
+            )
+        return attempt._replace(
+            assumptions={
+                **attempt.assumptions,
+                "fallback_from": ValuationModel.FCFE_2STAGE.value,
+                "fallback_reason": cash_flow.reason,
+            }
         )
 
     def _compute_relative(self, p: _ResolvedPipeline) -> ValuationResult:
@@ -361,6 +430,76 @@ class FairValueService:
             else DEFAULT_VALUATION_PROFILE_KEY
         )
         return profile_row, key
+
+    async def _roe_base(
+        self, company_id: uuid.UUID, latest_year: int
+    ) -> tuple[Decimal | None, dict[str, Any]]:
+        """Mean of the metrics engine's ROE for the last 3 fiscal years (R46 V8).
+
+        The per-year ROE is net income / average equity (strict: it needs the prior year's
+        equity), so three years need four balance sheets. Every one of the years
+        ``latest_year`` .. ``latest_year - 2`` must have an AVAILABLE ROE; otherwise
+        INSUFFICIENT_DATA naming the years, never a shorter average.
+        """
+        wanted = [latest_year - back for back in range(FCFE_BASE_YEARS)]
+        rows = (
+            await self.session.execute(
+                select(
+                    FinancialPeriod.fiscal_year,
+                    FinancialMetric.value,
+                    FinancialMetric.status,
+                )
+                .join(FinancialPeriod, FinancialMetric.period_id == FinancialPeriod.id)
+                .where(FinancialMetric.company_id == company_id)
+                .where(FinancialMetric.metric_code == "roe")
+                .where(FinancialPeriod.fiscal_year.in_(wanted))
+                .order_by(
+                    FinancialPeriod.end_date.desc(), FinancialMetric.calculated_at.desc()
+                )
+            )
+        ).all()
+        newest: dict[int, tuple[Any, Any]] = {}
+        for fiscal_year, value, status in rows:
+            newest.setdefault(int(fiscal_year), (value, status))
+        years: list[dict[str, Any]] = []
+        values: list[Decimal] = []
+        for fy in wanted:
+            value, status = newest.get(fy, (None, None))
+            roe: Decimal | None = None
+            reason: str | None = None
+            if value is None or status != MetricStatusDB.AVAILABLE:
+                reason = f"no available ROE for FY{fy} (needs FY{fy} and FY{fy - 1} equity)"
+            else:
+                try:
+                    roe = Decimal(value) / Decimal("100")
+                except InvalidOperation:
+                    reason = f"unreadable ROE for FY{fy}"
+            if roe is not None:
+                values.append(roe)
+            years.append(
+                {
+                    "fiscal_year": fy,
+                    "roe": str(roe) if roe is not None else None,
+                    "status": "AVAILABLE" if roe is not None else "INSUFFICIENT_DATA",
+                    "reason": reason,
+                }
+            )
+        method = (
+            f"mean of the last {FCFE_BASE_YEARS} fiscal years of ROE "
+            "(net income / average equity, metrics engine)"
+        )
+        if len(values) < FCFE_BASE_YEARS:
+            gaps = "; ".join(str(y["reason"]) for y in years if y["reason"])
+            reason_all = f"ROE needs {FCFE_BASE_YEARS} fiscal years; {gaps}"
+            return None, {
+                "method": method, "years_required": FCFE_BASE_YEARS,
+                "status": "INSUFFICIENT_DATA", "reason": reason_all, "mean": None, "years": years,
+            }
+        mean = sum(values, Decimal(0)) / Decimal(FCFE_BASE_YEARS)
+        return mean, {
+            "method": method, "years_required": FCFE_BASE_YEARS, "status": "AVAILABLE",
+            "reason": None, "mean": str(mean), "years": years,
+        }
 
     async def resolve_inputs(self, company_id: uuid.UUID) -> ResolvedFairValueInputs:
         """Inputs from the statement bridge + the sourced assumption record (R43)."""
@@ -430,14 +569,34 @@ class FairValueService:
         fcf_value = take("free_cash_flow", fcfe.resolved) if fcfe is not None else None
         if fcfe is not None and fcfe.resolved.available and latest is not None:
             sources["free_cash_flow"] = (
-                f"statement: 3-year mean FCFE FY{latest.fiscal_year - 2}-FY{latest.fiscal_year} "
-                f"({bridge.tier_of(fcfe.resolved.sources)}); {bridge.FCFE_BASE_METHOD}"
+                f"statement: 3-year mean pre-financing flow FY{latest.fiscal_year - 2}-"
+                f"FY{latest.fiscal_year} ({bridge.tier_of(fcfe.resolved.sources)}); "
+                f"{bridge.FCFE_BASE_METHOD}"
             )
+        debt = None if is_bank else bridge.debt_base(statements, latest)
+        debt_value = take("debt", debt.resolved) if debt is not None else None
+        if debt is not None and debt.resolved.available:
+            sources["debt"] = (
+                f"statement: interest_bearing_debt FY{debt.fiscal_year} x parent share "
+                f"{debt.parent_share} ({debt.basis}); {bridge.DEBT_METHOD}"
+            )
+        roe_value: Decimal | None = None
+        roe_detail: dict[str, Any] | None = None
+        if latest is not None:
+            roe_value, roe_detail = await self._roe_base(company_id, latest.fiscal_year)
+            sources["stable_roe"] = (
+                f"metric:roe 3-year mean FY{latest.fiscal_year - 2}-FY{latest.fiscal_year}"
+                if roe_value is not None
+                else None
+            )
+            if roe_value is None:
+                gaps["stable_roe"] = str(roe_detail["reason"])
 
         inputs = FairValueInput(
             revenue_growth=growth,
             free_cash_flow=fcf_value,
             earnings_per_share=take("earnings_per_share", bridge.eps(latest)),
+            stable_roe=roe_value,
             book_value_per_share=take(
                 "book_value_per_share", bridge.book_value_per_share(latest)
             ),
@@ -459,6 +618,9 @@ class FairValueService:
             pb_ratio=assume("pb_ratio", "target_pb"),
             expected_dps=None,
             fcfe_base=fcfe.payload() if fcfe is not None else None,
+            debt=debt_value,
+            debt_detail=debt.payload() if debt is not None else None,
+            roe_base=roe_detail,
         )
         # Historical DPS is not an *expected* DPS: the DDM leg stays INSUFFICIENT.
         sources["expected_dps"] = None
@@ -601,7 +763,12 @@ class FairValueService:
         operating_margin = await prefill(
             "operating_margin", inputs.operating_margin, "operating_margin"
         )
-        stable_roe = await prefill("stable_roe", inputs.stable_roe, "roe")
+        if primary_key == "residual_income_2stage":
+            # Banks: only the 3-year average ROE counts, never the single-year metric.
+            stable_roe = inputs.stable_roe
+            sources["stable_roe"] = given.get("stable_roe") if stable_roe is not None else None
+        else:
+            stable_roe = await prefill("stable_roe", inputs.stable_roe, "roe")
 
         growth_high = revenue_growth if revenue_growth is not None else inputs.growth_rate
         growth_floored = growth_high is not None and growth_high < STAGE1_GROWTH_FLOOR
@@ -639,6 +806,10 @@ class FairValueService:
             stable_growth=inputs.stable_growth,
             long_run_ke=inputs.long_run_cost_of_equity,
             fcf=inputs.free_cash_flow,
+            debt=inputs.debt,
+            debt_reason=(input_gaps or {}).get("debt"),
+            fallback_roe=inputs.stable_roe,
+            fallback_roe_reason=(input_gaps or {}).get("stable_roe"),
             fcf_scale=Decimal("1"),
             dps=inputs.expected_dps,
             roe=stable_roe,
@@ -707,7 +878,7 @@ class FairValueService:
         growth_gap = (input_gaps or {}).get("revenue_growth")
         if (
             growth_gap
-            and primary_key in _FCF_BASED_MODELS
+            and primary_key in _GROWTH_MODELS
             and primary.value is None
             and primary.status == ValuationStatus.INSUFFICIENT_DATA
             and growth_high is None
@@ -725,11 +896,21 @@ class FairValueService:
         ):
             # Name the missing statement line (cfo / capex), not generic engine text.
             primary = _insufficient(primary.model, f"Missing free cash flow: {fcf_gap}")
+        roe_gap = (input_gaps or {}).get("stable_roe")
+        if (
+            roe_gap
+            and primary_key == "residual_income_2stage"
+            and primary.value is None
+            and primary.status == ValuationStatus.INSUFFICIENT_DATA
+            and stable_roe is None
+            and not (primary.reason or "").startswith("No intrinsic")
+        ):
+            primary = _insufficient(primary.model, f"Missing ROE: {roe_gap}")
         primary, relative, gap_reason = _apply_assumption_gaps(
             primary, relative, primary_key, missing_assumptions, assumptions
         )
         if primary_key in _FCF_BASED_MODELS and inputs.fcfe_base is not None:
-            # Show the evidence behind the cash-flow base on the leg itself (R46 V1/V2).
+            # Show the evidence behind the cash-flow base on the leg itself (R46 V1/V7).
             primary = primary._replace(
                 assumptions={**primary.assumptions, **_fcfe_assumptions(inputs.fcfe_base)}
             )
@@ -772,8 +953,21 @@ class FairValueService:
         def opt(value: Decimal | None) -> str | None:
             return str(value) if value is not None else None
 
+        intrinsic_leg = _leg_payload(primary)
+        attempt_model = primary.assumptions.get("fallback_attempt_model")
+        intrinsic_leg["fallback_from"] = primary.assumptions.get("fallback_from")
+        intrinsic_leg["fallback_reason"] = primary.assumptions.get("fallback_reason")
+        intrinsic_leg["fallback_attempt"] = (
+            {
+                "model": attempt_model,
+                "status": primary.assumptions.get("fallback_attempt_status"),
+                "reason": primary.assumptions.get("fallback_attempt_reason"),
+            }
+            if attempt_model
+            else None
+        )
         legs = {
-            "intrinsic": _leg_payload(primary),
+            "intrinsic": intrinsic_leg,
             "relative": _leg_payload(relative),
             "fallback": _leg_payload(fallback),
         }
@@ -811,6 +1005,8 @@ class FairValueService:
             "resolved_pe_target": opt(pe_target),
             "resolved_affo_source": affo_source,
             "fcfe_base": inputs.fcfe_base,
+            "debt": inputs.debt_detail,
+            "roe_base": inputs.roe_base,
         }
 
         payload: dict[str, Any] = {
@@ -876,10 +1072,16 @@ class FairValueService:
         growth_cap: Decimal | None,
     ) -> dict[str, Any]:
         """What the price implies under the model (R46 V6). Display only: not in the verdict."""
-        bank = p.primary_key == "justified_pb"
+        # Follow the model that produced the value: banks, and cash-flow companies valued
+        # by the residual income fallback (R46 V9), are inverted on ROE.
+        bank = (
+            p.primary_key == "residual_income_2stage"
+            or primary.model == ValuationModel.RESIDUAL_INCOME_2STAGE
+        )
+        roe = p.roe if p.primary_key == "residual_income_2stage" else p.fallback_roe
         metric = "roe" if bank else "growth_high"
         compare = (
-            {"key": "roe", "value": p.roe}
+            {"key": "roe", "value": roe}
             if bank
             else {"key": "nominal_gdp_growth", "value": growth_cap}
         )
@@ -901,7 +1103,7 @@ class FairValueService:
                     {"min": str(bounds[0]), "max": str(bounds[1])} if bounds is not None else None
                 ),
                 "price": str(price) if price is not None else None,
-                "model": p.primary_key,
+                "model": primary.model.value,
             }
 
         insufficient = ValuationStatus.INSUFFICIENT_DATA.value
@@ -910,16 +1112,24 @@ class FairValueService:
         if fs_missing:
             return block(None, insufficient, "financial-statements data quality is MISSING")
         result: ImpliedResult
+        if (bank or p.primary_key == "fcfe_two_stage") and p.long_run_ke is None:
+            return block(
+                None, insufficient, "Missing long-run cost of equity (terminal discount rate)"
+            )
         if bank:
-            result = implied_justified_pb_roe(price, p.bvps, p.discount_rate, p.terminal_growth)
+            result = solve_implied_roe_residual_income(
+                price, p.bvps, p.discount_rate, p.growth_high, p.stable_growth,
+                p.terminal_growth, p.long_run_ke,
+            )
         elif p.primary_key == "fcfe_two_stage":
-            if p.long_run_ke is None:
+            if p.fcf is not None and p.debt is None:
                 return block(
-                    None, insufficient, "Missing long-run cost of equity (terminal discount rate)"
+                    None, insufficient,
+                    f"Missing interest-bearing debt: {p.debt_reason or 'not resolved'}",
                 )
             result = solve_implied_growth(
                 price, p.fcf, p.stable_growth, p.discount_rate, p.terminal_growth,
-                p.shares, p.long_run_ke,
+                p.shares, p.long_run_ke, p.debt if p.debt is not None else Decimal("0"),
             )
         else:
             return block(
@@ -1012,8 +1222,7 @@ class FairValueService:
         """Minimal 1-D sensitivity: ±discount and ±growth around the base."""
 
         rows: list[dict[str, Any]] = []
-        bank = base.primary_key == "justified_pb"  # revenue growth does not drive P/B
-        if fs_missing or base.discount_rate is None or (base.growth_high is None and not bank):
+        if fs_missing or base.discount_rate is None or base.growth_high is None:
             return rows
         for step in SENSITIVITY_DISCOUNT_STEPS:
             p = dataclasses.replace(base, discount_rate=base.discount_rate + step)
@@ -1023,8 +1232,6 @@ class FairValueService:
                     "discount_rate", base.discount_rate + step, value, base_fv
                 )
             )
-        if bank or base.growth_high is None:
-            return rows
         for step in SENSITIVITY_GROWTH_STEPS:
             p = dataclasses.replace(base, growth_high=base.growth_high + step)
             _primary, _relative, value, _n = self._pipeline_fv(p, weights)

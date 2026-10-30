@@ -18,6 +18,8 @@ from app.valuation.constants import (
     EXPLICIT_STAGE_YEARS,
     IMPLIED_GROWTH_MAX,
     IMPLIED_GROWTH_MIN,
+    IMPLIED_ROE_MAX,
+    IMPLIED_ROE_MIN,
     IMPLIED_SOLVER_MAX_ITERATIONS,
     IMPLIED_SOLVER_TOLERANCE,
 )
@@ -35,6 +37,7 @@ class ValuationModel(Enum):
     EXCESS_RETURNS = "excess_returns"
     AFFO_2STAGE = "affo_two_stage"
     JUSTIFIED_PB = "justified_pb"
+    RESIDUAL_INCOME_2STAGE = "residual_income_2stage"
 
 
 class ValuationStatus(Enum):
@@ -77,8 +80,16 @@ def _two_stage_present_value(
     discount_rate: Decimal,
     terminal_growth_rate: Decimal,
     terminal_discount_rate: Decimal | None = None,
+    debt: Decimal = Decimal("0"),
 ) -> tuple[Decimal, Decimal, Decimal, Decimal] | None:
     """Present value of a 2-stage cash-flow stream plus Gordon terminal value.
+
+    Debt that grows with the firm (valuation 1.4, owner ruling V7): ``base_cash_flow`` is
+    the pre-financing flow (operating cash flow - capex, parent share). It compounds at the
+    stage growth rate, and so does the debt ``debt`` (interest-bearing debt, parent share),
+    keeping the debt ratio stable: each year's distributable flow (FCFE) is the pre-financing
+    flow plus the change in debt, ``flow_t + D_{t-1} * g_t``. The terminal flow is
+    ``flow_N * (1 + g) + D_N * g``. ``debt = 0`` reproduces the plain flow stream.
 
     Stage 1 compounds at ``growth_high`` for ``years_high`` years, stage 2 at
     ``growth_stable`` for ``years_stable`` years; the terminal value is a
@@ -99,23 +110,28 @@ def _two_stage_present_value(
     terminal_rate = terminal_discount_rate if terminal_discount_rate is not None else discount_rate
     pv_flows = Decimal("0")
     projected = base_cash_flow
+    debt_t = debt
     factor = Decimal("1")
     for _ in range(years_high):
         projected = projected * (1 + growth_high)
+        new_debt = debt_t * (1 + growth_high)
         factor = factor * (1 + discount_rate)
-        pv = _safe_divide(projected, factor, precision=8)
+        pv = _safe_divide(projected + (new_debt - debt_t), factor, precision=8)
         if pv is None:
             return None
         pv_flows += pv
+        debt_t = new_debt
     for _ in range(years_stable):
         projected = projected * (1 + growth_stable)
+        new_debt = debt_t * (1 + growth_stable)
         factor = factor * (1 + terminal_rate)
-        pv = _safe_divide(projected, factor, precision=8)
+        pv = _safe_divide(projected + (new_debt - debt_t), factor, precision=8)
         if pv is None:
             return None
         pv_flows += pv
+        debt_t = new_debt
 
-    terminal_fcf = projected * (1 + terminal_growth_rate)
+    terminal_fcf = projected * (1 + terminal_growth_rate) + debt_t * terminal_growth_rate
     terminal_value = _safe_divide(
         terminal_fcf, terminal_rate - terminal_growth_rate, precision=8
     )
@@ -533,8 +549,13 @@ def calculate_fcfe_2stage(
     years_stable: int = 5,
     shares_outstanding: Decimal | None = None,
     terminal_discount_rate: Decimal | None = None,
+    debt: Decimal = Decimal("0"),
 ) -> ValuationResult:
     """Calculate implied share price with a 2-stage FCFE model (general companies).
+
+    ``free_cash_flow`` is the pre-financing flow base; ``debt`` (parent share of
+    interest-bearing debt, default 0 = no financing flows) grows with the firm, so each
+    projected year also distributes the change in debt (see ``_two_stage_present_value``).
 
     Stage 1 compounds FCF at ``growth_high`` for ``years_high`` years, stage 2
     at ``growth_stable`` for ``years_stable`` years; the explicit flows are
@@ -552,6 +573,7 @@ def calculate_fcfe_2stage(
         years_stable: Stage-2 years (default 5)
         shares_outstanding: Shares outstanding for per-share value
         terminal_discount_rate: Long-run cost of equity for the terminal value
+        debt: Interest-bearing debt (parent share) that grows with the firm
 
     Returns:
         ValuationResult with implied price and assumptions
@@ -587,6 +609,15 @@ def calculate_fcfe_2stage(
             model=ValuationModel.FCFE_2STAGE,
             assumptions={"fcf": str(free_cash_flow)},
             reason="Free cash flow must be positive for FCFE valuation",
+        )
+
+    if debt < 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.FCFE_2STAGE,
+            assumptions={"debt": str(debt)},
+            reason="Debt must not be negative",
         )
 
     if discount_rate <= 0:
@@ -643,6 +674,7 @@ def calculate_fcfe_2stage(
         discount_rate,
         terminal_growth_rate,
         terminal_discount_rate,
+        debt,
     )
     if stages is None:
         return ValuationResult(
@@ -674,6 +706,7 @@ def calculate_fcfe_2stage(
         model=ValuationModel.FCFE_2STAGE,
         assumptions={
             "fcf": str(free_cash_flow),
+            "debt": str(debt),
             "growth_high": str(growth_high),
             "years_high": str(years_high),
             "growth_stable": str(growth_stable),
@@ -688,7 +721,10 @@ def calculate_fcfe_2stage(
             "pv_terminal": str(pv_terminal),
             "enterprise_value": str(enterprise_value),
             "shares_outstanding": str(shares_outstanding) if shares_outstanding else None,
-            "formula": "2-stage FCFE with Gordon terminal value",
+            "formula": (
+                "2-stage FCFE: pre-financing flow + change in debt (debt grows with the "
+                "firm), Gordon terminal value"
+            ),
         },
     )
 
@@ -1341,6 +1377,117 @@ def calculate_sensitivity(
     return results
 
 
+def calculate_residual_income_2stage(
+    book_value_per_share: Decimal | None,
+    roe: Decimal | None,
+    cost_of_equity: Decimal | None,
+    growth_high: Decimal | None,
+    growth_stable: Decimal | None,
+    terminal_growth_rate: Decimal | None,
+    years_high: int = EXPLICIT_STAGE_YEARS,
+    years_stable: int = 5,
+    terminal_discount_rate: Decimal | None = None,
+) -> ValuationResult:
+    """Two-stage residual income for banks (valuation 1.4, owner ruling V8).
+
+    Book value compounds at ``growth_high`` for ``years_high`` years, at ``growth_stable``
+    for ``years_stable`` years, then at ``terminal_growth_rate`` forever. Residual income
+    in year t is ``(ROE - ke_t) x BV_{t-1}``: ``ke_t`` is ``cost_of_equity`` during the
+    first ``years_high`` years and ``terminal_discount_rate`` (the long-run cost of equity)
+    afterwards, with discount factors compounding across the switch (the same fade as the
+    FCFE model). The terminal residual income ``(ROE - ke_long) x BV_N`` is capitalised at
+    ``ke_long - g``. ``ROE`` is the 3-year average (supplied by the caller) and is held
+    constant. Value per share = BV_0 + PV(residual income) + PV(terminal value).
+    """
+    named = {
+        "BVPS": book_value_per_share,
+        "ROE": roe,
+        "cost of equity": cost_of_equity,
+        "stage-1 growth": growth_high,
+        "stable growth": growth_stable,
+        "terminal growth": terminal_growth_rate,
+    }
+    missing = [name for name, value in named.items() if value is None]
+    model = ValuationModel.RESIDUAL_INCOME_2STAGE
+    if missing:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=model,
+            assumptions={},
+            reason=f"Missing {', '.join(missing)} for the residual income model",
+        )
+    assert book_value_per_share is not None
+    assert roe is not None
+    assert cost_of_equity is not None
+    assert growth_high is not None
+    assert growth_stable is not None
+    assert terminal_growth_rate is not None
+    long_rate = terminal_discount_rate if terminal_discount_rate is not None else cost_of_equity
+    echo: dict[str, str | None] = {
+        "bvps": str(book_value_per_share),
+        "roe": str(roe),
+        "cost_of_equity": str(cost_of_equity),
+        "terminal_discount_rate": str(long_rate),
+        "growth_high": str(growth_high),
+        "years_high": str(years_high),
+        "growth_stable": str(growth_stable),
+        "years_stable": str(years_stable),
+        "terminal_growth_rate": str(terminal_growth_rate),
+    }
+
+    def invalid(reason: str) -> ValuationResult:
+        return ValuationResult(
+            value=None, status=ValuationStatus.INVALID, model=model, assumptions=echo,
+            reason=reason,
+        )
+
+    if book_value_per_share <= 0:
+        return invalid("Book value per share must be positive")
+    if cost_of_equity <= 0 or long_rate <= 0:
+        return invalid("Cost of equity must be positive")
+    if long_rate <= terminal_growth_rate:
+        return invalid("Long-run cost of equity must be greater than terminal growth rate")
+    if years_high <= 0 or years_stable <= 0:
+        return invalid("Projection horizons must be positive")
+
+    book = book_value_per_share
+    factor = Decimal("1")
+    pv_residual = Decimal("0")
+    for _ in range(years_high):
+        residual = (roe - cost_of_equity) * book
+        book = book * (1 + growth_high)
+        factor = factor * (1 + cost_of_equity)
+        pv_residual += residual / factor
+    for _ in range(years_stable):
+        residual = (roe - long_rate) * book
+        book = book * (1 + growth_stable)
+        factor = factor * (1 + long_rate)
+        pv_residual += residual / factor
+    terminal_residual = (roe - long_rate) * book
+    terminal_value = terminal_residual / (long_rate - terminal_growth_rate)
+    pv_terminal = terminal_value / factor
+    value = book_value_per_share + pv_residual + pv_terminal
+    if value <= 0:
+        return invalid("Implied fair value is not positive")
+    return ValuationResult(
+        value=value.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP),
+        status=ValuationStatus.AVAILABLE,
+        model=model,
+        assumptions={
+            **echo,
+            "pv_residual_income": str(pv_residual),
+            "terminal_value": str(terminal_value),
+            "pv_terminal": str(pv_terminal),
+            "book_value_end_of_explicit": str(book),
+            "formula": (
+                "FV = BV0 + PV[(ROE - ke_t) x BV_{t-1}] + PV[terminal residual income / "
+                "(ke_long - g)]; ke fades from the first-stage to the long-run rate"
+            ),
+        },
+    )
+
+
 class ImpliedResult(NamedTuple):
     """Reverse-calculation outcome (R46 V6): what the price implies, or why not."""
 
@@ -1351,6 +1498,43 @@ class ImpliedResult(NamedTuple):
     bounds: tuple[Decimal, Decimal] | None = None
 
 
+def _invert_increasing(
+    value_at: Callable[[Decimal], Decimal | None],
+    price: Decimal,
+    lower: Decimal,
+    upper: Decimal,
+    tolerance: Decimal,
+    max_iterations: int,
+    what: str,
+) -> tuple[Decimal | None, str | None]:
+    """Bisection for ``value_at(x) == price`` where ``value_at`` increases in ``x``.
+
+    Returns (x, None), or (None, reason) when the price lies outside the values the bounds
+    produce or the model has no value inside them.
+    """
+    low = value_at(lower)
+    high = value_at(upper)
+    if low is None or high is None:
+        return None, "the model has no value at the search bounds"
+    if price < low:
+        return None, f"price is below the model value at {lower:.0%}: {what} is under {lower:.0%}"
+    if price > high:
+        return None, f"price is above the model value at {upper:.0%}: {what} is over {upper:.0%}"
+    lo, hi = lower, upper
+    for _ in range(max_iterations):
+        if hi - lo <= tolerance:
+            break
+        mid = (lo + hi) / 2
+        mid_value = value_at(mid)
+        if mid_value is None:
+            return None, "the model produced no value during the search"
+        if mid_value < price:
+            lo = mid
+        else:
+            hi = mid
+    return ((lo + hi) / 2).quantize(Decimal("0.000001")), None
+
+
 def solve_implied_growth(
     price: Decimal | None,
     free_cash_flow: Decimal | None,
@@ -1359,6 +1543,7 @@ def solve_implied_growth(
     terminal_growth_rate: Decimal | None,
     shares_outstanding: Decimal | None,
     terminal_discount_rate: Decimal | None = None,
+    debt: Decimal = Decimal("0"),
     *,
     lower: Decimal = IMPLIED_GROWTH_MIN,
     upper: Decimal = IMPLIED_GROWTH_MAX,
@@ -1367,11 +1552,11 @@ def solve_implied_growth(
 ) -> ImpliedResult:
     """Stage-1 growth at which the 2-stage FCFE value per share equals ``price``.
 
-    Deterministic bisection over ``[lower, upper]`` holding every other input fixed; the
-    model value is increasing in stage-1 growth for a positive cash-flow base. A price
-    outside the values the bounds produce, a missing price, or a model that cannot value
-    the company (INVALID / INSUFFICIENT) gives INSUFFICIENT_DATA with a reason, never a
-    clamped number.
+    Deterministic bisection over ``[lower, upper]`` holding every other input fixed
+    (including the debt, which grows at the same stage rate as the flow); the model value
+    is increasing in stage-1 growth for a positive flow base. A price outside the values
+    the bounds produce, a missing price, or a model that cannot value the company
+    (INVALID / INSUFFICIENT) gives INSUFFICIENT_DATA with a reason, never a clamped number.
     """
     bounds = (lower, upper)
 
@@ -1381,7 +1566,7 @@ def solve_implied_growth(
     if price is None or price <= 0:
         return insufficient("no positive current price to compare with")
 
-    def value_at(growth: Decimal) -> ValuationResult:
+    def result_at(growth: Decimal) -> ValuationResult:
         return calculate_fcfe_2stage(
             free_cash_flow,
             growth,
@@ -1390,67 +1575,76 @@ def solve_implied_growth(
             terminal_growth_rate,
             shares_outstanding=shares_outstanding,
             terminal_discount_rate=terminal_discount_rate,
+            debt=debt,
         )
 
-    low = value_at(lower)
-    if low.status != ValuationStatus.AVAILABLE:
-        return insufficient(f"the model has no value to invert: {low.reason}")
-    high = value_at(upper)
-    if low.value is None or high.value is None:
+    # Unusable inputs (missing, non-positive flow, rates) show up at a neutral growth rate.
+    probe = result_at(Decimal("0"))
+    if probe.status != ValuationStatus.AVAILABLE:
+        return insufficient(f"the model has no value to invert: {probe.reason}")
+    if probe.value is None:
         return insufficient("the model has no per-share value (shares outstanding missing)")
-    if price < low.value:
-        return insufficient(
-            f"price is below the model value at {lower:.0%} stage-1 growth: "
-            f"implied growth is under {lower:.0%}"
-        )
-    if price > high.value:
-        return insufficient(
-            f"price is above the model value at {upper:.0%} stage-1 growth: "
-            f"implied growth is over {upper:.0%}"
-        )
-    lo, hi = lower, upper
-    for _ in range(max_iterations):
-        if hi - lo <= tolerance:
-            break
-        mid = (lo + hi) / 2
-        mid_value = value_at(mid).value
-        if mid_value is None:
-            return insufficient("the model produced no value during the search")
-        if mid_value < price:
-            lo = mid
-        else:
-            hi = mid
-    return ImpliedResult(
-        "growth_high", ((lo + hi) / 2).quantize(Decimal("0.000001")),
-        ValuationStatus.AVAILABLE, None, bounds,
+
+    def value_at(growth: Decimal) -> Decimal | None:
+        result = result_at(growth)
+        if result.value is not None:
+            return result.value
+        # Debt shrinking at a very negative growth rate can swamp the flow: the model value
+        # is then non-positive, i.e. below any positive price.
+        return Decimal("0") if "not positive" in (result.reason or "") else None
+
+    found, reason = _invert_increasing(
+        value_at, price, lower, upper, tolerance, max_iterations, "implied growth"
     )
+    if found is None:
+        return insufficient(reason or "no solution")
+    return ImpliedResult("growth_high", found, ValuationStatus.AVAILABLE, None, bounds)
 
 
-def implied_justified_pb_roe(
+def solve_implied_roe_residual_income(
     price: Decimal | None,
     book_value_per_share: Decimal | None,
     cost_of_equity: Decimal | None,
-    growth_rate: Decimal | None,
+    growth_high: Decimal | None,
+    growth_stable: Decimal | None,
+    terminal_growth_rate: Decimal | None,
+    terminal_discount_rate: Decimal | None = None,
+    *,
+    lower: Decimal = IMPLIED_ROE_MIN,
+    upper: Decimal = IMPLIED_ROE_MAX,
+    tolerance: Decimal = IMPLIED_SOLVER_TOLERANCE,
+    max_iterations: int = IMPLIED_SOLVER_MAX_ITERATIONS,
 ) -> ImpliedResult:
-    """ROE the price implies under justified P/B: ``g + (price / BVPS) x (ke - g)``."""
-    metric = "roe"
+    """3-year ROE at which the two-stage residual income value equals ``price`` (bisection)."""
+    bounds = (lower, upper)
+
+    def insufficient(reason: str) -> ImpliedResult:
+        return ImpliedResult("roe", None, ValuationStatus.INSUFFICIENT_DATA, reason, bounds)
+
     if price is None or price <= 0:
-        return ImpliedResult(
-            metric, None, ValuationStatus.INSUFFICIENT_DATA,
-            "no positive current price to compare with",
+        return insufficient("no positive current price to compare with")
+
+    def result_at(roe: Decimal) -> ValuationResult:
+        return calculate_residual_income_2stage(
+            book_value_per_share, roe, cost_of_equity, growth_high, growth_stable,
+            terminal_growth_rate, terminal_discount_rate=terminal_discount_rate,
         )
-    if book_value_per_share is None or cost_of_equity is None or growth_rate is None:
-        return ImpliedResult(
-            metric, None, ValuationStatus.INSUFFICIENT_DATA,
-            "missing BVPS, cost of equity or growth",
-        )
-    if book_value_per_share <= 0:
-        return ImpliedResult(
-            metric, None, ValuationStatus.INVALID, "Book value per share must be positive"
-        )
-    if cost_of_equity <= growth_rate:
-        return ImpliedResult(
-            metric, None, ValuationStatus.INVALID, "Cost of equity must be greater than growth"
-        )
-    roe = growth_rate + (price / book_value_per_share) * (cost_of_equity - growth_rate)
-    return ImpliedResult(metric, roe, ValuationStatus.AVAILABLE, None)
+
+    # Unusable inputs (missing, non-positive BVPS, ke <= g) show up at a high ROE.
+    probe = result_at(upper)
+    if probe.status != ValuationStatus.AVAILABLE:
+        return insufficient(f"the model has no value to invert: {probe.reason}")
+
+    def value_at(roe: Decimal) -> Decimal | None:
+        result = result_at(roe)
+        if result.value is not None:
+            return result.value
+        # A very low ROE can make the model value non-positive: below any positive price.
+        return Decimal("0") if "not positive" in (result.reason or "") else None
+
+    found, reason = _invert_increasing(
+        value_at, price, lower, upper, tolerance, max_iterations, "implied ROE"
+    )
+    if found is None:
+        return insufficient(reason or "no solution")
+    return ImpliedResult("roe", found, ValuationStatus.AVAILABLE, None, bounds)

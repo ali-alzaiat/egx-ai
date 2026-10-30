@@ -19,6 +19,7 @@ from app.models.metrics import FinancialMetric, MetricStatusDB
 from app.models.valuation import ValuationFairValue
 from app.valuation.assumptions import record_assumption
 from app.valuation.constants import VALUATION_METHODOLOGY_VERSION
+from app.valuation.models import calculate_residual_income_2stage
 from app.valuation.seed import seed_valuation_profiles
 from app.valuation.service import FairValueInput, FairValueService
 from statement_seed import FULL_YEAR, seed_year
@@ -30,6 +31,7 @@ BANK_PARAMS = {
     "stable_roe": "0.098",
     "discount_rate": "0.0761",
     "terminal_growth_rate": "0.02",
+    "stable_growth": "0.02",
     "long_run_cost_of_equity": "0.0761",
     "expected_dps": "2",
     "earnings_per_share": "5",
@@ -196,7 +198,7 @@ async def test_bank_happy_path(
     assert data["ticker"] == "BANKFV"
     assert data["methodology_version"] == VALUATION_METHODOLOGY_VERSION
     assert data["profile"]["profile_id"] == "banks"
-    assert data["profile"]["primary_model"] == "justified_pb"
+    assert data["profile"]["primary_model"] == "residual_income_2stage"
     assert data["profile"]["preferred_multiple"] == "pb"
     assert data["weights"] == {"intrinsic": "0.6", "relative": "0.4"}
     assert data["n_with_data"] == 2
@@ -204,12 +206,19 @@ async def test_bank_happy_path(
     fv = data["fair_value"]
     assert fv["status"] == "AVAILABLE"
     assert fv["value"] is not None
-    # 0.6 × excess-returns (~49.19) + 0.4 × PE (5 × exit 12 = 60) ≈ 53.5.
-    # Exit multiple takes precedence over pe_ratio (disclosed fallback).
-    assert abs(Decimal(fv["value"]) - Decimal("53.5")) < Decimal("0.5")
+    # 0.6 x two-stage residual income + 0.4 x PE (5 x exit 12 = 60). Exit multiple takes
+    # precedence over pe_ratio (disclosed fallback).
+    residual = calculate_residual_income_2stage(
+        Decimal("35.38"), Decimal("0.098"), Decimal("0.0761"), Decimal("0.05"),
+        Decimal("0.02"), Decimal("0.02"), terminal_discount_rate=Decimal("0.0761"),
+    )
+    assert residual.value is not None
+    assert Decimal(data["legs"]["intrinsic"]["value"]) == residual.value
+    expected = Decimal("0.6") * residual.value + Decimal("0.4") * Decimal("60")
+    assert abs(Decimal(fv["value"]) - expected) < Decimal("0.001")
     assert Decimal(data["legs"]["relative"]["value"]) == Decimal("60")
 
-    assert data["legs"]["intrinsic"]["model"] == "justified_pb"
+    assert data["legs"]["intrinsic"]["model"] == "residual_income_2stage"
     assert data["legs"]["relative"]["model"] == "price_to_earnings"
     assert data["legs"]["fallback"]["model"] == "dividend_discount"
 
@@ -302,6 +311,7 @@ async def test_default_profile_routing(
 
     params = {
         "free_cash_flow": "100",
+        "debt": "20",
         "growth_rate": "0.08",
         "stable_growth": "0.03",
         "discount_rate": "0.12",
@@ -334,6 +344,7 @@ async def test_metric_prefill_for_growth_and_margin(
 
     params = {
         "free_cash_flow": "100",
+        "debt": "20",
         "stable_growth": "0.03",
         "discount_rate": "0.12",
         "terminal_growth_rate": "0.02",

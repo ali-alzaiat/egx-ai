@@ -89,20 +89,6 @@ function buildRows(
     input("resolved_growth_high") ?? input("revenue_growth") ?? input("growth_rate"),
   );
   const capText = cap ? fmtRate(locale, cap.value) : null;
-  // A bank is valued on book value and ROE: stage-1 growth is not one of its inputs.
-  const usesStageOne = fairValue.legs.intrinsic.model !== "justified_pb";
-
-  const stageOneRows: Row[] = usesStageOne
-    ? [
-        {
-          id: "stage_one_growth",
-          label: t("rv_a_stage1_growth"),
-          value: stageOne ?? <MissingReason reason={fairValue.legs.intrinsic.reason} />,
-          source: capText ? t("rv_src_growth", { cap: capText }) : t("rv_src_growth_nocap"),
-          asOf: cap?.as_of ?? null,
-        },
-      ]
-    : [];
 
   return [
     {
@@ -127,7 +113,13 @@ function buildRows(
       ),
       asOf: inflation?.as_of ?? null,
     },
-    ...stageOneRows,
+    {
+      id: "stage_one_growth",
+      label: t("rv_a_stage1_growth"),
+      value: stageOne ?? <MissingReason reason={fairValue.legs.intrinsic.reason} />,
+      source: capText ? t("rv_src_growth", { cap: capText }) : t("rv_src_growth_nocap"),
+      asOf: cap?.as_of ?? null,
+    },
     stored("nominal_gdp_growth"),
     stored("target_pe"),
     stored("target_pb"),

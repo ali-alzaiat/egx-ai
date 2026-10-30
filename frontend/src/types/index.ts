@@ -482,6 +482,12 @@ export interface FairValueLeg {
   status: string; // AVAILABLE | INSUFFICIENT_DATA | INVALID
   reason: string | null;
   assumptions: Record<string, unknown>;
+  /** R46 V9: set when this leg is the residual-income fallback for a failed cash-flow model. */
+  fallback_from?: string | null;
+  /** The cash-flow model's own reason for failing (backend text). */
+  fallback_reason?: string | null;
+  /** Set when the fallback ran but also gave no value; the leg then keeps the cash-flow result. */
+  fallback_attempt?: { model: string; status: string | null; reason: string | null } | null;
 }
 
 export interface FairValueScenario {
@@ -490,19 +496,23 @@ export interface FairValueScenario {
   reason: string | null;
 }
 
-/** One fiscal year of the FCFE base (R46 V2): every component, or the reason the year has none. */
+/** One fiscal year of the cash-flow base (R46 V7): every component, or the reason the year has none. */
 export interface FcfeBaseYear {
   fiscal_year: number;
   status: string; // AVAILABLE | INSUFFICIENT_DATA
   reason: string | null;
   cfo: string | null;
   capex: string | null;
+  /** Operating cash flow minus capex. */
+  pre_financing: string | null;
+  /** Information only: past borrowing is not part of the base. */
   net_borrowing: string | null;
   parent_share: string | null;
-  fcfe: string | null;
+  /** `pre_financing` times `parent_share`: the figure the base averages. */
+  flow: string | null;
 }
 
-/** The starting cash flow of the two-stage model: the mean of the last `years_required` years (R46 V1). Null for banks. */
+/** The starting cash flow of the two-stage model: the mean of the last `years_required` years (R46 V1/V7). Null for banks. */
 export interface FcfeBase {
   method: string;
   years_required: number;
@@ -512,10 +522,36 @@ export interface FcfeBase {
   years: FcfeBaseYear[];
 }
 
-/** Resolved model inputs: decimal strings, plus the structured FCFE base (read scalars with `lib/fairValue`). */
+/** Starting debt of the cash-flow model (R46 V7): debt grows with the firm, so future borrowing = growth x debt. */
+export interface DebtBase {
+  method: string;
+  /** Interest-bearing debt x parent share. */
+  value: string | null;
+  fiscal_year: number | null;
+  reported_value: string | null;
+  parent_share: string | null;
+  /** `vendor_omitted_zero`: the vendor omits zero rows, so the absent line is read as no debt. */
+  basis: "reported" | "vendor_omitted_zero" | string;
+  status: string;
+  reason: string | null;
+}
+
+/** ROE for the residual-income model (R46 V8): the mean of the last `years_required` years. */
+export interface RoeBase {
+  method: string;
+  years_required: number;
+  status: string;
+  reason: string | null;
+  mean: string | null;
+  years: { fiscal_year: number; roe: string | null; status: string; reason: string | null }[];
+}
+
+/** Resolved model inputs: decimal strings, plus structured bases (read scalars with `lib/fairValue`). */
 export interface FairValueInputs {
   fcfe_base?: FcfeBase | null;
-  [key: string]: string | FcfeBase | null | undefined;
+  debt?: DebtBase | null;
+  roe_base?: RoeBase | null;
+  [key: string]: string | FcfeBase | DebtBase | RoeBase | null | undefined;
 }
 
 /** What the price implies under the model (R46 V6): stage-1 growth, or a bank's ROE. */

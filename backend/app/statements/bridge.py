@@ -37,12 +37,13 @@ BRIDGE_VERSION = "stmt-bridge-1.0"
 SourceTier = Literal["filing", "vendor"]
 ResolvedStatus = Literal["AVAILABLE", "INSUFFICIENT_DATA"]
 
-#: The shape of one FCFE year (R46 V2); the years averaged are ``FCFE_BASE_YEARS`` (V1).
-FCFE_DERIVATION = "(cfo - abs(capex) + net_borrowing) x parent_share"
+#: The shape of one cash-flow base year (R46 V7); the years averaged are ``FCFE_BASE_YEARS``.
+FCFE_DERIVATION = "(cfo - abs(capex)) x parent_share"
 FCFE_BASE_METHOD = (
     f"mean of the last {FCFE_BASE_YEARS} fiscal years of "
-    "(operating cash flow - capex + net borrowing) x parent share"
+    "(operating cash flow - capex) x parent share; debt grows with the firm"
 )
+DEBT_METHOD = "latest-year interest-bearing debt x parent share"
 PARENT_SHARE_DERIVATION = "net_income / (net_income_to_parent - minority_income)"
 
 DPS_DERIVATION = "abs(dividends_paid) / shares_outstanding"
@@ -324,16 +325,21 @@ def free_cash_flow(p: PeriodLines | None) -> Resolved:
 
 @dataclass(frozen=True, slots=True)
 class FcfeYear:
-    """One fiscal year of true FCFE with every component (R46 V2); a gap names its line."""
+    """One fiscal year of the cash-flow base (R46 V7); a gap names its line.
+
+    ``flow`` is ``(cfo - abs(capex)) x parent_share``, the value averaged into the base.
+    ``net_borrowing`` is information only: it no longer enters the base.
+    """
 
     fiscal_year: int
     status: ResolvedStatus
     reason: str | None
     cfo: Decimal | None = None
     capex: Decimal | None = None
+    pre_financing: Decimal | None = None
     net_borrowing: Decimal | None = None
     parent_share: Decimal | None = None
-    fcfe: Decimal | None = None
+    flow: Decimal | None = None
     sources: tuple[LineValue, ...] = field(default=())
 
     def payload(self) -> dict[str, str | int | None]:
@@ -346,15 +352,16 @@ class FcfeYear:
             "reason": self.reason,
             "cfo": opt(self.cfo),
             "capex": opt(self.capex),
+            "pre_financing": opt(self.pre_financing),
             "net_borrowing": opt(self.net_borrowing),
             "parent_share": opt(self.parent_share),
-            "fcfe": opt(self.fcfe),
+            "flow": opt(self.flow),
         }
 
 
 @dataclass(frozen=True, slots=True)
 class FcfeBase:
-    """The FCFE valuation base: ``resolved`` is the mean, ``years`` the evidence."""
+    """The cash-flow valuation base: ``resolved`` is the mean, ``years`` the evidence."""
 
     resolved: Resolved
     years: tuple[FcfeYear, ...]
@@ -367,6 +374,33 @@ class FcfeBase:
             "reason": self.resolved.reason,
             "mean": str(self.resolved.value) if self.resolved.value is not None else None,
             "years": [y.payload() for y in self.years],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DebtBase:
+    """Interest-bearing debt that grows with the firm (R46 V7): latest year x parent share."""
+
+    resolved: Resolved
+    fiscal_year: int | None = None
+    reported: Decimal | None = None
+    parent_share: Decimal | None = None
+    #: "reported" (a debt line exists) or "vendor_omitted_zero" (no-debt evidence, see below).
+    basis: str | None = None
+
+    def payload(self) -> dict[str, Any]:
+        def opt(v: Decimal | None) -> str | None:
+            return str(v) if v is not None else None
+
+        return {
+            "method": DEBT_METHOD,
+            "value": opt(self.resolved.value),
+            "fiscal_year": self.fiscal_year,
+            "reported_value": opt(self.reported),
+            "parent_share": opt(self.parent_share),
+            "basis": self.basis,
+            "status": self.resolved.status,
+            "reason": self.resolved.reason,
         }
 
 
@@ -433,31 +467,38 @@ def parent_share(p: PeriodLines | None) -> Resolved:
 
 
 def fcfe_year(p: PeriodLines) -> FcfeYear:
-    """True FCFE of one fiscal year; any missing component makes the year missing (never 0)."""
+    """Pre-financing cash flow of one fiscal year x parent share; a missing line = missing year.
+
+    Net borrowing is carried for information only (R46 V7): the projection grows the
+    latest debt with the firm instead of repeating past repayments.
+    """
     fy = p.fiscal_year
     cfo = line(p, "cfo")
     capex = capex_magnitude(p)
     borrowing = line(p, "net_borrowing")
-    for part in (cfo, capex, borrowing):
+    for part in (cfo, capex):
         if not part.available or part.value is None:
             return FcfeYear(
-                fy, "INSUFFICIENT_DATA", part.reason, cfo.value, capex.value, borrowing.value
+                fy, "INSUFFICIENT_DATA", part.reason, cfo.value, capex.value,
+                net_borrowing=borrowing.value,
             )
+    assert cfo.value is not None and capex.value is not None
+    pre_financing = cfo.value - capex.value
     share = parent_share(p)
     if not share.available or share.value is None:
         return FcfeYear(
-            fy, "INSUFFICIENT_DATA", share.reason, cfo.value, capex.value, borrowing.value
+            fy, "INSUFFICIENT_DATA", share.reason, cfo.value, capex.value, pre_financing,
+            borrowing.value,
         )
-    assert cfo.value is not None and capex.value is not None and borrowing.value is not None
-    value = (cfo.value - capex.value + borrowing.value) * share.value
     return FcfeYear(
-        fy, "AVAILABLE", None, cfo.value, capex.value, borrowing.value, share.value, value,
-        cfo.sources + capex.sources + borrowing.sources + share.sources,
+        fy, "AVAILABLE", None, cfo.value, capex.value, pre_financing, borrowing.value,
+        share.value, pre_financing * share.value,
+        cfo.sources + capex.sources + share.sources,
     )
 
 
 def fcfe_base(bundle: CompanyStatements, p: PeriodLines | None) -> FcfeBase:
-    """Mean true FCFE of the last ``FCFE_BASE_YEARS`` fiscal years ending at ``p``.
+    """Mean pre-financing flow (x parent share) of the last ``FCFE_BASE_YEARS`` years.
 
     Needs every one of the consecutive years t, t-1, t-2; a missing period or a year
     missing any component is INSUFFICIENT_DATA naming it (no shorter average, no
@@ -488,7 +529,7 @@ def fcfe_base(bundle: CompanyStatements, p: PeriodLines | None) -> FcfeBase:
             ),
             tuple(years),
         )
-    total = sum((y.fcfe for y in years if y.fcfe is not None), Decimal(0))
+    total = sum((y.flow for y in years if y.flow is not None), Decimal(0))
     sources = tuple(lv for y in years for lv in y.sources)
     return FcfeBase(
         Resolved(
@@ -496,6 +537,65 @@ def fcfe_base(bundle: CompanyStatements, p: PeriodLines | None) -> FcfeBase:
         ),
         tuple(years),
     )
+
+
+def debt_base(bundle: CompanyStatements, p: PeriodLines | None) -> DebtBase:
+    """Latest-year interest-bearing debt x the same year's parent share (R46 V7).
+
+    Scaled by the parent share because the flow base is: minorities' part of the group's
+    debt is not the parent's to grow or repay. A reported ``interest_bearing_debt`` line is
+    used as is. When the line is absent, zero debt is only concluded from evidence, never
+    assumed: the vendor omits zero-valued rows (a company repaying to nil, or with none,
+    has no ``debt`` row), so all of these must hold - every line of the period is
+    vendor-sourced, the balance sheet is present (``total_liabilities``), the period has no
+    finance costs, net borrowing or debt repayment, and the prior year has no debt. Any
+    other absence is INSUFFICIENT_DATA naming what contradicts it.
+    """
+    if p is None:
+        return DebtBase(_missing("interest_bearing_debt", None, DEBT_METHOD))
+    share = parent_share(p)
+    if not share.available or share.value is None:
+        return DebtBase(
+            Resolved(None, "INSUFFICIENT_DATA", share.reason, share.missing_input, (), DEBT_METHOD),
+            p.fiscal_year,
+        )
+
+    def done(value: Decimal, reported: Decimal, basis: str, src: tuple[LineValue, ...]) -> DebtBase:
+        return DebtBase(
+            Resolved(value, "AVAILABLE", None, None, src + share.sources, DEBT_METHOD),
+            p.fiscal_year, reported, share.value, basis,
+        )
+
+    def unresolved(reason: str) -> DebtBase:
+        return DebtBase(
+            Resolved(None, "INSUFFICIENT_DATA", reason, "interest_bearing_debt", (), DEBT_METHOD),
+            p.fiscal_year, None, share.value,
+        )
+
+    debt = line(p, "interest_bearing_debt")
+    if debt.available and debt.value is not None:
+        if debt.value < 0:
+            return unresolved(f"negative interest_bearing_debt (FY{p.fiscal_year})")
+        return done(debt.value * share.value, debt.value, "reported", debt.sources)
+
+    base = f"interest_bearing_debt missing (FY{p.fiscal_year}) and not evidenced as nil"
+    if any(lv.source_tier != "vendor" for lv in p.lines.values()):
+        return unresolved(f"{base}: the period is not vendor-sourced")
+    balance = line(p, "total_liabilities")
+    if not balance.available:
+        return unresolved(f"{base}: no balance sheet (total_liabilities) in the period")
+    for code in ("finance_costs", "net_borrowing", "debt_repayment"):
+        lv = p.get(code)
+        if lv is not None and lv.value != 0:
+            return unresolved(f"{base}: {code} {lv.value} is non-zero")
+    prior = bundle.prior(p)
+    prior_debt = prior.get("interest_bearing_debt") if prior is not None else None
+    if prior_debt is not None and prior_debt.value != 0:
+        return unresolved(
+            f"{base}: FY{prior_debt.fiscal_year} debt {prior_debt.value} has no recorded "
+            f"repayment"
+        )
+    return done(Decimal(0), Decimal(0), "vendor_omitted_zero", balance.sources)
 
 
 def is_bank(p: PeriodLines | None) -> bool:

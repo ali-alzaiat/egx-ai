@@ -539,7 +539,7 @@ async def test_full_assumption_set_gives_a_faded_intrinsic_value(
     assert D(assumptions["discount_rate"]) == D("0.24")
     assert D(assumptions["terminal_discount_rate"]) == D("0.15")
     assert D(assumptions["terminal_growth_rate"]) == D("0.05")
-    assert fair["methodology_version"] == VALUATION_METHODOLOGY_VERSION == "1.3"
+    assert fair["methodology_version"] == VALUATION_METHODOLOGY_VERSION == "1.5"
     assert fair["input_sources"]["discount_rate"].count("assumption:") == 2
     assert fair["input_sources"]["long_run_cost_of_equity"].startswith(
         "assumption:long_run_cost_of_equity"

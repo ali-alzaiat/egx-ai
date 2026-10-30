@@ -73,7 +73,7 @@ class TestFcfe2Stage:
         result = calculate_fcfe_2stage(**FCFE_KWARGS)
         assert result.status == ValuationStatus.AVAILABLE
         assert result.value is not None and result.value > 0
-        assert result.assumptions["formula"] == "2-stage FCFE with Gordon terminal value"
+        assert "change in debt" in result.assumptions["formula"]
 
     def test_missing_inputs(self) -> None:
         kwargs = dict(FCFE_KWARGS, growth_high=None)

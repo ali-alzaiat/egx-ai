@@ -18,7 +18,7 @@ const FILES = [
   "PeersTab.tsx",
   "AssumptionsTable.tsx",
   "FcfeBaseTable.tsx",
-  "BankModel.tsx",
+  "ResidualIncomeModel.tsx",
   "ImpliedPrice.tsx",
   "parts.tsx",
   "reasons.tsx",

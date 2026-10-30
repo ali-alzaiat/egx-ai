@@ -1,4 +1,4 @@
-"""Pinned constants for Phase-3 fair value (methodology version 1.3).
+"""Pinned constants for Phase-3 fair value (methodology version 1.5).
 
 1.1 (R45 M5): the discount rate fades. Explicit-stage flows use the cost of equity
 (risk-free rate + equity risk premium); the Gordon terminal value is capitalised
@@ -18,6 +18,18 @@ statement lines (net loans + deposits), use justified P/B instead of FCFE; the r
 (P/E) leg stays off until sourced target multiples exist, so fair value is the intrinsic
 leg alone.
 
+1.4 (owner rulings R46 V7 + V8): the cash-flow base is the 3-year mean of pre-financing
+flow (operating cash flow - capex) x parent share; past net borrowing no longer enters it.
+Interest-bearing debt (latest year x parent share) grows at the same rate as the flow in
+every projected year, so each year also distributes the change in debt and the debt ratio
+stays stable. Banks use a two-stage residual income model with the same faded discount rates
+and the 3-year average ROE, replacing the single-rate justified P/B.
+
+1.5 (owner ruling R46 V9): when the cash-flow model is INVALID for a non-bank (3-year mean
+pre-financing flow <= 0), the company is valued with the two-stage residual income model
+banks use (3-year mean ROE, same fade and growth rules), labelled as the fallback. Missing
+data (INSUFFICIENT_DATA) never falls back, and a non-positive 3-year ROE gives no value.
+
 Sources:
 - 4-model split + P/E→P/S→P/B router: Simply Wall St valuation methodology,
   https://support.simplywall.st/hc/en-us/articles/4751563581071
@@ -36,7 +48,7 @@ Sources:
 
 from decimal import Decimal
 
-VALUATION_METHODOLOGY_VERSION = "1.3"
+VALUATION_METHODOLOGY_VERSION = "1.5"
 
 #: Fiscal years averaged into the FCFE base (R46 V1; implemented in ``app.statements.bridge``).
 FCFE_BASE_YEARS = 3
@@ -54,15 +66,16 @@ DEFAULT_VALUATION_PROFILE_KEY = "default"
 
 # profile_key -> EGX sector scope (None = default fallback), primary intrinsic
 # model, fallback intrinsic model, preferred relative multiple basis.
-# Bank→justified P/B (R46 V3; was Excess-Returns), general→FCFE (R25 V2). The relative
-# leg is off for every profile until sourced target multiples exist (R46 V5).
+# Bank→two-stage residual income (R46 V8; was justified P/B, before that Excess-Returns),
+# general→FCFE (R25 V2). The relative leg is off for every profile until sourced target
+# multiples exist (R46 V5).
 # A company uses the "banks" profile when its statement lines include net loans and
 # deposits (``bridge.is_bank``), whatever its sector row says.
 BANK_PROFILE_KEY = "banks"
 VALUATION_PROFILES: dict[str, dict[str, str | None]] = {
     "banks": {
         "egx_sector": "Banks",
-        "primary_model": "justified_pb",
+        "primary_model": "residual_income_2stage",
         "fallback_model": "dividend_discount",
         "preferred_multiple": "pb",
     },
@@ -140,5 +153,7 @@ DISCOUNT_FIXED_NOTE = (
 # only: the implied value never feeds the verdict or the stance.
 IMPLIED_GROWTH_MIN = Decimal("-0.5")
 IMPLIED_GROWTH_MAX = Decimal("1.0")
+IMPLIED_ROE_MIN = Decimal("-0.5")
+IMPLIED_ROE_MAX = Decimal("1.0")
 IMPLIED_SOLVER_TOLERANCE = Decimal("0.000001")
 IMPLIED_SOLVER_MAX_ITERATIONS = 100

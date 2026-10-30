@@ -4,8 +4,8 @@ import FairValueCard from "../components/FairValueCard";
 import SensitivityTable from "../components/SensitivityTable";
 import AssumptionsTable from "../components/research/AssumptionsTable";
 import { TechnicalDetails } from "../components/research/parts";
-import BankModel from "../components/research/BankModel";
 import FcfeBaseTable from "../components/research/FcfeBaseTable";
+import ResidualIncomeModel from "../components/research/ResidualIncomeModel";
 import { Reason } from "../components/research/reasons";
 import { Notice } from "../components/ui/Notice";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
@@ -32,7 +32,9 @@ export default function Valuation() {
   const sources = Object.entries(fairValue.input_sources).filter(([, v]) => v !== null && v !== "");
   const inputs = scalarInputEntries(fairValue.inputs);
   const fcfeBase = fairValue.inputs.fcfe_base ?? null;
-  const isBank = fairValue.legs.intrinsic.model === "justified_pb";
+  const intrinsic = fairValue.legs.intrinsic;
+  // Banks and cash-flow fallbacks are valued from book value and returns (R46 V8/V9): read the leg, not the profile.
+  const residualIncome = intrinsic.model === "residual_income_2stage";
 
   return (
     <div className="page">
@@ -49,10 +51,18 @@ export default function Valuation() {
       )}
 
       <FairValueCard fairValue={fairValue} />
-      {isBank ? (
-        <BankModel leg={fairValue.legs.intrinsic} detection={fairValue.profile.detection} />
-      ) : (
-        fcfeBase && <FcfeBaseTable base={fcfeBase} />
+      {fcfeBase && <FcfeBaseTable base={fcfeBase} debt={fairValue.inputs.debt ?? null} />}
+      {intrinsic.fallback_attempt && (
+        <Notice>
+          {t("rv_ri_attempt_failed")} <Reason reason={intrinsic.fallback_attempt.reason} />
+        </Notice>
+      )}
+      {residualIncome && (
+        <ResidualIncomeModel
+          leg={intrinsic}
+          roeBase={fairValue.inputs.roe_base ?? null}
+          detection={fairValue.profile.detection}
+        />
       )}
       <AssumptionsTable fairValue={fairValue} />
       <SensitivityTable rows={fairValue.sensitivity} baseValue={fairValue.fair_value.value} />
@@ -72,9 +82,7 @@ export default function Valuation() {
           <span>{`fallback_model = ${fairValue.profile.fallback_model}`}</span>
           {fairValue.profile.detection && <span>{`detection = ${fairValue.profile.detection}`}</span>}
           {fairValue.fair_value.basis && <span>{`basis = ${fairValue.fair_value.basis}`}</span>}
-          {isBank && typeof fairValue.legs.intrinsic.assumptions.formula === "string" && (
-            <span>{`formula = ${fairValue.legs.intrinsic.assumptions.formula}`}</span>
-          )}
+          {typeof intrinsic.assumptions.formula === "string" && <span>{`formula = ${intrinsic.assumptions.formula}`}</span>}
           {inputs.map(([key, value]) => (
             <span key={`in-${key}`}>{`${key} = ${value}`}</span>
           ))}

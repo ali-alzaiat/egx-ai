@@ -19,8 +19,7 @@ from app.valuation.fairvalue import currency_check
 from app.valuation.models import (
     ValuationStatus,
     calculate_fcfe_2stage,
-    calculate_justified_pb,
-    implied_justified_pb_roe,
+    calculate_residual_income_2stage,
     solve_implied_growth,
 )
 from statement_seed import FULL_YEAR, make_company, seed_prices, seed_year
@@ -112,41 +111,6 @@ class TestImpliedGrowth:
     def test_custom_bounds_are_reported(self) -> None:
         result = _solve(D("12"), lower=D("-0.1"), upper=D("0.3"))
         assert result.bounds == (D("-0.1"), D("0.3"))
-
-
-class TestImpliedRoe:
-    def test_round_trip_with_justified_pb(self) -> None:
-        bvps, ke, g = D("35.38"), D("0.0761"), D("0.02")
-        price = calculate_justified_pb(bvps, D("0.098"), ke, g).value
-        result = implied_justified_pb_roe(price, bvps, ke, g)
-        assert result.status == ValuationStatus.AVAILABLE
-        assert abs(result.value - D("0.098")) < D("0.0001")
-
-    def test_price_at_book_implies_roe_equal_to_ke(self) -> None:
-        result = implied_justified_pb_roe(D("10"), D("10"), D("0.2"), D("0.05"))
-        assert result.value == D("0.2")
-
-    def test_formula(self) -> None:
-        # g + (price / BVPS) x (ke - g) = 0.054 + 0.5 x 0.186
-        result = implied_justified_pb_roe(D("5"), D("10"), D("0.24"), D("0.054"))
-        assert result.value == D("0.147")
-
-    @pytest.mark.parametrize("price", [None, D("0"), D("-1")])
-    def test_no_usable_price(self, price: Decimal | None) -> None:
-        assert implied_justified_pb_roe(price, D("10"), D("0.2"), D("0.05")).status == (
-            ValuationStatus.INSUFFICIENT_DATA
-        )
-
-    def test_missing_input_and_invalid_inputs(self) -> None:
-        assert implied_justified_pb_roe(D("5"), None, D("0.2"), D("0.05")).status == (
-            ValuationStatus.INSUFFICIENT_DATA
-        )
-        assert implied_justified_pb_roe(D("5"), D("0"), D("0.2"), D("0.05")).status == (
-            ValuationStatus.INVALID
-        )
-        assert implied_justified_pb_roe(D("5"), D("10"), D("0.05"), D("0.05")).status == (
-            ValuationStatus.INVALID
-        )
 
 
 # --- C1: currency -----------------------------------------------------------------------------
@@ -278,7 +242,7 @@ async def test_implied_growth_block_for_an_fcfe_company(
     back = calculate_fcfe_2stage(
         D(a["fcf"]), D(implied["value"]), D(a["growth_stable"]), D(a["discount_rate"]),
         D(a["terminal_growth_rate"]), shares_outstanding=D(a["shares_outstanding"]),
-        terminal_discount_rate=D(a["terminal_discount_rate"]),
+        terminal_discount_rate=D(a["terminal_discount_rate"]), debt=D(a["debt"]),
     )
     assert back.value is not None
     assert abs(back.value - D(implied["price"])) < D("0.05")
@@ -292,7 +256,9 @@ async def test_implied_is_insufficient_when_the_model_has_no_value(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     await _assumptions(db_session)
-    company = await _company(db_session, cfo=D("10"), capex=D("-100"))  # negative FCFE base
+    company = await _company(  # negative flow base and no positive ROE: no fallback either
+        db_session, cfo=D("10"), capex=D("-100"), net_income=D("-200")
+    )
     implied = (await _fair(client, company))["implied"]
     assert implied["status"] == "INSUFFICIENT_DATA"
     assert implied["value"] is None
@@ -306,14 +272,20 @@ async def test_implied_roe_block_for_a_bank(
     company = await _company(db_session, net_loans=D("700"), total_deposits=D("900"))
     fair = await _fair(client, company)
     implied = fair["implied"]
-    assert implied["metric"] == "roe" and implied["model"] == "justified_pb"
+    assert implied["metric"] == "roe" and implied["model"] == "residual_income_2stage"
     assert implied["status"] == "AVAILABLE", implied
-    assert implied["bounds"] is None
-    assert D(implied["compare_to"]["value"]) == D("0.1818")  # the computed ROE
+    assert implied["bounds"] == {"min": "-0.5", "max": "1.0"}
+    assert D(implied["compare_to"]["value"]) == D("0.1818")  # the computed 3-year ROE
     assert implied["compare_to"]["key"] == "roe"
-    price = D(fair["current_price"]["value"])
-    expected = D("0.054") + (price / D("11")) * (D("0.24") - D("0.054"))
-    assert abs(D(implied["value"]) - expected) < D("0.0001")
+    # plugging the implied ROE back into the residual income model reproduces the price
+    a = fair["legs"]["intrinsic"]["assumptions"]
+    back = calculate_residual_income_2stage(
+        D(a["bvps"]), D(implied["value"]), D(a["cost_of_equity"]), D(a["growth_high"]),
+        D(a["growth_stable"]), D(a["terminal_growth_rate"]),
+        terminal_discount_rate=D(a["terminal_discount_rate"]),
+    )
+    assert back.value is not None
+    assert abs(back.value - D(fair["current_price"]["value"])) < D("0.05")
 
 
 async def test_currency_mismatch_blocks_verdict_and_implied(

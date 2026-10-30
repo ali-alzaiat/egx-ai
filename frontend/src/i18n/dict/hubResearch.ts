@@ -93,6 +93,10 @@ export const HUB_RESEARCH_COPY = {
     en: "There is no positive current price to compare with",
     ar: "لا يوجد سعر حالي موجب للمقارنة",
   },
+  rs_fcf_not_positive: {
+    en: "The average cash flow before financing is not positive",
+    ar: "متوسط التدفق النقدي قبل التمويل ليس موجباً",
+  },
   rs_no_annual_period: {
     en: "No approved annual statement for FY{year}",
     ar: "لا توجد قوائم سنوية معتمدة للسنة المالية {year}",
@@ -183,8 +187,8 @@ export const HUB_RESEARCH_COPY = {
     ar: "يعني السعر نمواً قدره {implied} سنوياً لمدة {years} سنوات.",
   },
   rv_implied_roe: {
-    en: "The price implies an ROE of {implied}; the bank's ROE is {roe}.",
-    ar: "يعني السعر عائداً على حقوق الملكية قدره {implied}؛ وعائد البنك {roe}.",
+    en: "The price implies an ROE of {implied}; the company's 3-year ROE is {roe}.",
+    ar: "يعني السعر عائداً على حقوق الملكية قدره {implied}؛ وعائد الشركة على حقوق الملكية لثلاث سنوات {roe}.",
   },
   rv_implied_roe_nocompare: {
     en: "The price implies an ROE of {implied}.",
@@ -196,13 +200,13 @@ export const HUB_RESEARCH_COPY = {
     ar: "نمو المرحلة الأولى الذي تساوي عنده قيمة النموذج سعر اليوم مع ثبات كل المدخلات الأخرى. السقف هو نمو الناتج المحلي الاسمي، وهو أقصى ما يسمح به النموذج لنمو المرحلة الأولى. الرقم الأعلى من السقف يعني أن السعر يفترض نمواً أسرع مما يسمح به النموذج. يشرح هذا الرقم الحكم ولا يغيّره.",
   },
   rv_implied_info_roe: {
-    en: "The return on equity at which the bank's justified price-to-book gives today's price, with book value, cost of equity and growth unchanged. It explains the verdict; it does not change it.",
-    ar: "العائد على حقوق الملكية الذي يعطي عنده السعر إلى القيمة الدفترية المبرَّر سعر اليوم مع ثبات القيمة الدفترية وتكلفة حقوق الملكية والنمو. يشرح هذا الرقم الحكم ولا يغيّره.",
+    en: "The return on equity at which the residual-income model's value equals today's price, with book value, cost of equity and growth unchanged. It explains the verdict; it does not change it.",
+    ar: "العائد على حقوق الملكية الذي تساوي عنده قيمة نموذج الدخل المتبقي سعر اليوم مع ثبات القيمة الدفترية وتكلفة حقوق الملكية والنمو. يشرح هذا الرقم الحكم ولا يغيّره.",
   },
   rv_fcfe_title: { en: "How the starting cash flow is built", ar: "كيف يُبنى التدفق النقدي الابتدائي" },
   rv_fcfe_lead: {
-    en: "The model starts from the average of the last {n} fiscal years of free cash flow to equity (FCFE): operating cash flow, minus capex, plus net borrowing, times the parent's share of earnings (net income to common over net income including minorities).",
-    ar: "يبدأ النموذج من متوسط التدفق النقدي الحر لحملة الأسهم (FCFE) لآخر {n} سنوات مالية: التدفق النقدي التشغيلي، ناقصاً النفقات الرأسمالية، زائداً صافي الاقتراض، مضروباً في حصة الشركة الأم من الأرباح (صافي الربح العائد للمساهمين إلى صافي الربح شاملاً الأقلية).",
+    en: "The model starts from the average of the last {n} fiscal years of cash flow before financing (operating cash flow minus capex), times the parent's share of earnings (net income to common over net income including minorities).",
+    ar: "يبدأ النموذج من متوسط التدفق النقدي قبل التمويل (التدفق النقدي التشغيلي ناقصاً النفقات الرأسمالية) لآخر {n} سنوات مالية، مضروباً في حصة الشركة الأم من الأرباح (صافي الربح العائد للمساهمين إلى صافي الربح شاملاً الأقلية).",
   },
   rv_fcfe_caption: {
     en: "Free cash flow to equity by fiscal year and its average",
@@ -211,15 +215,58 @@ export const HUB_RESEARCH_COPY = {
   rv_fcfe_col_year: { en: "Fiscal year", ar: "السنة المالية" },
   rv_fcfe_col_cfo: { en: "Operating cash flow", ar: "التدفق التشغيلي" },
   rv_fcfe_col_capex: { en: "Capex", ar: "النفقات الرأسمالية" },
-  rv_fcfe_col_borrowing: { en: "Net borrowing", ar: "صافي الاقتراض" },
+  rv_fcfe_col_prefin: { en: "Cash flow before financing", ar: "التدفق قبل التمويل" },
+  rv_fcfe_col_flow: { en: "Parent's flow", ar: "تدفق الشركة الأم" },
   rv_fcfe_col_share: { en: "Parent share", ar: "حصة الشركة الأم" },
-  rv_fcfe_col_fcfe: { en: "FCFE", ar: "FCFE" },
   rv_fcfe_year: { en: "FY{year}", ar: "السنة المالية {year}" },
   rv_fcfe_mean: { en: "{n}-year average", ar: "متوسط {n} سنوات" },
   rv_fcfe_incomplete: {
     en: "No average: all {n} fiscal years are needed",
     ar: "لا متوسط: يلزم توفر السنوات المالية الـ {n} كلها",
   },
+  rv_debt_line: {
+    en: "Debt grows with the company: starting debt {debt} (FY{year}), so future borrowing = growth × debt.",
+    ar: "يرتفع الدين مع نمو الشركة: الدين الابتدائي {debt} (السنة المالية {year})، فالاقتراض المستقبلي = النمو × الدين.",
+  },
+  rv_debt_omitted: {
+    en: "The statements list no interest-bearing debt line, which the vendor omits when it is zero, so starting debt is read as zero.",
+    ar: "لا تتضمن القوائم بند ديون تحمل فائدة، ويحذفه المزوّد عندما يكون صفراً، لذلك يُعتبر الدين الابتدائي صفراً.",
+  },
+  rv_debt_unavailable: { en: "Starting debt is not available:", ar: "الدين الابتدائي غير متاح:" },
+  rv_ri_attempt_failed: {
+    en: "Valuing the company from book value and returns was also tried and gave no value:",
+    ar: "جُرّب أيضاً تقييم الشركة من القيمة الدفترية والعوائد ولم يعطِ قيمة:",
+  },
+  rv_ri_title_fallback: { en: "How the company is valued from book value", ar: "كيف تُقيَّم الشركة من القيمة الدفترية" },
+  rv_ri_fallback_note: {
+    en: "The cash-flow model could not be used ({why}), so this company is valued from book value and returns, like a bank.",
+    ar: "تعذّر استخدام نموذج التدفقات النقدية ({why})، لذلك تُقيَّم هذه الشركة من القيمة الدفترية والعوائد، مثل البنك.",
+  },
+  rv_ri_lead: {
+    en: "Fair value is book value per share plus the present value of the excess returns, (ROE − cost of equity) × book value, and of what follows them.",
+    ar: "القيمة العادلة هي القيمة الدفترية للسهم زائداً القيمة الحالية للعوائد الزائدة، أي (العائد على حقوق الملكية − تكلفة حقوق الملكية) × القيمة الدفترية، ولما يليها.",
+  },
+  rv_ri_caption: { en: "Residual-income valuation, step by step", ar: "التقييم بالدخل المتبقي خطوة بخطوة" },
+  rv_ri_col_item: { en: "Component", ar: "المكوّن" },
+  rv_ri_bvps: { en: "Book value per share", ar: "القيمة الدفترية للسهم" },
+  rv_ri_pv: { en: "Present value of excess returns, years 1–{years}", ar: "القيمة الحالية للعوائد الزائدة، السنوات 1–{years}" },
+  rv_ri_pv_basis: {
+    en: "Each year (ROE {roe} − cost of equity) × book value; cost of equity {ke} for {years} years",
+    ar: "كل سنة (العائد على حقوق الملكية {roe} − تكلفة حقوق الملكية) × القيمة الدفترية؛ تكلفة حقوق الملكية {ke} لمدة {years} سنوات",
+  },
+  rv_ri_terminal: { en: "Present value of the excess returns that follow", ar: "القيمة الحالية للعوائد الزائدة اللاحقة" },
+  rv_ri_terminal_basis: {
+    en: "After year {years}, at the long-run cost of equity {keLong} and growth {growth}",
+    ar: "بعد السنة {years}، بتكلفة حقوق الملكية طويلة الأجل {keLong} ونمو {growth}",
+  },
+  rv_ri_fv: { en: "Fair value", ar: "القيمة العادلة" },
+  rv_ri_roe: { en: "ROE", ar: "العائد على حقوق الملكية" },
+  rv_roe_title: { en: "How ROE is built", ar: "كيف يُبنى العائد على حقوق الملكية" },
+  rv_roe_lead: {
+    en: "ROE is the average of the last {n} fiscal years: net income over average equity.",
+    ar: "العائد على حقوق الملكية هو متوسط آخر {n} سنوات مالية: صافي الربح إلى متوسط حقوق الملكية.",
+  },
+  rv_roe_caption: { en: "Return on equity by fiscal year and its average", ar: "العائد على حقوق الملكية لكل سنة مالية ومتوسطه" },
   rv_bank_title: { en: "How the bank is valued", ar: "كيف يُقيَّم البنك" },
   rv_bank_detected_lines: {
     en: "Valued as a bank because its statements report net loans and customer deposits.",
@@ -229,18 +276,6 @@ export const HUB_RESEARCH_COPY = {
     en: "Valued as a bank because of its sector.",
     ar: "يُقيَّم كبنك بسبب قطاعه.",
   },
-  rv_bank_lead: {
-    en: "Fair value is book value per share times a justified price-to-book: (ROE − growth) ÷ (cost of equity − growth).",
-    ar: "القيمة العادلة هي القيمة الدفترية للسهم مضروبة في السعر إلى القيمة الدفترية المبرَّر: (العائد على حقوق الملكية − النمو) ÷ (تكلفة حقوق الملكية − النمو).",
-  },
-  rv_bank_caption: { en: "Inputs of the bank valuation", ar: "مدخلات تقييم البنك" },
-  rv_bank_col_item: { en: "Input", ar: "المدخل" },
-  rv_bank_bvps: { en: "Book value per share", ar: "القيمة الدفترية للسهم" },
-  rv_bank_roe: { en: "Return on equity (ROE)", ar: "العائد على حقوق الملكية (ROE)" },
-  rv_bank_ke: { en: "Cost of equity", ar: "تكلفة حقوق الملكية" },
-  rv_bank_growth: { en: "Growth", ar: "النمو" },
-  rv_bank_pb: { en: "Justified price-to-book", ar: "السعر إلى القيمة الدفترية المبرَّر" },
-  rv_bank_fv: { en: "Fair value (book value × justified P/B)", ar: "القيمة العادلة (القيمة الدفترية × السعر إلى الدفترية المبرَّر)" },
   rv_legs_title: { en: "Model legs", ar: "مكونات النموذج" },
   rv_legs_caption: {
     en: "Model legs and the fixed weights behind the headline value",
@@ -323,7 +358,7 @@ export const HUB_RESEARCH_COPY = {
   rd_discounted_cash_flow: { en: "Discounted cash flow", ar: "التدفقات النقدية المخصومة" },
   rd_dividend_discount: { en: "Dividend discount", ar: "خصم التوزيعات" },
   rd_excess_returns: { en: "Excess returns", ar: "العوائد الزائدة" },
-  rd_justified_pb: { en: "Justified price-to-book (banks)", ar: "السعر إلى القيمة الدفترية المبرَّر (البنوك)" },
+  rd_residual_income_2stage: { en: "Two-stage residual income", ar: "الدخل المتبقي على مرحلتين" },
   rd_affo_two_stage: { en: "Two-stage adjusted funds from operations", ar: "الأموال المعدّلة من العمليات على مرحلتين" },
 
   // ---- Investment score ----

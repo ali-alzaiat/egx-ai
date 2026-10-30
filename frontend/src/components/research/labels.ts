@@ -92,7 +92,7 @@ const MODELS: KeyMap = new Map<string, CopyKey>([
   ["dividend_discount", "rd_dividend_discount"],
   ["excess_returns", "rd_excess_returns"],
   ["affo_two_stage", "rd_affo_two_stage"],
-  ["justified_pb", "rd_justified_pb"],
+  ["residual_income_2stage", "rd_residual_income_2stage"],
 ]);
 export const modelLabelKey = (code: string | null | undefined): CopyKey | null => pick(MODELS, code);
 

@@ -20,6 +20,10 @@ describe("localizeReason: fair-value reasons (R46)", () => {
     expect(en("no approved annual period FY2023")).toBe("No approved annual statement for FY2023");
     expect(ar("no approved annual period FY2023")).toContain("2023");
   });
+  it("localizes the cash-flow fallback reason", () => {
+    expect(en("Free cash flow must be positive for FCFE valuation")).toBe("The average cash flow before financing is not positive");
+    expect(ar("Free cash flow must be positive for FCFE valuation")).toContain("التدفق");
+  });
   it("names the new statement lines instead of showing the code", () => {
     expect(en("missing statement line: net_borrowing (FY2024)")).toBe("Missing line: Net borrowing (FY2024)");
   });

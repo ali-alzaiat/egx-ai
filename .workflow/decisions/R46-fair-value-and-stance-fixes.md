@@ -26,3 +26,22 @@ Evidence: with V1-V5 live, 85 companies have a fair value; median fair value / p
 | C1 | **Trading currency**: record each listing's trading currency; when it differs from the statements' currency, the price comparison is INSUFFICIENT_DATA ("price in USD, statements in EGP"). Never converted. Case: EGBE (price 0.51 vs BVPS 25.84 EGP). |
 
 Build defaults, not yet confirmed by the owner: 0.5 full-scale discount; "Medium or High" includes VeryHigh. Fixed in review: a negative parent share (parent loss, minorities profit) is now INSUFFICIENT_DATA instead of flipping the sign of FCFE (MIPH FY2023 was -2.47).
+
+## Round 3 (after the blind check, 2026-10-30)
+
+Evidence: `.workflow/research/blind-fair-value-check-2026-10-30.md`. An independent agent with raw data only agreed on direction (52 of 75) and ranking (Spearman 0.67), but the app was a median 0.64x its values, traced to the two causes below.
+
+| # | Ruling |
+|---|---|
+| V7 | **Debt grows with the firm.** The cash-flow base is the 3-year mean of pre-financing cash flow (operating cash flow - capex) x parent share. Projected FCFE each year = that flow grown at the stage's rate + the change in debt, where debt (interest-bearing debt, latest year) grows at the same rate, so the debt ratio stays stable. Past net borrowing no longer enters the base. Replaces V2's use of historical net borrowing. |
+| V8 | **Banks: two-stage residual income with the fade.** 5 years at the near-term cost of equity, then the long-run rate (R45 fade ruling); ROE is the 3-year average. Replaces the single-rate justified P/B of V3. |
+
+Version: valuation methodology 1.4.
+
+## Round 4 (after re-running the blind comparison on 1.4, 2026-10-30)
+
+Evidence: banks now agree with the blind values (median app / blind 1.18, all 11 within 2x; FAIT 64.0 vs 63.5); rank correlation 0.75 on 66 companies. But removing past borrowing from the base left 58 companies INVALID (was 26), e.g. SWDY: 3-year operating cash flow minus capex is negative.
+
+| # | Ruling |
+|---|---|
+| V9 | **Residual income fallback.** When the cash-flow model is INVALID for a non-bank, value it with the same two-stage residual income model banks use (3-year ROE, 5-year fade), labelled as the fallback. |

@@ -26,6 +26,7 @@ const COMPUTATION_FAILED = /^computation failed: (.+)$/;
 const IMPLIED_ABOVE = /^price is above the model value at (-?\d+)% stage-1 growth: implied growth is over -?\d+%$/;
 const IMPLIED_BELOW = /^price is below the model value at (-?\d+)% stage-1 growth: implied growth is under -?\d+%$/;
 const NO_POSITIVE_PRICE = /^no positive current price to compare with$/;
+const FCF_NOT_POSITIVE = /^Free cash flow must be positive for FCFE valuation$/;
 const NO_ANNUAL_PERIOD = /^no approved annual period FY(\d{4})$/;
 
 /**
@@ -75,6 +76,7 @@ export function localizeReason(
   const below = IMPLIED_BELOW.exec(text);
   if (below?.[1]) return t("rs_implied_below", { pct: fmtPct(locale, Number(below[1]) / 100) ?? below[1] });
   if (NO_POSITIVE_PRICE.test(text)) return t("rs_no_positive_price");
+  if (FCF_NOT_POSITIVE.test(text)) return t("rs_fcf_not_positive");
   const noPeriod = NO_ANNUAL_PERIOD.exec(text);
   if (noPeriod?.[1]) return t("rs_no_annual_period", { year: noPeriod[1] });
   return null;
