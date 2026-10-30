@@ -408,3 +408,10 @@ def test_value_fv_deep_discount_second_tier() -> None:
         ScoreInputs(current_price=D("75"), fair_value=D("100"))
     ).status is CheckStatus.FAIL
     assert check_value_fv_deep_discount(ScoreInputs()).status is CheckStatus.NOT_RUN
+
+
+def test_check_keys_are_unique_per_track() -> None:
+    """Each check has its own key: duplicates collide in stored rows and the UI."""
+    for track in ("standard", "bank"):
+        keys = [(c.component, c.check_key) for c in run_checks(ScoreInputs(), health_track=track)]
+        assert len(keys) == len(set(keys)), track

@@ -205,9 +205,18 @@ async def get_latest_price(
     price_repo = PriceRepository(session)
     price = await price_repo.get_latest(company_id)
     if not price:
-        raise HTTPException(status_code=404, detail="No price data available")
+        # A known company with no stored prices is missing data, not a missing
+        # resource: answer 200 with the reason (AGENTS rule 2).
+        return {
+            "company_id": str(company_id),
+            "status": "INSUFFICIENT_DATA",
+            "reason": "No daily prices stored for this company",
+            "date": None,
+            "close": None,
+        }
 
     return {
+        "status": "AVAILABLE",
         "id": str(price.id),
         "company_id": str(price.company_id),
         "date": price.date.isoformat(),

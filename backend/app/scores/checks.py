@@ -666,7 +666,7 @@ def check_dividend_growing(i: ScoreInputs) -> CheckResult:
 
 
 def check_growth_earnings_hist(i: ScoreInputs) -> CheckResult:
-    key, comp = "growth", "growth"
+    key, comp = "growth_earnings_hist", "growth"
     threshold = (
         f"historical earnings growth > {GROWTH_HIGH_THRESHOLD * 100:.0f}% "
         "(extrapolation fallback; no consensus available)"
@@ -684,7 +684,7 @@ def check_growth_earnings_hist(i: ScoreInputs) -> CheckResult:
 
 
 def check_growth_revenue_hist(i: ScoreInputs) -> CheckResult:
-    key, comp = "growth", "growth"
+    key, comp = "growth_revenue_hist", "growth"
     threshold = (
         f"historical revenue growth > {GROWTH_HIGH_THRESHOLD * 100:.0f}% "
         "(extrapolation fallback; no consensus available)"

@@ -224,10 +224,14 @@ async def get_support(
     """).params(t=ticker.upper())
     closes_raw: Sequence[Any] = (await session.execute(prices_stmt)).scalars().all()
     if len(closes_raw) < 10:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Insufficient price history for {ticker} (got {len(closes_raw)} rows)",
-        )
+        return {
+            "ticker": company.ticker,
+            "status": "INSUFFICIENT_DATA",
+            "reason": f"Support levels need at least 10 daily closes; {len(closes_raw)} stored",
+            "latest_close": round(float(closes_raw[0]), 2) if closes_raw else None,
+            "best_buy_price": None,
+            "support_levels": [],
+        }
 
     closes = [float(c) for c in closes_raw]
 
@@ -270,7 +274,8 @@ async def get_support(
     latest = (await session.execute(latest_stmt)).scalar()
 
     return {
-        "ticker": ticker,
+        "ticker": company.ticker,
+        "status": "AVAILABLE",
         "latest_close": round(float(latest), 2) if latest else None,
         "best_buy_price": {
             "price": round(float(latest), 2) if latest else None,
@@ -339,7 +344,28 @@ async def get_signal(
 
     signal = (await session.execute(query)).scalar_one_or_none()
     if not signal:
-        raise HTTPException(status_code=404, detail="No signal stored for this company")
+        # Known company, not ranked (no prices or too little history yet).
+        return {
+            "ticker": company.ticker,
+            "name": company.name,
+            "as_of": as_of.isoformat() if as_of else None,
+            "model": f"{DEFAULT_MODEL.name}@{version}",
+            "status": "INSUFFICIENT_DATA",
+            "tier": None,
+            "score": None,
+            "rank": None,
+            "universe_size": None,
+            "data_coverage": None,
+            "percentiles": {},
+            "factors": {},
+            "excluded_factors": [],
+            "rationale": None,
+            "reason": (
+                "No signal stored: the company has no prices or too little history to be ranked"
+            ),
+            "sector": company.sector,
+            "industry": company.industry,
+        }
 
     payload = _serialize(signal, company.ticker, company.name)
     payload["sector"] = company.sector

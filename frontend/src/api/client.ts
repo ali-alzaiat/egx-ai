@@ -4,7 +4,6 @@ import type {
   AlertFired,
   AlertRule,
   Company,
-  CompanyValuation,
   DailyPrice,
   DataQualityListResponse,
   DataSource,
@@ -29,7 +28,6 @@ import type {
   SyncJobStatus,
   ThesisResponse,
   UniverseCoverage,
-  MarketSignal,
   ScoringModelInfo,
   UnscorableCompany,
   ScreenedCompanySummary,
@@ -135,16 +133,6 @@ export function useCompanyPrices(
   });
 }
 
-export function useLatestPrice(companyId: string | undefined) {
-  return useQuery({
-    queryKey: ["latestPrice", companyId],
-    queryFn: () =>
-      fetchApi<DailyPrice>(`/companies/${companyId}/prices/latest`),
-    enabled: !!companyId,
-    retry: retryUnless404,
-  });
-}
-
 export function useSignals(
   params: {
     limit?: number;
@@ -187,14 +175,6 @@ export function useUnscorable() {
   return useQuery({
     queryKey: ["signals", "unscorable"],
     queryFn: () => fetchApi<UnscorableCompany[]>("/signals/unscorable"),
-  });
-}
-
-export function useSignalForTicker(ticker: string | undefined) {
-  return useQuery({
-    queryKey: ["signals", "ticker", ticker],
-    queryFn: () => fetchApi<MarketSignal>(`/signals/${ticker}`),
-    enabled: !!ticker,
   });
 }
 
@@ -359,20 +339,6 @@ export function useScreeningResult(
   });
 }
 
-// POST /api/screening/companies/{company_id}/screen — plain async, not useMutation.
-// GET /api/valuation/companies/{company_id}
-export function useValuations(companyId: string | undefined) {
-  return useQuery({
-    queryKey: ["valuations", companyId],
-    queryFn: () =>
-      fetchApi<CompanyValuation[]>(`/valuation/companies/${companyId}`),
-    enabled: !!companyId,
-    retry: retryUnless404,
-  });
-}
-
-// POST /api/valuation/companies/{company_id}/calculate — plain async, not
-// useMutation. Empty call evaluates every model with no supplied assumptions.
 export async function getCompanyByTicker(ticker: string): Promise<Company | null> {
   const res = await fetch(`${API_BASE}/companies/ticker/${encodeURIComponent(ticker)}`);
   if (res.status === 404) return null;
@@ -380,7 +346,6 @@ export async function getCompanyByTicker(ticker: string): Promise<Company | null
   return res.json();
 }
 
-// POST /api/metrics/companies/{company_id}/calculate — plain async, not useMutation.
 // GET /api/scores/companies/{company_id} — 404 means unknown company;
 // a known but unassessed company returns { assessment: null } (empty state).
 export function useScore(companyId: string | undefined) {
@@ -397,7 +362,6 @@ export function useScore(companyId: string | undefined) {
   });
 }
 
-// POST /api/scores/companies/{company_id}/assess — plain async, not useMutation.
 // GET /api/industry/companies/{company_id}
 export function useIndustrySnapshot(companyId: string | undefined) {
   return useQuery({
@@ -450,7 +414,6 @@ export function usePurification(companyId: string | undefined) {
   });
 }
 
-// POST /api/screening/companies/{company_id}/purification — plain async.
 // GET /api/screening/companies/{company_id}/egx-membership — 404 means never recorded.
 // Returns the side-by-side envelope, not the flat POST record.
 export function useEgxMembership(companyId: string | undefined) {
@@ -469,9 +432,7 @@ export function useEgxMembership(companyId: string | undefined) {
   });
 }
 
-// POST /api/screening/companies/{company_id}/egx-membership — plain async.
-// POST /api/ingestion/sync — follows the runSignals pattern (plain fetch,
-// not useMutation). 409 means a job is already live: adopt the returned job
+// POST /api/ingestion/sync — plain fetch, not useMutation. 409 means a job is already live: adopt the returned job
 // and start polling it instead of throwing.
 export async function startMarketRefresh(params?: {
   tickers?: string;
@@ -526,7 +487,6 @@ export function useThesis(companyId: string | undefined) {
   });
 }
 
-// POST /api/theses/companies/{company_id}/assess — plain async, not useMutation.
 // POST /api/theses/companies/{company_id}/update — rationale required server-side.
 export async function updateThesis(
   companyId: string,

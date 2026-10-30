@@ -129,3 +129,41 @@ async def test_signals_run_now(client: AsyncClient, priced_companies) -> None:
     data = response.json()
     assert data["model"] == "egx_price_momentum@1.1.0"
     assert data["scored_count"] + data["unscorable_count"] == data["universe_total"]
+
+
+@pytest.mark.asyncio
+async def test_known_company_without_data_answers_200_insufficient(
+    client: AsyncClient, db_session
+) -> None:
+    """No prices is missing data, not a missing resource: 200 + reason, never 404."""
+    company = Company(
+        id=uuid.uuid4(),
+        ticker=f"NOP{uuid.uuid4().hex[:5].upper()}",
+        name="No prices",
+        currency="EGP",
+        status=CompanyStatus.ACTIVE,
+    )
+    db_session.add(company)
+    await db_session.flush()
+
+    signal = await client.get(f"/api/signals/{company.ticker}")
+    assert signal.status_code == 200
+    assert signal.json()["status"] == "INSUFFICIENT_DATA"
+    assert signal.json()["score"] is None
+    assert signal.json()["reason"]
+
+    support = await client.get(f"/api/signals/{company.ticker}/support")
+    assert support.status_code == 200
+    assert support.json()["status"] == "INSUFFICIENT_DATA"
+    assert support.json()["support_levels"] == []
+
+    latest = await client.get(f"/api/companies/{company.id}/prices/latest")
+    assert latest.status_code == 200
+    assert latest.json()["status"] == "INSUFFICIENT_DATA"
+    assert latest.json()["close"] is None
+
+
+@pytest.mark.asyncio
+async def test_unknown_ticker_is_still_404(client: AsyncClient) -> None:
+    assert (await client.get("/api/signals/ZZZNOTREAL")).status_code == 404
+    assert (await client.get("/api/signals/ZZZNOTREAL/support")).status_code == 404
