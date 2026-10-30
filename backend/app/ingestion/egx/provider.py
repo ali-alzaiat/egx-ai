@@ -63,6 +63,15 @@ def _text(info: dict[str, object], key: str, default: str | None = None) -> str 
     return default
 
 
+def normalize_currency(raw: object) -> str | None:
+    """A 3-letter upper-case ISO currency code, else None (e.g. sub-units like ``GBp``)."""
+    if isinstance(raw, str):
+        code = raw.strip()
+        if len(code) == 3 and code.isalpha() and code.isupper():
+            return code
+    return None
+
+
 def _free_float_ratio(
     float_shares: Decimal | None, shares: Decimal | None
 ) -> Decimal | None:
@@ -140,6 +149,24 @@ class EGXMarketDataProvider(MarketDataProvider):
             except Exception:  # noqa: BLE001 - metadata is best effort
                 return {}
             return {k: v for k, v in info.items() if isinstance(v, (str, int, float))}
+
+        return await anyio.to_thread.run_sync(_load)
+
+    async def fetch_trading_currency(self, ticker: str) -> str | None:
+        """Currency Yahoo quotes this ticker's prices in (price metadata), or None.
+
+        Read from the price series' own metadata, never defaulted: None when Yahoo has no
+        data or reports something that is not a 3-letter ISO code.
+        """
+
+        def _load() -> str | None:
+            try:
+                handle = _yfinance().Ticker(to_yahoo_ticker(ticker))
+                handle.history(period="5d", interval="1d", auto_adjust=False)
+                meta = handle.history_metadata or {}
+            except Exception:  # noqa: BLE001 - missing coverage is expected
+                return None
+            return normalize_currency(meta.get("currency"))
 
         return await anyio.to_thread.run_sync(_load)
 

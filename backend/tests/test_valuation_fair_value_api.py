@@ -196,7 +196,7 @@ async def test_bank_happy_path(
     assert data["ticker"] == "BANKFV"
     assert data["methodology_version"] == VALUATION_METHODOLOGY_VERSION
     assert data["profile"]["profile_id"] == "banks"
-    assert data["profile"]["primary_model"] == "excess_returns"
+    assert data["profile"]["primary_model"] == "justified_pb"
     assert data["profile"]["preferred_multiple"] == "pb"
     assert data["weights"] == {"intrinsic": "0.6", "relative": "0.4"}
     assert data["n_with_data"] == 2
@@ -209,7 +209,7 @@ async def test_bank_happy_path(
     assert abs(Decimal(fv["value"]) - Decimal("53.5")) < Decimal("0.5")
     assert Decimal(data["legs"]["relative"]["value"]) == Decimal("60")
 
-    assert data["legs"]["intrinsic"]["model"] == "excess_returns"
+    assert data["legs"]["intrinsic"]["model"] == "justified_pb"
     assert data["legs"]["relative"]["model"] == "price_to_earnings"
     assert data["legs"]["fallback"]["model"] == "dividend_discount"
 
@@ -261,6 +261,8 @@ async def test_missing_dq_degrades_honestly(
         "value": None,
         "status": "INSUFFICIENT_DATA",
         "reason": data["fair_value"]["reason"],
+        "basis": None,
+        "basis_note": None,
     }
     assert "MISSING" in data["fair_value"]["reason"]
     assert data["legs"]["intrinsic"]["status"] == "INSUFFICIENT_DATA"

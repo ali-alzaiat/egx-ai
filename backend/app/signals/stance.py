@@ -1,4 +1,4 @@
-"""Deterministic stance service (signal-rules-2.0).
+"""Deterministic stance service (signal-rules-2.2).
 
 I/O shell around the pure rules in :mod:`app.signals.rules`: loads prices,
 valuation scenarios, the investment score, statement freshness and the
@@ -27,7 +27,9 @@ from app.scores.service import ScoreService
 from app.screening.status import shariah_statuses
 from app.signals import stance_cache
 from app.signals.rules import (
+    FAIR_VALUE_CONFIDENCE_LEVELS,
     LOW_LIQUIDITY_EGP,
+    MIN_MARKET_PEERS,
     SIGNAL_RULES_VERSION,
     STALE_STATEMENT_DAYS,
     Bar,
@@ -36,8 +38,11 @@ from app.signals.rules import (
     Stance,
     composite,
     confidence_for,
+    fair_value_discount,
     liquidity,
+    market_median_discount,
     reference_levels,
+    relative_fair_value_subscore,
     score_subscore,
     stance_for,
     technical_view,
@@ -165,10 +170,33 @@ class StanceService:
             for note in view.notes:
                 reasons.append(Reason(engine="volume", inputs=view.inputs, text=note))
 
-        # Valuation scenarios
-        targets, base, bear, bull = await self._scenario_targets(company.id)
-        if base is None or current_price is None:
-            missing.append("valuation scenarios")
+        # Valuation: scenarios win; else the market-relative fair-value discount (R46 S2)
+        payload = await self._valuation_payload(company.id)
+        targets, base, bear, bull = self._scenario_targets(payload)
+        currency_reason = self._currency_mismatch(payload)
+        fv_sub: Decimal | None = None
+        fv_reason: Reason | None = None
+        fv_note: str | None = None
+        if currency_reason is not None:
+            # Price and statements are in different currencies: nothing is compared.
+            targets = {
+                key: TargetLevel(value=t.value, status="INSUFFICIENT_DATA", reason=currency_reason)
+                for key, t in targets.items()
+            }
+            base = bear = bull = None
+        elif base is None and current_price is not None:
+            fv_sub, fv_reason, fv_note = await self._fair_value_view(payload, current_price)
+        if currency_reason is not None:
+            missing.append("valuation (" + currency_reason + ")")
+            subscores["valuation"] = None
+        elif fv_sub is not None and fv_reason is not None:
+            subscores["valuation"] = fv_sub
+            reasons.append(fv_reason)
+        elif base is None or current_price is None:
+            missing.append(
+                "valuation scenarios or fair value"
+                + (f" ({fv_note})" if fv_note else " (Medium+ confidence)")
+            )
             subscores["valuation"] = None
         else:
             sub = valuation_subscore(current_price, bear, base, bull)
@@ -289,15 +317,78 @@ class StanceService:
         stance_cache.put(ticker, price_date, result)
         return result
 
-    async def _scenario_targets(
-        self, company_id: Any
-    ) -> tuple[dict[str, TargetLevel], Decimal | None, Decimal | None, Decimal | None]:
-        """Valuation scenarios as targets; an inverted set is INSUFFICIENT_DATA."""
+    async def _valuation_payload(self, company_id: Any) -> dict[str, Any] | None:
         try:
-            payload = await self.valuation.latest_payload(company_id)
+            return await self.valuation.latest_payload(company_id)
         except Exception:
             logger.warning("fair value unavailable for %s", company_id, exc_info=True)
-            payload = None
+            return None
+
+    @staticmethod
+    def _currency_mismatch(payload: dict[str, Any] | None) -> str | None:
+        """The "price in USD, statements in EGP" reason when the stored fair value says so."""
+        block = payload.get("currency") if isinstance(payload, dict) else None
+        if isinstance(block, dict) and block.get("status") == "MISMATCH":
+            return str(block.get("reason"))
+        return None
+
+    async def _market_discounts(self) -> list[Decimal]:
+        cached = stance_cache.get_market_discounts()
+        if cached is not None:
+            return cached
+        values = await self.valuation.snapshots.peer_discounts(
+            sorted(FAIR_VALUE_CONFIDENCE_LEVELS)
+        )
+        stance_cache.put_market_discounts(values)
+        return values
+
+    async def _fair_value_view(
+        self, payload: dict[str, Any] | None, price: Decimal
+    ) -> tuple[Decimal | None, Reason | None, str | None]:
+        """(sub-score, reason, note): market-relative discount, or why it is unavailable."""
+        if not isinstance(payload, dict):
+            return None, None, None
+        fair_value = _decimal((payload.get("fair_value") or {}).get("value"))
+        level = str((payload.get("confidence") or {}).get("level"))
+        if fair_value is None:
+            return None, None, None
+        if level not in FAIR_VALUE_CONFIDENCE_LEVELS:
+            return None, None, f"fair value confidence {level} is below Medium"
+        discount = fair_value_discount(price, fair_value)
+        if discount is None:
+            return None, None, None
+        peers = await self._market_discounts()
+        market = market_median_discount(peers)
+        if market is None:
+            note = (
+                f"only {len(peers)} companies with Medium+ fair values; "
+                f"{MIN_MARKET_PEERS} needed for a market median"
+            )
+            return None, None, note
+        sub = relative_fair_value_subscore(discount, market)
+        reason = Reason(
+            engine="valuation",
+            inputs={
+                "fair_value": str(fair_value),
+                "price": str(price),
+                "discount": str(discount),
+                "market_median_discount": str(market),
+                "peers": str(len(peers)),
+                "confidence": level,
+            },
+            text=(
+                f"Price is {1 - discount:.2f}x fair value vs a market median of "
+                f"{1 - market:.2f}x ({len(peers)} companies, {level} confidence): "
+                f"sub-score {sub:+.2f}."
+            ),
+        )
+        return sub, reason, None
+
+    @staticmethod
+    def _scenario_targets(
+        payload: dict[str, Any] | None,
+    ) -> tuple[dict[str, TargetLevel], Decimal | None, Decimal | None, Decimal | None]:
+        """Valuation scenarios as targets; an inverted set is INSUFFICIENT_DATA."""
         scenarios = (payload or {}).get("scenarios", {}) if isinstance(payload, dict) else {}
         targets: dict[str, TargetLevel] = {}
         values: dict[str, Decimal | None] = {}

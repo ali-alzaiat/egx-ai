@@ -1,4 +1,4 @@
-"""Tests for the statement ontology (stmt-ontology-1.1)."""
+"""Tests for the statement ontology (stmt-ontology-1.2)."""
 
 import pytest
 
@@ -23,6 +23,8 @@ EXPECTED_INCOME = [
     "net_income",
     "eps",
     "interest_income",
+    "net_income_to_parent",
+    "minority_income",
     "weighted_avg_shares_basic",
 ]
 
@@ -38,6 +40,8 @@ EXPECTED_BALANCE = [
     "interest_bearing_debt",
     "total_equity",
     "minority_interests",
+    "net_loans",
+    "total_deposits",
     "shares_outstanding",
 ]
 
@@ -48,11 +52,12 @@ EXPECTED_CASH = [
     "capex",
     "dividends_paid",
     "debt_repayment",
+    "net_borrowing",
 ]
 
 
 def test_ontology_version_constant() -> None:
-    assert STATEMENT_ONTOLOGY_VERSION == "stmt-ontology-1.1"
+    assert STATEMENT_ONTOLOGY_VERSION == "stmt-ontology-1.2"
 
 
 def test_income_codes_present() -> None:

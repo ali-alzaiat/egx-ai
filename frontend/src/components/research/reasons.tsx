@@ -1,4 +1,5 @@
 import { useLang } from "../../i18n/useLang";
+import { fmtPct } from "../../lib/format";
 import { parseReason } from "../../lib/reasons";
 import { ForeignText } from "../../pages/shared/ForeignText";
 import { Missing } from "../ui/Missing";
@@ -22,6 +23,10 @@ const ZERO_PRIOR = /^prior-year value is zero; percent change undefined$/;
 const NO_STATEMENTS = /^no approved statement lines$/;
 const NO_SNAPSHOT = /^no snapshot$/;
 const COMPUTATION_FAILED = /^computation failed: (.+)$/;
+const IMPLIED_ABOVE = /^price is above the model value at (-?\d+)% stage-1 growth: implied growth is over -?\d+%$/;
+const IMPLIED_BELOW = /^price is below the model value at (-?\d+)% stage-1 growth: implied growth is under -?\d+%$/;
+const NO_POSITIVE_PRICE = /^no positive current price to compare with$/;
+const NO_ANNUAL_PERIOD = /^no approved annual period FY(\d{4})$/;
 
 /**
  * Backend reason text -> our own localized sentence. Returns null for text we do
@@ -65,6 +70,13 @@ export function localizeReason(
   if (MARGIN_LEG_MISSING.test(text)) return t("rs_margin_missing");
   if (MARGIN_BOTH_YEARS.test(text)) return t("rs_margin_both_years");
   if (ZERO_PRIOR.test(text)) return t("rs_zero_prior");
+  const above = IMPLIED_ABOVE.exec(text);
+  if (above?.[1]) return t("rs_implied_above", { pct: fmtPct(locale, Number(above[1]) / 100) ?? above[1] });
+  const below = IMPLIED_BELOW.exec(text);
+  if (below?.[1]) return t("rs_implied_below", { pct: fmtPct(locale, Number(below[1]) / 100) ?? below[1] });
+  if (NO_POSITIVE_PRICE.test(text)) return t("rs_no_positive_price");
+  const noPeriod = NO_ANNUAL_PERIOD.exec(text);
+  if (noPeriod?.[1]) return t("rs_no_annual_period", { year: noPeriod[1] });
   return null;
 }
 

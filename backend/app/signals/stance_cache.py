@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from datetime import date
+    from decimal import Decimal
 
     from app.signals.stance import StanceResult
 
@@ -46,5 +47,26 @@ def put(
     )
 
 
+# Market-wide fair-value discounts for the relative valuation sub-score (R46 S2): one query
+# over stored snapshots, reused for every stance until the TTL ends or any recompute clears it.
+_market: tuple[float, list[Decimal]] | None = None
+
+
+def get_market_discounts(now: float | None = None) -> list[Decimal] | None:
+    if _market is None:
+        return None
+    stored_at, values = _market
+    if (now if now is not None else time.monotonic()) - stored_at > CACHE_TTL_SECONDS:
+        return None
+    return values
+
+
+def put_market_discounts(values: list[Decimal], now: float | None = None) -> None:
+    global _market
+    _market = (now if now is not None else time.monotonic(), values)
+
+
 def clear() -> None:
+    global _market
     _entries.clear()
+    _market = None

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useLang } from "../../i18n/useLang";
+import { scalarInput } from "../../lib/fairValue";
 import { fmtDate, fmtNum, fmtRatio, toNumber } from "../../lib/format";
 import { ForeignText } from "../../pages/shared/ForeignText";
 import type { FairValueAssumptions, FairValueResponse, ValuationAssumptionItem } from "../../types";
@@ -80,13 +81,28 @@ function buildRows(
   const erp = byKey.get("equity_risk_premium");
   const inflation = byKey.get("long_run_inflation");
   const cap = byKey.get("nominal_gdp_growth");
-  const discount = fmtRate(locale, assumptions.computed?.discount_rate ?? fairValue.inputs.discount_rate);
-  const terminal = fmtRate(locale, assumptions.computed?.terminal_growth_rate ?? fairValue.inputs.terminal_growth_rate);
+  const input = (key: string): string | null => scalarInput(fairValue.inputs, key);
+  const discount = fmtRate(locale, assumptions.computed?.discount_rate ?? input("discount_rate"));
+  const terminal = fmtRate(locale, assumptions.computed?.terminal_growth_rate ?? input("terminal_growth_rate"));
   const stageOne = fmtRate(
     locale,
-    fairValue.inputs.resolved_growth_high ?? fairValue.inputs.revenue_growth ?? fairValue.inputs.growth_rate,
+    input("resolved_growth_high") ?? input("revenue_growth") ?? input("growth_rate"),
   );
   const capText = cap ? fmtRate(locale, cap.value) : null;
+  // A bank is valued on book value and ROE: stage-1 growth is not one of its inputs.
+  const usesStageOne = fairValue.legs.intrinsic.model !== "justified_pb";
+
+  const stageOneRows: Row[] = usesStageOne
+    ? [
+        {
+          id: "stage_one_growth",
+          label: t("rv_a_stage1_growth"),
+          value: stageOne ?? <MissingReason reason={fairValue.legs.intrinsic.reason} />,
+          source: capText ? t("rv_src_growth", { cap: capText }) : t("rv_src_growth_nocap"),
+          asOf: cap?.as_of ?? null,
+        },
+      ]
+    : [];
 
   return [
     {
@@ -111,13 +127,7 @@ function buildRows(
       ),
       asOf: inflation?.as_of ?? null,
     },
-    {
-      id: "stage_one_growth",
-      label: t("rv_a_stage1_growth"),
-      value: stageOne ?? <MissingReason reason={fairValue.legs.intrinsic.reason} />,
-      source: capText ? t("rv_src_growth", { cap: capText }) : t("rv_src_growth_nocap"),
-      asOf: cap?.as_of ?? null,
-    },
+    ...stageOneRows,
     stored("nominal_gdp_growth"),
     stored("target_pe"),
     stored("target_pb"),

@@ -231,7 +231,7 @@ class TestVendorEquityFallback:
         assert self._total_equity(payload) == {2025: D("580"), 2024: D("480")}
 
     def test_mapping_version_bumped(self) -> None:
-        assert VENDOR_MAPPING_VERSION == "stockanalysis-map-1.2"
+        assert VENDOR_MAPPING_VERSION == "stockanalysis-map-1.3"
 
 
 # --- QA F4: an identical re-import changes nothing ---------------------------------------------
@@ -471,6 +471,7 @@ async def _fv_company(
     company = await make_company(db, industry="Software")
     for year in years:
         values = dict(FULL_YEAR)
+        values["net_borrowing"] = D("20")  # R46: true FCFE needs the net borrowing line
         if year == years[0]:
             values["revenue"] = D(start_revenue)
         await seed_year(db, company, year, values)
@@ -538,7 +539,7 @@ async def test_full_assumption_set_gives_a_faded_intrinsic_value(
     assert D(assumptions["discount_rate"]) == D("0.24")
     assert D(assumptions["terminal_discount_rate"]) == D("0.15")
     assert D(assumptions["terminal_growth_rate"]) == D("0.05")
-    assert fair["methodology_version"] == VALUATION_METHODOLOGY_VERSION == "1.2"
+    assert fair["methodology_version"] == VALUATION_METHODOLOGY_VERSION == "1.3"
     assert fair["input_sources"]["discount_rate"].count("assumption:") == 2
     assert fair["input_sources"]["long_run_cost_of_equity"].startswith(
         "assumption:long_run_cost_of_equity"

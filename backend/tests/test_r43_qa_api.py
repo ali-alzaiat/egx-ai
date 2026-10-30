@@ -1136,7 +1136,7 @@ async def test_refresh_job_survives_a_failing_engine(
 # --- migration 023 with data, constraint and drift --------------------------------------------
 
 
-async def test_migration_023_has_no_model_drift_and_single_head() -> None:
+async def test_migrations_have_no_model_drift_and_single_head() -> None:
     import asyncio
 
     from alembic import command
@@ -1144,7 +1144,7 @@ async def test_migration_023_has_no_model_drift_and_single_head() -> None:
     from alembic.script import ScriptDirectory
 
     cfg = Config("alembic.ini")
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["023"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["024"]
     await asyncio.to_thread(command.check, cfg)  # raises when models and migrations differ
 
 

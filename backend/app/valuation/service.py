@@ -24,22 +24,26 @@ from app.statements import bridge
 from app.statements.bridge import LineValue, Resolved, load_company_statements
 from app.valuation.assumptions import AssumptionSet, resolve_assumptions
 from app.valuation.constants import (
+    BANK_PROFILE_KEY,
     DEFAULT_VALUATION_PROFILE_KEY,
     PROFILE_WEIGHTS,
     RANGE_NOTE,
     SENSITIVITY_DISCOUNT_STEPS,
     SENSITIVITY_GROWTH_STEPS,
+    STAGE1_GROWTH_FLOOR,
     VALUATION_METHODOLOGY_VERSION,
     VALUATION_PROFILES,
 )
 from app.valuation.fairvalue import (
     TikrInputs,
     confidence_for_dq,
+    currency_check,
     scenario_inputs,
     verdict_for,
     weighted_fair_value,
 )
 from app.valuation.models import (
+    ImpliedResult,
     ValuationModel,
     ValuationResult,
     ValuationStatus,
@@ -47,7 +51,10 @@ from app.valuation.models import (
     calculate_ddm,
     calculate_excess_returns,
     calculate_fcfe_2stage,
+    calculate_justified_pb,
+    implied_justified_pb_roe,
     select_preferred_multiple,
+    solve_implied_growth,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,7 +64,17 @@ PRIMARY_MODEL_MEMBERS: dict[str, ValuationModel] = {
     "dividend_discount": ValuationModel.DDM,
     "excess_returns": ValuationModel.EXCESS_RETURNS,
     "affo_two_stage": ValuationModel.AFFO_2STAGE,
+    "justified_pb": ValuationModel.JUSTIFIED_PB,
 }
+
+#: Primary models whose cash-flow base is the 3-year FCFE (the base evidence is echoed).
+_FCF_BASED_MODELS = ("fcfe_two_stage", "affo_two_stage")
+
+#: Why the relative leg is off and what fair value therefore is (R46 V5).
+INTRINSIC_ONLY_NOTE = (
+    "Fair value is the intrinsic model alone: the relative (P/E, P/S, P/B) leg is off "
+    "until sourced target multiples exist."
+)
 
 
 class FairValueInput(NamedTuple):
@@ -90,6 +107,8 @@ class FairValueInput(NamedTuple):
     revenue_growth: Decimal | None = None
     operating_margin: Decimal | None = None
     exit_multiple: Decimal | None = None
+    #: Evidence behind ``free_cash_flow`` (R46): method, 3 yearly FCFE values, gaps.
+    fcfe_base: dict[str, Any] | None = None
 
 
 @dataclass
@@ -127,6 +146,10 @@ class ResolvedFairValueInputs:
     assumptions: AssumptionSet
     statement_sources: list[LineValue]
     profile_key: str
+    #: Net loans + deposits present on the latest approved period (R46 V3).
+    is_bank: bool = False
+    #: Currency of the latest approved statements (R46 C1); None when unknown or mixed.
+    statements_currency: str | None = None
     #: Statement-derived input -> why it is unavailable (names the missing line).
     gaps: dict[str, str] = field(default_factory=dict)
 
@@ -134,6 +157,7 @@ class ResolvedFairValueInputs:
 #: Stored assumption keys each primary model needs (R44 (b) + R45 M5 + F13). The
 #: growth cap (``nominal_gdp_growth``) is only needed by the growth-stage models.
 _INTRINSIC_KEYS: dict[str, tuple[str, ...]] = {
+    "justified_pb": ("risk_free_rate", "equity_risk_premium", "long_run_inflation"),
     "excess_returns": (
         "risk_free_rate",
         "equity_risk_premium",
@@ -189,6 +213,28 @@ def _apply_assumption_gaps(
     return primary, relative, "; ".join(reasons) if reasons else None
 
 
+def _fcfe_assumptions(base: Mapping[str, Any]) -> dict[str, str | None]:
+    """Flatten the FCFE base evidence into leg assumptions (``fcfe_FY<year>`` per year)."""
+    out: dict[str, str | None] = {
+        "fcfe_base_method": str(base.get("method")),
+        "fcfe_base_mean": base.get("mean"),
+    }
+    for year in base.get("years") or []:
+        out[f"fcfe_FY{year['fiscal_year']}"] = year.get("fcfe")
+    return out
+
+
+def _fair_value_basis(
+    primary: ValuationResult, relative: ValuationResult, fair_value: Decimal | None
+) -> str | None:
+    """Which legs made the headline fair value: intrinsic, relative or the weighted blend."""
+    if fair_value is None:
+        return None
+    if primary.value is not None and relative.value is not None:
+        return "weighted"
+    return "intrinsic_only" if primary.value is not None else "relative_only"
+
+
 def _leg_payload(result: ValuationResult) -> dict[str, Any]:
     return {
         "model": result.model.value,
@@ -221,6 +267,9 @@ class FairValueService:
         self.data_quality = DataQualityService(session)
 
     def _compute_primary(self, p: _ResolvedPipeline) -> ValuationResult:
+        if p.primary_key == "justified_pb":
+            roe = p.roe + p.roe_shift if p.roe is not None else None
+            return calculate_justified_pb(p.bvps, roe, p.discount_rate, p.terminal_growth)
         if p.long_run_ke is None:
             model = {
                 "excess_returns": ValuationModel.EXCESS_RETURNS,
@@ -319,9 +368,13 @@ class FairValueService:
         if company is None:
             raise HTTPException(status_code=404, detail="Company not found")
         _row, profile_key = await self._profile(company)
-        assumptions = await resolve_assumptions(self.session, profile_key)
         statements = await load_company_statements(self.session, company_id)
         latest = statements.latest()
+        # Banks are identified from statement lines, not the sector row (R46 V3).
+        is_bank = bridge.is_bank(latest)
+        if is_bank:
+            profile_key = BANK_PROFILE_KEY
+        assumptions = await resolve_assumptions(self.session, profile_key)
 
         sources: dict[str, str | None] = {}
         gaps: dict[str, str] = {}
@@ -356,7 +409,7 @@ class FairValueService:
             gaps["revenue_growth"] = cagr.reason or "revenue CAGR unavailable"
         elif cap is not None:
             used.extend(cagr.sources)
-            growth = min(cagr.value, cap)
+            growth = max(STAGE1_GROWTH_FLOOR, min(cagr.value, cap))
             fy = cagr.sources[-1].fiscal_year
             tier = bridge.tier_of(cagr.sources)
             sources["revenue_growth"] = (
@@ -366,11 +419,24 @@ class FairValueService:
                     if cagr.value > cap
                     else f"; below cap {assumptions.provenance_of('nominal_gdp_growth')}"
                 )
+                + (
+                    f"; floored at {STAGE1_GROWTH_FLOOR:.0%} (negative growth is not extrapolated)"
+                    if cagr.value < STAGE1_GROWTH_FLOOR
+                    else ""
+                )
+            )
+
+        fcfe = None if is_bank else bridge.fcfe_base(statements, latest)
+        fcf_value = take("free_cash_flow", fcfe.resolved) if fcfe is not None else None
+        if fcfe is not None and fcfe.resolved.available and latest is not None:
+            sources["free_cash_flow"] = (
+                f"statement: 3-year mean FCFE FY{latest.fiscal_year - 2}-FY{latest.fiscal_year} "
+                f"({bridge.tier_of(fcfe.resolved.sources)}); {bridge.FCFE_BASE_METHOD}"
             )
 
         inputs = FairValueInput(
             revenue_growth=growth,
-            free_cash_flow=take("free_cash_flow", bridge.free_cash_flow(latest)),
+            free_cash_flow=fcf_value,
             earnings_per_share=take("earnings_per_share", bridge.eps(latest)),
             book_value_per_share=take(
                 "book_value_per_share", bridge.book_value_per_share(latest)
@@ -392,6 +458,7 @@ class FairValueService:
             ps_ratio=assume("ps_ratio", "target_ps"),
             pb_ratio=assume("pb_ratio", "target_pb"),
             expected_dps=None,
+            fcfe_base=fcfe.payload() if fcfe is not None else None,
         )
         # Historical DPS is not an *expected* DPS: the DDM leg stays INSUFFICIENT.
         sources["expected_dps"] = None
@@ -401,6 +468,8 @@ class FairValueService:
             assumptions=assumptions,
             statement_sources=bridge.unique_sources(used),
             profile_key=profile_key,
+            is_bank=is_bank,
+            statements_currency=latest.currency() if latest is not None else None,
             gaps=gaps,
         )
 
@@ -414,6 +483,8 @@ class FairValueService:
             missing_assumptions=resolved.assumptions.missing,
             assumptions=resolved.assumptions,
             input_gaps=resolved.gaps,
+            is_bank=resolved.is_bank,
+            statements_currency=resolved.statements_currency,
         )
         payload["assumptions"] = resolved.assumptions.payload()
         payload["statement_sources"] = [
@@ -470,8 +541,14 @@ class FairValueService:
         missing_assumptions: Sequence[str] = (),
         assumptions: AssumptionSet | None = None,
         input_gaps: Mapping[str, str] | None = None,
+        is_bank: bool = False,
+        statements_currency: str | None = None,
     ) -> dict[str, Any]:
-        """Compute and hand-serialize the weighted fair value. Never persists."""
+        """Compute and hand-serialize the weighted fair value. Never persists.
+
+        ``is_bank`` (statement lines show net loans + deposits) routes to the banks
+        profile whatever the sector row says.
+        """
         company = await self.companies.get_by_id(company_id)
         if company is None:
             raise HTTPException(status_code=404, detail="Company not found")
@@ -484,6 +561,9 @@ class FairValueService:
         ph_missing = dq_ph is not None and dq_ph.status.value == "MISSING"
 
         profile_row, profile_key = await self._profile(company)
+        if is_bank:
+            profile_key = BANK_PROFILE_KEY
+            profile_row = None  # the sector row (if any) belongs to another profile
         shape = VALUATION_PROFILES.get(
             profile_key, VALUATION_PROFILES[DEFAULT_VALUATION_PROFILE_KEY]
         )
@@ -511,6 +591,8 @@ class FairValueService:
         # Stage-1 growth is the capped 3-year revenue CAGR supplied by ``resolve_inputs``
         # (owner ruling F13); the single-year metric is never a fallback.
         revenue_growth = inputs.revenue_growth
+        if revenue_growth is not None and revenue_growth < STAGE1_GROWTH_FLOOR:
+            revenue_growth = STAGE1_GROWTH_FLOOR  # R46 V4: never extrapolate negative growth
         sources["revenue_growth"] = (
             given.get("revenue_growth") or "input:revenue_growth"
             if revenue_growth is not None
@@ -522,12 +604,17 @@ class FairValueService:
         stable_roe = await prefill("stable_roe", inputs.stable_roe, "roe")
 
         growth_high = revenue_growth if revenue_growth is not None else inputs.growth_rate
+        growth_floored = growth_high is not None and growth_high < STAGE1_GROWTH_FLOOR
+        if growth_high is not None and growth_floored:
+            growth_high = STAGE1_GROWTH_FLOOR
         if revenue_growth is not None:
             sources["growth_high"] = sources["revenue_growth"]
         elif inputs.growth_rate is not None:
             sources["growth_high"] = given.get("growth_rate") or "input:growth_rate"
         else:
             sources["growth_high"] = None
+        if growth_floored and sources["growth_high"] is not None:
+            sources["growth_high"] += f"; floored at {STAGE1_GROWTH_FLOOR:.0%}"
         pe_target = inputs.exit_multiple if inputs.exit_multiple is not None else inputs.pe_ratio
         if inputs.exit_multiple is not None:
             sources["pe_target"] = given.get("exit_multiple") or "input:exit_multiple"
@@ -620,7 +707,7 @@ class FairValueService:
         growth_gap = (input_gaps or {}).get("revenue_growth")
         if (
             growth_gap
-            and primary_key != "excess_returns"
+            and primary_key in _FCF_BASED_MODELS
             and primary.value is None
             and primary.status == ValuationStatus.INSUFFICIENT_DATA
             and growth_high is None
@@ -630,7 +717,7 @@ class FairValueService:
         fcf_gap = (input_gaps or {}).get("free_cash_flow")
         if (
             fcf_gap
-            and primary_key != "excess_returns"
+            and primary_key in _FCF_BASED_MODELS
             and primary.value is None
             and primary.status == ValuationStatus.INSUFFICIENT_DATA
             and affo is None
@@ -641,6 +728,11 @@ class FairValueService:
         primary, relative, gap_reason = _apply_assumption_gaps(
             primary, relative, primary_key, missing_assumptions, assumptions
         )
+        if primary_key in _FCF_BASED_MODELS and inputs.fcfe_base is not None:
+            # Show the evidence behind the cash-flow base on the leg itself (R46 V1/V2).
+            primary = primary._replace(
+                assumptions={**primary.assumptions, **_fcfe_assumptions(inputs.fcfe_base)}
+            )
 
         price_row = (
             await self.session.execute(
@@ -657,7 +749,19 @@ class FairValueService:
             dq_fs.score if dq_fs is not None else None,
             dq_fs.status.value if dq_fs is not None else None,
         )
+        currency = currency_check(company.trading_currency, statements_currency)
         verdict = verdict_for(fair_value, current_price, confidence.required_discount)
+        if currency["status"] == "MISMATCH":
+            # Different currencies: no price comparison, and nothing is converted (R46 C1).
+            verdict = {
+                "label": "INSUFFICIENT_DATA",
+                "detail": f"No verdict: {currency['reason']}.",
+                "discount": None,
+            }
+        implied = self._implied(
+            base, primary, current_price, fs_missing, currency,
+            assumptions.value("nominal_gdp_growth") if assumptions is not None else None,
+        )
 
         scenarios = self._scenarios(
             base, weights, revenue_growth, operating_margin, inputs.exit_multiple,
@@ -706,6 +810,7 @@ class FairValueService:
             "resolved_growth_high": opt(growth_high),
             "resolved_pe_target": opt(pe_target),
             "resolved_affo_source": affo_source,
+            "fcfe_base": inputs.fcfe_base,
         }
 
         payload: dict[str, Any] = {
@@ -722,6 +827,9 @@ class FairValueService:
                 "primary_model": primary_key,
                 "fallback_model": shape["fallback_model"],
                 "preferred_multiple": shape["preferred_multiple"],
+                "detection": (
+                    "statement_lines: net_loans + total_deposits" if is_bank else "sector"
+                ),
             },
             "inputs": inputs_payload,
             "input_sources": sources,
@@ -739,6 +847,10 @@ class FairValueService:
                     else gap_reason
                     or "No model leg produced a value from the resolved inputs."
                 ),
+                "basis": _fair_value_basis(primary, relative, fair_value),
+                "basis_note": INTRINSIC_ONLY_NOTE
+                if _fair_value_basis(primary, relative, fair_value) == "intrinsic_only"
+                else None,
             },
             "current_price": {
                 "value": opt(current_price),
@@ -748,9 +860,72 @@ class FairValueService:
             "sensitivity": sensitivity,
             "confidence": confidence_payload,
             "verdict": verdict,
+            "currency": currency,
+            "implied": implied,
         }
 
         return payload
+
+    @staticmethod
+    def _implied(
+        p: _ResolvedPipeline,
+        primary: ValuationResult,
+        price: Decimal | None,
+        fs_missing: bool,
+        currency: Mapping[str, Any],
+        growth_cap: Decimal | None,
+    ) -> dict[str, Any]:
+        """What the price implies under the model (R46 V6). Display only: not in the verdict."""
+        bank = p.primary_key == "justified_pb"
+        metric = "roe" if bank else "growth_high"
+        compare = (
+            {"key": "roe", "value": p.roe}
+            if bank
+            else {"key": "nominal_gdp_growth", "value": growth_cap}
+        )
+
+        def block(
+            value: Decimal | None, status: str, reason: str | None,
+            bounds: tuple[Decimal, Decimal] | None = None,
+        ) -> dict[str, Any]:
+            return {
+                "metric": metric,
+                "value": str(value) if value is not None else None,
+                "status": status,
+                "reason": reason,
+                "compare_to": {
+                    "key": compare["key"],
+                    "value": str(compare["value"]) if compare["value"] is not None else None,
+                },
+                "bounds": (
+                    {"min": str(bounds[0]), "max": str(bounds[1])} if bounds is not None else None
+                ),
+                "price": str(price) if price is not None else None,
+                "model": p.primary_key,
+            }
+
+        insufficient = ValuationStatus.INSUFFICIENT_DATA.value
+        if currency["status"] == "MISMATCH":
+            return block(None, insufficient, str(currency["reason"]))
+        if fs_missing:
+            return block(None, insufficient, "financial-statements data quality is MISSING")
+        result: ImpliedResult
+        if bank:
+            result = implied_justified_pb_roe(price, p.bvps, p.discount_rate, p.terminal_growth)
+        elif p.primary_key == "fcfe_two_stage":
+            if p.long_run_ke is None:
+                return block(
+                    None, insufficient, "Missing long-run cost of equity (terminal discount rate)"
+                )
+            result = solve_implied_growth(
+                price, p.fcf, p.stable_growth, p.discount_rate, p.terminal_growth,
+                p.shares, p.long_run_ke,
+            )
+        else:
+            return block(
+                None, insufficient, f"implied growth is not defined for model {p.primary_key}"
+            )
+        return block(result.value, result.status.value, result.reason, result.bounds)
 
     def _scenarios(
         self,
@@ -837,7 +1012,8 @@ class FairValueService:
         """Minimal 1-D sensitivity: ±discount and ±growth around the base."""
 
         rows: list[dict[str, Any]] = []
-        if fs_missing or base.discount_rate is None or base.growth_high is None:
+        bank = base.primary_key == "justified_pb"  # revenue growth does not drive P/B
+        if fs_missing or base.discount_rate is None or (base.growth_high is None and not bank):
             return rows
         for step in SENSITIVITY_DISCOUNT_STEPS:
             p = dataclasses.replace(base, discount_rate=base.discount_rate + step)
@@ -847,6 +1023,8 @@ class FairValueService:
                     "discount_rate", base.discount_rate + step, value, base_fv
                 )
             )
+        if bank or base.growth_high is None:
+            return rows
         for step in SENSITIVITY_GROWTH_STEPS:
             p = dataclasses.replace(base, growth_high=base.growth_high + step)
             _primary, _relative, value, _n = self._pipeline_fv(p, weights)

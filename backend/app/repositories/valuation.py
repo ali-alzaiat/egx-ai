@@ -213,3 +213,30 @@ class FairValueRepository:
             .execution_options(populate_existing=True)
         )
         return result.scalars().first()
+
+    async def peer_discounts(self, confidence_levels: Sequence[str]) -> list[Decimal]:
+        """Stored fair-value discounts of every company at one of ``confidence_levels``.
+
+        One cheap query over the current-methodology snapshots (no recompute). A snapshot
+        only has a ``verdict.discount`` when it had a fair value, a price and no currency
+        mismatch, so those are the only ones counted.
+        """
+        rows = (
+            await self.session.execute(
+                select(ValuationFairValue.confidence, ValuationFairValue.verdict).where(
+                    ValuationFairValue.methodology_version == VALUATION_METHODOLOGY_VERSION
+                )
+            )
+        ).all()
+        out: list[Decimal] = []
+        for confidence, verdict in rows:
+            if not isinstance(confidence, dict) or confidence.get("level") not in confidence_levels:
+                continue
+            raw = verdict.get("discount") if isinstance(verdict, dict) else None
+            if raw is None:
+                continue
+            try:
+                out.append(Decimal(str(raw)))
+            except ArithmeticError:
+                continue
+        return out

@@ -14,7 +14,13 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, NamedTuple
 
-from app.valuation.constants import EXPLICIT_STAGE_YEARS
+from app.valuation.constants import (
+    EXPLICIT_STAGE_YEARS,
+    IMPLIED_GROWTH_MAX,
+    IMPLIED_GROWTH_MIN,
+    IMPLIED_SOLVER_MAX_ITERATIONS,
+    IMPLIED_SOLVER_TOLERANCE,
+)
 
 
 class ValuationModel(Enum):
@@ -28,6 +34,7 @@ class ValuationModel(Enum):
     DDM = "dividend_discount"
     EXCESS_RETURNS = "excess_returns"
     AFFO_2STAGE = "affo_two_stage"
+    JUSTIFIED_PB = "justified_pb"
 
 
 class ValuationStatus(Enum):
@@ -962,6 +969,83 @@ def calculate_excess_returns(
     )
 
 
+def calculate_justified_pb(
+    book_value_per_share: Decimal | None,
+    roe: Decimal | None,
+    cost_of_equity: Decimal | None,
+    growth_rate: Decimal | None,
+) -> ValuationResult:
+    """Justified price-to-book for banks (R46 V3).
+
+    Formula: justified P/B = (ROE - g) / (ke - g); fair value/share = BVPS x justified P/B.
+    ``roe`` is the strict-average ROE from metrics (fraction), ``ke`` the first-stage cost
+    of equity and ``g`` the terminal growth. Missing inputs are INSUFFICIENT_DATA naming
+    them; a non-positive BVPS, ``ke <= g`` or a non-positive result is INVALID.
+    """
+    named = {
+        "BVPS": book_value_per_share,
+        "ROE": roe,
+        "cost of equity": cost_of_equity,
+        "growth": growth_rate,
+    }
+    missing = [name for name, value in named.items() if value is None]
+    if missing:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INSUFFICIENT_DATA,
+            model=ValuationModel.JUSTIFIED_PB,
+            assumptions={},
+            reason=f"Missing {', '.join(missing)} for the justified P/B model",
+        )
+    assert book_value_per_share is not None
+    assert roe is not None
+    assert cost_of_equity is not None
+    assert growth_rate is not None
+    echo: dict[str, str | None] = {
+        "bvps": str(book_value_per_share),
+        "roe": str(roe),
+        "cost_of_equity": str(cost_of_equity),
+        "growth": str(growth_rate),
+    }
+    if book_value_per_share <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.JUSTIFIED_PB,
+            assumptions=echo,
+            reason="Book value per share must be positive",
+        )
+    if cost_of_equity <= growth_rate:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.JUSTIFIED_PB,
+            assumptions=echo,
+            reason="Cost of equity must be greater than growth",
+        )
+    justified = (roe - growth_rate) / (cost_of_equity - growth_rate)
+    if justified <= 0:
+        return ValuationResult(
+            value=None,
+            status=ValuationStatus.INVALID,
+            model=ValuationModel.JUSTIFIED_PB,
+            assumptions={**echo, "justified_pb": str(justified)},
+            reason="ROE does not exceed growth: justified P/B is not positive",
+        )
+    return ValuationResult(
+        value=(book_value_per_share * justified).quantize(
+            Decimal("0.0001"), rounding=ROUND_HALF_UP
+        ),
+        status=ValuationStatus.AVAILABLE,
+        model=ValuationModel.JUSTIFIED_PB,
+        assumptions={
+            **echo,
+            "justified_pb": str(justified),
+            "formula": "FV = BVPS x (ROE - g) / (ke - g)",
+        },
+    )
+
+
 def calculate_affo_2stage(
     cash_flow: Decimal | None,
     growth_high: Decimal | None,
@@ -1255,3 +1339,118 @@ def calculate_sensitivity(
             })
 
     return results
+
+
+class ImpliedResult(NamedTuple):
+    """Reverse-calculation outcome (R46 V6): what the price implies, or why not."""
+
+    metric: str
+    value: Decimal | None
+    status: ValuationStatus
+    reason: str | None
+    bounds: tuple[Decimal, Decimal] | None = None
+
+
+def solve_implied_growth(
+    price: Decimal | None,
+    free_cash_flow: Decimal | None,
+    growth_stable: Decimal | None,
+    discount_rate: Decimal | None,
+    terminal_growth_rate: Decimal | None,
+    shares_outstanding: Decimal | None,
+    terminal_discount_rate: Decimal | None = None,
+    *,
+    lower: Decimal = IMPLIED_GROWTH_MIN,
+    upper: Decimal = IMPLIED_GROWTH_MAX,
+    tolerance: Decimal = IMPLIED_SOLVER_TOLERANCE,
+    max_iterations: int = IMPLIED_SOLVER_MAX_ITERATIONS,
+) -> ImpliedResult:
+    """Stage-1 growth at which the 2-stage FCFE value per share equals ``price``.
+
+    Deterministic bisection over ``[lower, upper]`` holding every other input fixed; the
+    model value is increasing in stage-1 growth for a positive cash-flow base. A price
+    outside the values the bounds produce, a missing price, or a model that cannot value
+    the company (INVALID / INSUFFICIENT) gives INSUFFICIENT_DATA with a reason, never a
+    clamped number.
+    """
+    bounds = (lower, upper)
+
+    def insufficient(reason: str) -> ImpliedResult:
+        return ImpliedResult("growth_high", None, ValuationStatus.INSUFFICIENT_DATA, reason, bounds)
+
+    if price is None or price <= 0:
+        return insufficient("no positive current price to compare with")
+
+    def value_at(growth: Decimal) -> ValuationResult:
+        return calculate_fcfe_2stage(
+            free_cash_flow,
+            growth,
+            growth_stable,
+            discount_rate,
+            terminal_growth_rate,
+            shares_outstanding=shares_outstanding,
+            terminal_discount_rate=terminal_discount_rate,
+        )
+
+    low = value_at(lower)
+    if low.status != ValuationStatus.AVAILABLE:
+        return insufficient(f"the model has no value to invert: {low.reason}")
+    high = value_at(upper)
+    if low.value is None or high.value is None:
+        return insufficient("the model has no per-share value (shares outstanding missing)")
+    if price < low.value:
+        return insufficient(
+            f"price is below the model value at {lower:.0%} stage-1 growth: "
+            f"implied growth is under {lower:.0%}"
+        )
+    if price > high.value:
+        return insufficient(
+            f"price is above the model value at {upper:.0%} stage-1 growth: "
+            f"implied growth is over {upper:.0%}"
+        )
+    lo, hi = lower, upper
+    for _ in range(max_iterations):
+        if hi - lo <= tolerance:
+            break
+        mid = (lo + hi) / 2
+        mid_value = value_at(mid).value
+        if mid_value is None:
+            return insufficient("the model produced no value during the search")
+        if mid_value < price:
+            lo = mid
+        else:
+            hi = mid
+    return ImpliedResult(
+        "growth_high", ((lo + hi) / 2).quantize(Decimal("0.000001")),
+        ValuationStatus.AVAILABLE, None, bounds,
+    )
+
+
+def implied_justified_pb_roe(
+    price: Decimal | None,
+    book_value_per_share: Decimal | None,
+    cost_of_equity: Decimal | None,
+    growth_rate: Decimal | None,
+) -> ImpliedResult:
+    """ROE the price implies under justified P/B: ``g + (price / BVPS) x (ke - g)``."""
+    metric = "roe"
+    if price is None or price <= 0:
+        return ImpliedResult(
+            metric, None, ValuationStatus.INSUFFICIENT_DATA,
+            "no positive current price to compare with",
+        )
+    if book_value_per_share is None or cost_of_equity is None or growth_rate is None:
+        return ImpliedResult(
+            metric, None, ValuationStatus.INSUFFICIENT_DATA,
+            "missing BVPS, cost of equity or growth",
+        )
+    if book_value_per_share <= 0:
+        return ImpliedResult(
+            metric, None, ValuationStatus.INVALID, "Book value per share must be positive"
+        )
+    if cost_of_equity <= growth_rate:
+        return ImpliedResult(
+            metric, None, ValuationStatus.INVALID, "Cost of equity must be greater than growth"
+        )
+    roe = growth_rate + (price / book_value_per_share) * (cost_of_equity - growth_rate)
+    return ImpliedResult(metric, roe, ValuationStatus.AVAILABLE, None)

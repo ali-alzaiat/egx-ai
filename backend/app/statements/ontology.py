@@ -1,4 +1,4 @@
-"""Statement line ontology (stmt-ontology-1.1).
+"""Statement line ontology (stmt-ontology-1.2).
 
 Canonical codes for income / balance / cash-flow lines extracted from published
 filings. Labels are shipped here as the single source of truth and mirrored in
@@ -7,6 +7,10 @@ the REST contract and frontend types.
 1.1 (R43, additive): ``interest_income``, ``weighted_avg_shares_basic`` and
 ``shares_outstanding``, plus a per-line ``unit`` so readers format share
 counts and per-share values correctly (never from the ``currency`` column).
+
+1.2 (R46, additive): ``net_income_to_parent`` and ``minority_income`` (parent share of
+earnings for FCFE), ``net_borrowing`` (FCFE), ``net_loans`` and ``total_deposits``
+(bank detection and the justified P/B model).
 """
 
 from enum import StrEnum
@@ -33,7 +37,7 @@ class StatementLine(NamedTuple):
     unit: LineUnit = "currency"
 
 
-STATEMENT_ONTOLOGY_VERSION = "stmt-ontology-1.1"
+STATEMENT_ONTOLOGY_VERSION = "stmt-ontology-1.2"
 
 _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
     # --- Income statement ---
@@ -57,6 +61,18 @@ _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
         "eps", LineSection.INCOME, "Earnings per share", "ربحية السهم", "currency_per_share"
     ),
     StatementLine("interest_income", LineSection.INCOME, "Interest income", "إيرادات الفوائد"),
+    StatementLine(
+        "net_income_to_parent",
+        LineSection.INCOME,
+        "Net income to parent (before preferred dividends)",
+        "صافي الربح الخاص بالشركة الأم (قبل توزيعات الأسهم الممتازة)",
+    ),
+    StatementLine(
+        "minority_income",
+        LineSection.INCOME,
+        "Minority interest in earnings",
+        "حقوق الأقلية في الأرباح",
+    ),
     StatementLine(
         "weighted_avg_shares_basic",
         LineSection.INCOME,
@@ -89,6 +105,8 @@ _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
     ),
     StatementLine("total_equity", LineSection.BALANCE, "Total equity", "إجمالي حقوق الملكية"),
     StatementLine("minority_interests", LineSection.BALANCE, "Minority interests", "حقوق الأقلية"),
+    StatementLine("net_loans", LineSection.BALANCE, "Net loans", "صافي القروض"),
+    StatementLine("total_deposits", LineSection.BALANCE, "Total deposits", "إجمالي الودائع"),
     StatementLine(
         "shares_outstanding",
         LineSection.BALANCE,
@@ -111,6 +129,12 @@ _STATEMENT_LINE_TUPLES: tuple[StatementLine, ...] = (
         "dividends_paid", LineSection.CASH_FLOW, "Dividends paid", "التوزيعات النقدية المدفوعة"
     ),
     StatementLine("debt_repayment", LineSection.CASH_FLOW, "Debt repayment", "سداد الدين"),
+    StatementLine(
+        "net_borrowing",
+        LineSection.CASH_FLOW,
+        "Net borrowing (debt issued less repaid)",
+        "صافي الاقتراض (الدين المُصدَر ناقص المسدد)",
+    ),
 )
 
 STATEMENT_LINES: dict[str, StatementLine] = {sl.code: sl for sl in _STATEMENT_LINE_TUPLES}

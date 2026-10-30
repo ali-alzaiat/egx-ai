@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { engineCoverage, engineWeight, isIndicatorType, isSwingHorizon, joinList, visibleLimitations, visibleReasons } from "./stanceModel";
+import { KNOWN_RULES_VERSION, engineCoverage, engineWeight, isIndicatorType, isSwingHorizon, joinList, visibleLimitations, visibleReasons } from "./stanceModel";
 
 describe("engineCoverage", () => {
   it("splits composite engines into used and missing", () => {
@@ -13,9 +13,17 @@ describe("engineCoverage", () => {
   });
 });
 
+describe("KNOWN_RULES_VERSION", () => {
+  it("pins the rules version the backend returns (R46 S2)", () => {
+    expect(KNOWN_RULES_VERSION).toBe("signal-rules-2.2");
+  });
+});
+
 describe("engineWeight", () => {
   it("knows weights for the documented rules version only", () => {
-    expect(engineWeight("signal-rules-2.0", "technical")).toBe(40);
+    expect(engineWeight("signal-rules-2.2", "technical")).toBe(40);
+    expect(engineWeight("signal-rules-2.2", "valuation")).toBe(35);
+    expect(engineWeight("signal-rules-2.0", "technical")).toBeNull();
     expect(engineWeight("signal-rules-9.9", "technical")).toBeNull();
   });
 });

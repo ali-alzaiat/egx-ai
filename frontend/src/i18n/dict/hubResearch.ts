@@ -81,6 +81,22 @@ export const HUB_RESEARCH_COPY = {
     en: "The prior value is zero, so a percent change is undefined",
     ar: "القيمة السابقة صفر، لذلك لا يمكن حساب نسبة التغير",
   },
+  rs_implied_above: {
+    en: "The price is above the model value even at {pct} stage-1 growth, so the implied growth is over {pct}",
+    ar: "السعر أعلى من قيمة النموذج حتى عند نمو {pct} في المرحلة الأولى، لذلك يتجاوز النمو الضمني {pct}",
+  },
+  rs_implied_below: {
+    en: "The price is below the model value even at {pct} stage-1 growth, so the implied growth is under {pct}",
+    ar: "السعر أقل من قيمة النموذج حتى عند نمو {pct} في المرحلة الأولى، لذلك ينخفض النمو الضمني عن {pct}",
+  },
+  rs_no_positive_price: {
+    en: "There is no positive current price to compare with",
+    ar: "لا يوجد سعر حالي موجب للمقارنة",
+  },
+  rs_no_annual_period: {
+    en: "No approved annual statement for FY{year}",
+    ar: "لا توجد قوائم سنوية معتمدة للسنة المالية {year}",
+  },
   rs_dq_ok: { en: "good", ar: "جيدة" },
   rs_dq_degraded: { en: "partial", ar: "جزئية" },
   rs_dq_poor: { en: "poor", ar: "ضعيفة" },
@@ -141,6 +157,90 @@ export const HUB_RESEARCH_COPY = {
     en: "Range under the stated assumptions: {bear} to {bull}.",
     ar: "النطاق وفق الافتراضات المعلنة: من {bear} إلى {bull}.",
   },
+  rv_verdict_currency: {
+    en: "No comparison: the price and the fair value are in different currencies.",
+    ar: "لا مقارنة: السعر والقيمة العادلة بعملتين مختلفتين.",
+  },
+  rv_price_line_ccy: {
+    en: "Price {price} {currency} as of {date}",
+    ar: "السعر {price} {currency} حتى {date}",
+  },
+  rv_currency_mismatch: {
+    en: "The price is quoted in {price} but the financial statements are in {statements}. Nothing is converted, so the price is not compared with the fair value. The fair value is in {statements}.",
+    ar: "السعر مُسعَّر بعملة {price} بينما القوائم المالية بعملة {statements}. لا يجري أي تحويل، لذلك لا تُقارن القيمة العادلة بالسعر. القيمة العادلة بعملة {statements}.",
+  },
+  rv_basis_intrinsic_only: {
+    en: "The fair value is the intrinsic model alone: the relative leg (P/E, P/S, P/B) stays off until sourced target multiples exist.",
+    ar: "القيمة العادلة هي نتيجة النموذج الجوهري وحده: يبقى المكوّن النسبي (P/E وP/S وP/B) متوقفاً إلى أن تتوفر مضاعفات مستهدفة موثقة المصدر.",
+  },
+  rv_implied_label: { en: "What the price implies", ar: "ما يعنيه السعر" },
+  rv_implied_growth: {
+    en: "The price implies growth of {implied} a year for {years} years; the economy cap is {cap}.",
+    ar: "يعني السعر نمواً قدره {implied} سنوياً لمدة {years} سنوات؛ وسقف نمو الاقتصاد {cap}.",
+  },
+  rv_implied_growth_nocap: {
+    en: "The price implies growth of {implied} a year for {years} years.",
+    ar: "يعني السعر نمواً قدره {implied} سنوياً لمدة {years} سنوات.",
+  },
+  rv_implied_roe: {
+    en: "The price implies an ROE of {implied}; the bank's ROE is {roe}.",
+    ar: "يعني السعر عائداً على حقوق الملكية قدره {implied}؛ وعائد البنك {roe}.",
+  },
+  rv_implied_roe_nocompare: {
+    en: "The price implies an ROE of {implied}.",
+    ar: "يعني السعر عائداً على حقوق الملكية قدره {implied}.",
+  },
+  rv_implied_info_label: { en: "How the implied figure is found", ar: "كيف يُحسب الرقم الضمني" },
+  rv_implied_info_growth: {
+    en: "The stage-1 growth at which the model's value equals today's price, with every other input unchanged. The cap is nominal GDP growth, the most the model lets stage-1 growth reach. A figure above the cap means the price assumes faster growth than the model allows. It explains the verdict; it does not change it.",
+    ar: "نمو المرحلة الأولى الذي تساوي عنده قيمة النموذج سعر اليوم مع ثبات كل المدخلات الأخرى. السقف هو نمو الناتج المحلي الاسمي، وهو أقصى ما يسمح به النموذج لنمو المرحلة الأولى. الرقم الأعلى من السقف يعني أن السعر يفترض نمواً أسرع مما يسمح به النموذج. يشرح هذا الرقم الحكم ولا يغيّره.",
+  },
+  rv_implied_info_roe: {
+    en: "The return on equity at which the bank's justified price-to-book gives today's price, with book value, cost of equity and growth unchanged. It explains the verdict; it does not change it.",
+    ar: "العائد على حقوق الملكية الذي يعطي عنده السعر إلى القيمة الدفترية المبرَّر سعر اليوم مع ثبات القيمة الدفترية وتكلفة حقوق الملكية والنمو. يشرح هذا الرقم الحكم ولا يغيّره.",
+  },
+  rv_fcfe_title: { en: "How the starting cash flow is built", ar: "كيف يُبنى التدفق النقدي الابتدائي" },
+  rv_fcfe_lead: {
+    en: "The model starts from the average of the last {n} fiscal years of free cash flow to equity (FCFE): operating cash flow, minus capex, plus net borrowing, times the parent's share of earnings (net income to common over net income including minorities).",
+    ar: "يبدأ النموذج من متوسط التدفق النقدي الحر لحملة الأسهم (FCFE) لآخر {n} سنوات مالية: التدفق النقدي التشغيلي، ناقصاً النفقات الرأسمالية، زائداً صافي الاقتراض، مضروباً في حصة الشركة الأم من الأرباح (صافي الربح العائد للمساهمين إلى صافي الربح شاملاً الأقلية).",
+  },
+  rv_fcfe_caption: {
+    en: "Free cash flow to equity by fiscal year and its average",
+    ar: "التدفق النقدي الحر لحملة الأسهم لكل سنة مالية ومتوسطه",
+  },
+  rv_fcfe_col_year: { en: "Fiscal year", ar: "السنة المالية" },
+  rv_fcfe_col_cfo: { en: "Operating cash flow", ar: "التدفق التشغيلي" },
+  rv_fcfe_col_capex: { en: "Capex", ar: "النفقات الرأسمالية" },
+  rv_fcfe_col_borrowing: { en: "Net borrowing", ar: "صافي الاقتراض" },
+  rv_fcfe_col_share: { en: "Parent share", ar: "حصة الشركة الأم" },
+  rv_fcfe_col_fcfe: { en: "FCFE", ar: "FCFE" },
+  rv_fcfe_year: { en: "FY{year}", ar: "السنة المالية {year}" },
+  rv_fcfe_mean: { en: "{n}-year average", ar: "متوسط {n} سنوات" },
+  rv_fcfe_incomplete: {
+    en: "No average: all {n} fiscal years are needed",
+    ar: "لا متوسط: يلزم توفر السنوات المالية الـ {n} كلها",
+  },
+  rv_bank_title: { en: "How the bank is valued", ar: "كيف يُقيَّم البنك" },
+  rv_bank_detected_lines: {
+    en: "Valued as a bank because its statements report net loans and customer deposits.",
+    ar: "يُقيَّم كبنك لأن قوائمه تُظهر صافي القروض وودائع العملاء.",
+  },
+  rv_bank_detected_sector: {
+    en: "Valued as a bank because of its sector.",
+    ar: "يُقيَّم كبنك بسبب قطاعه.",
+  },
+  rv_bank_lead: {
+    en: "Fair value is book value per share times a justified price-to-book: (ROE − growth) ÷ (cost of equity − growth).",
+    ar: "القيمة العادلة هي القيمة الدفترية للسهم مضروبة في السعر إلى القيمة الدفترية المبرَّر: (العائد على حقوق الملكية − النمو) ÷ (تكلفة حقوق الملكية − النمو).",
+  },
+  rv_bank_caption: { en: "Inputs of the bank valuation", ar: "مدخلات تقييم البنك" },
+  rv_bank_col_item: { en: "Input", ar: "المدخل" },
+  rv_bank_bvps: { en: "Book value per share", ar: "القيمة الدفترية للسهم" },
+  rv_bank_roe: { en: "Return on equity (ROE)", ar: "العائد على حقوق الملكية (ROE)" },
+  rv_bank_ke: { en: "Cost of equity", ar: "تكلفة حقوق الملكية" },
+  rv_bank_growth: { en: "Growth", ar: "النمو" },
+  rv_bank_pb: { en: "Justified price-to-book", ar: "السعر إلى القيمة الدفترية المبرَّر" },
+  rv_bank_fv: { en: "Fair value (book value × justified P/B)", ar: "القيمة العادلة (القيمة الدفترية × السعر إلى الدفترية المبرَّر)" },
   rv_legs_title: { en: "Model legs", ar: "مكونات النموذج" },
   rv_legs_caption: {
     en: "Model legs and the fixed weights behind the headline value",
@@ -223,6 +323,7 @@ export const HUB_RESEARCH_COPY = {
   rd_discounted_cash_flow: { en: "Discounted cash flow", ar: "التدفقات النقدية المخصومة" },
   rd_dividend_discount: { en: "Dividend discount", ar: "خصم التوزيعات" },
   rd_excess_returns: { en: "Excess returns", ar: "العوائد الزائدة" },
+  rd_justified_pb: { en: "Justified price-to-book (banks)", ar: "السعر إلى القيمة الدفترية المبرَّر (البنوك)" },
   rd_affo_two_stage: { en: "Two-stage adjusted funds from operations", ar: "الأموال المعدّلة من العمليات على مرحلتين" },
 
   // ---- Investment score ----
@@ -544,6 +645,10 @@ export const HUB_RESEARCH_COPY = {
   rl_capex: { en: "Capital expenditure", ar: "النفقات الرأسمالية" },
   rl_dividends_paid: { en: "Dividends paid", ar: "التوزيعات النقدية المدفوعة" },
   rl_weighted_avg_shares_basic: { en: "Weighted average shares", ar: "المتوسط المرجح للأسهم" },
+  rl_net_borrowing: { en: "Net borrowing", ar: "صافي الاقتراض" },
+  rl_net_income_to_parent: { en: "Net income to the parent", ar: "صافي الربح العائد للشركة الأم" },
+  rl_minority_income: { en: "Minority share of income", ar: "حصة الأقلية من الربح" },
+  rl_minority_interests: { en: "Minority interests", ar: "حقوق الأقلية" },
 
   // ---- Metrics (period comparison selector, peer percentiles, invalidation conditions) ----
   rm_revenue: { en: "Revenue", ar: "الإيرادات" },

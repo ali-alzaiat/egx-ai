@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
 
-VENDOR_MAPPING_VERSION = "stockanalysis-map-1.2"
+VENDOR_MAPPING_VERSION = "stockanalysis-map-1.3"
 VENDOR_SOURCE_NAME = "STOCKANALYSIS_SPG"
 VENDOR_DOCUMENT_TYPE = "VENDOR_ANNUAL_STATEMENTS"
 DEFAULT_DIR = Path(__file__).resolve().parents[3] / "data" / "vendor" / "stockanalysis"
@@ -82,6 +82,11 @@ FIELD_MAP: tuple[tuple[str, str, str, str], ...] = (
     ("income", "interestIncome", "interest_income", AS_REPORTED),
     ("income", "interestIncomeTotalBank", "interest_income", AS_REPORTED),
     ("income", "sharesBasic", "weighted_avg_shares_basic", AS_REPORTED),
+    # Map 1.3 (R46): parent share of earnings. ``netinc`` is net income after minority
+    # interest (before preferred dividends); ``minorityInterest`` keeps the vendor sign
+    # (negative = earnings attributed to minorities, so incl.-minorities = netinc - it).
+    ("income", "netinc", "net_income_to_parent", AS_REPORTED),
+    ("income", "minorityInterest", "minority_income", AS_REPORTED),
     ("balance", "assets", "total_assets", AS_REPORTED),
     ("balance", "assetsc", "current_assets", AS_REPORTED),
     ("balance", "cashneq", "cash_and_equivalents", AS_REPORTED),
@@ -95,12 +100,17 @@ FIELD_MAP: tuple[tuple[str, str, str, str], ...] = (
     ("balance", "equity", "total_equity", EQUITY_IF_NO_MINORITY),
     ("balance", "minorityInterestBS", "minority_interests", AS_REPORTED),
     ("balance", "sharesOutTotalCommon", "shares_outstanding", AS_REPORTED),
+    # Map 1.3 (R46): bank-format balance sheets only (12 files); they identify banks.
+    ("balance", "netLoans", "net_loans", AS_REPORTED),
+    ("balance", "totalDeposits", "total_deposits", AS_REPORTED),
     ("cash_flow", "ncfo", "cfo", AS_REPORTED),
     ("cash_flow", "ncfi", "cfi", AS_REPORTED),
     ("cash_flow", "ncff", "cff", AS_REPORTED),
     ("cash_flow", "capex", "capex", AS_REPORTED),
     ("cash_flow", "commonDividendCF", "dividends_paid", AS_REPORTED),
     ("cash_flow", "debtRepaidTotal", "debt_repayment", AS_REPORTED),
+    # Map 1.3 (R46): debt issued less repaid, as reported (negative = net repayment).
+    ("cash_flow", "netDebtIssued", "net_borrowing", AS_REPORTED),
 )
 
 @dataclass

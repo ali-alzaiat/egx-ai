@@ -165,3 +165,31 @@ def verdict_for(
         ),
         "discount": str(discount),
     }
+
+
+def currency_check(trading_currency: str | None, statements_currency: str | None) -> dict[str, Any]:
+    """Compare the price's trading currency with the statements' currency (R46 C1).
+
+    Never converts. ``MISMATCH`` means a price/fair-value comparison would mix currencies;
+    ``UNKNOWN`` (either side not recorded) leaves the comparison as it was.
+    """
+    if trading_currency is None or statements_currency is None:
+        return {
+            "status": "UNKNOWN",
+            "trading_currency": trading_currency,
+            "statements_currency": statements_currency,
+            "reason": None,
+        }
+    if trading_currency == statements_currency:
+        return {
+            "status": "MATCH",
+            "trading_currency": trading_currency,
+            "statements_currency": statements_currency,
+            "reason": None,
+        }
+    return {
+        "status": "MISMATCH",
+        "trading_currency": trading_currency,
+        "statements_currency": statements_currency,
+        "reason": f"price in {trading_currency}, statements in {statements_currency}",
+    }

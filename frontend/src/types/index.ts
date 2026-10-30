@@ -490,6 +490,54 @@ export interface FairValueScenario {
   reason: string | null;
 }
 
+/** One fiscal year of the FCFE base (R46 V2): every component, or the reason the year has none. */
+export interface FcfeBaseYear {
+  fiscal_year: number;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA
+  reason: string | null;
+  cfo: string | null;
+  capex: string | null;
+  net_borrowing: string | null;
+  parent_share: string | null;
+  fcfe: string | null;
+}
+
+/** The starting cash flow of the two-stage model: the mean of the last `years_required` years (R46 V1). Null for banks. */
+export interface FcfeBase {
+  method: string;
+  years_required: number;
+  status: string;
+  reason: string | null;
+  mean: string | null;
+  years: FcfeBaseYear[];
+}
+
+/** Resolved model inputs: decimal strings, plus the structured FCFE base (read scalars with `lib/fairValue`). */
+export interface FairValueInputs {
+  fcfe_base?: FcfeBase | null;
+  [key: string]: string | FcfeBase | null | undefined;
+}
+
+/** What the price implies under the model (R46 V6): stage-1 growth, or a bank's ROE. */
+export interface FairValueImplied {
+  metric: "growth_high" | "roe";
+  value: string | null;
+  status: string; // AVAILABLE | INSUFFICIENT_DATA | INVALID
+  reason: string | null;
+  compare_to: { key: string; value: string | null };
+  bounds: { min: string; max: string } | null;
+  price: string | null;
+  model: string;
+}
+
+/** Trading currency against the statements' currency (R46 C1). Never converted. */
+export interface FairValueCurrency {
+  status: "MATCH" | "MISMATCH" | "UNKNOWN";
+  trading_currency: string | null;
+  statements_currency: string | null;
+  reason: string | null;
+}
+
 export interface FairValueResponse extends Partial<ComputeMeta> {
   company_id: string;
   ticker: string;
@@ -502,13 +550,22 @@ export interface FairValueResponse extends Partial<ComputeMeta> {
     primary_model: string;
     fallback_model: string;
     preferred_multiple: string | null;
+    /** R46 V3: `"sector"` or `"statement_lines: net_loans + total_deposits"`. */
+    detection?: string;
   };
-  inputs: Record<string, string | null>;
+  inputs: FairValueInputs;
   input_sources: Record<string, string | null>;
   legs: { intrinsic: FairValueLeg; relative: FairValueLeg; fallback: FairValueLeg };
   weights: Record<string, string>;
   n_with_data: number;
-  fair_value: { value: string | null; status: string; reason: string | null };
+  fair_value: {
+    value: string | null;
+    status: string;
+    reason: string | null;
+    /** R46 V5: which legs made the value. */
+    basis?: "weighted" | "intrinsic_only" | "relative_only" | null;
+    basis_note?: string | null;
+  };
   current_price: { value: string | null; as_of: string | null };
   scenarios: { bull: FairValueScenario; base: FairValueScenario; bear: FairValueScenario; note: string };
   sensitivity: Record<string, string | number | null>[];
@@ -521,6 +578,10 @@ export interface FairValueResponse extends Partial<ComputeMeta> {
     methodology_version: string;
   };
   verdict: { label: string; detail: string; discount: string | null };
+  /** R46 V6: the reverse calculation beside the verdict (absent on pre-R46 servers). */
+  implied?: FairValueImplied;
+  /** R46 C1 (absent on pre-R46 servers). */
+  currency?: FairValueCurrency;
   /** R43: sourced valuation assumptions behind the estimate (absent on pre-R43 servers). */
   assumptions?: FairValueAssumptions;
 }
@@ -871,7 +932,7 @@ export interface ShariahStatus {
   note: string | null
 }
 
-/** ATR volatility band around the last close (signal-rules-2.0). */
+/** ATR volatility band around the last close (signal-rules-2.2). */
 export interface ReferenceLevels {
   entry: string
   upside: string

@@ -17,6 +17,9 @@ const FILES = [
   "SensitivityTable.tsx",
   "PeersTab.tsx",
   "AssumptionsTable.tsx",
+  "FcfeBaseTable.tsx",
+  "BankModel.tsx",
+  "ImpliedPrice.tsx",
   "parts.tsx",
   "reasons.tsx",
 ] as const;

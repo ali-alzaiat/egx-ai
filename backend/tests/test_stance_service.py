@@ -1,4 +1,4 @@
-"""Deterministic stance service (signal-rules-2.0).
+"""Deterministic stance service (signal-rules-2.2).
 
 The pure rule math is pinned in ``test_signal_rules.py``; these tests pin
 the service wiring: missing engines lower confidence instead of biasing the
@@ -23,6 +23,7 @@ import pytest
 from app.api.stance import _liquidity
 from app.models.market import DailyPrice, DataSource, DataSourceType
 from app.models.screening import ScreeningEgxMembership
+from app.signals import stance_cache
 from app.signals.rules import Bar, Liquidity
 from app.signals.stance import (
     COMPLIANCE_COPY,
@@ -98,6 +99,11 @@ class EngineWorld:
         self.scenarios: dict[str, dict[str, str | None]] = _scenarios(
             None, None, None, status="INSUFFICIENT_DATA"
         )
+        self.fair_value: str | None = None
+        self.fv_confidence = "High"
+        self.currency: dict[str, Any] | None = None
+        #: Stored discounts of the Medium+ peer set (the market median is taken over them).
+        self.peer_discounts: list[Decimal] = [Decimal("0.5")] * 25
         self.valuation_raises = False
         self.headline: float | None = None
         self.stmt_lines: Sequence[Any] = []
@@ -105,6 +111,7 @@ class EngineWorld:
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from app.repositories.price import PriceRepository
         from app.repositories.statements import StatementLineRepository
+        from app.repositories.valuation import FairValueRepository
         from app.scores.service import ScoreService
         from app.valuation.service import FairValueService
 
@@ -123,7 +130,15 @@ class EngineWorld:
             # R43: stance reads the stored fair-value snapshot, never recomputes.
             if world.valuation_raises:
                 raise RuntimeError("valuation engine down (simulated)")
-            return {"scenarios": world.scenarios}
+            return {
+                "scenarios": world.scenarios,
+                "fair_value": {"value": world.fair_value},
+                "confidence": {"level": world.fv_confidence},
+                "currency": world.currency,
+            }
+
+        async def peer_discounts(_self: Any, _levels: Sequence[str]) -> list[Decimal]:
+            return world.peer_discounts
 
         async def latest_payload(_self: Any, _company_id: UUID) -> dict[str, Any]:
             assessment = (
@@ -144,6 +159,7 @@ class EngineWorld:
 
         monkeypatch.setattr(PriceRepository, "get_prices", get_prices)
         monkeypatch.setattr(FairValueService, "latest_payload", fv_latest)
+        monkeypatch.setattr(FairValueRepository, "peer_discounts", peer_discounts)
         monkeypatch.setattr(ScoreService, "latest_payload", latest_payload)
         monkeypatch.setattr(StatementLineRepository, "latest_approved", stmt_approved)
 
@@ -303,6 +319,155 @@ class TestMissingInputs:
         assert LEVELS_COPY in result.limitations
 
 
+class TestFairValueValuation:
+    """R46 S2: the market-relative fair-value discount feeds the valuation sub-score."""
+
+    async def _stance(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch,
+        *, fair_value: str | None, confidence: str, scenarios: bool = False,
+        peers: list[Decimal] | None = None, currency: dict[str, Any] | None = None,
+    ) -> Any:
+        world = EngineWorld()
+        world.closes = _uptrend()
+        world.fair_value = fair_value
+        world.fv_confidence = confidence
+        world.currency = currency
+        if peers is not None:
+            world.peer_discounts = peers
+        if scenarios:
+            world.scenarios = _scenarios()
+        world.install(monkeypatch)
+        return await StanceService(db_session).compute(test_company.ticker)
+
+    @staticmethod
+    def _valuation_reason(result: Any) -> Any:
+        return next((r for r in result.reasons if r.engine == "valuation"), None)
+
+    @pytest.mark.parametrize("confidence", ["Medium", "High", "VeryHigh"])
+    async def test_discount_is_taken_relative_to_the_market_median(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch,
+        confidence: str,
+    ) -> None:
+        # Price ~88 vs fair value 1000: discount ~0.91; market median 0.5 -> +0.41 / 0.5 = 0.82.
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence=confidence
+        )
+        reason = self._valuation_reason(result)
+        assert reason is not None
+        assert reason.inputs["market_median_discount"] == "0.5"
+        assert reason.inputs["peers"] == "25"
+        assert reason.inputs["confidence"] == confidence
+        discount = Decimal(reason.inputs["discount"])
+        expected = min(Decimal(1), (discount - Decimal("0.5")) / Decimal("0.5"))
+        assert f"sub-score {expected:+.2f}" in reason.text
+
+    async def test_company_at_the_market_median_scores_zero(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Make the peers' median equal this company's own discount.
+        first = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence="High"
+        )
+        own = Decimal(self._valuation_reason(first).inputs["discount"])
+        stance_cache.clear()  # the market median is cached between stances
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence="High",
+            peers=[own] * 20,
+        )
+        assert "sub-score +0.00" in self._valuation_reason(result).text
+
+    async def test_market_wide_expensiveness_is_not_a_negative_signal(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Fair value 100 vs price ~88 is a small discount, but the whole market sits at -60%
+        # (price 1.6x fair value): relative to that the company is cheap, so the sub-score > 0.
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="100", confidence="High",
+            peers=[Decimal("-0.6")] * 30,
+        )
+        reason = self._valuation_reason(result)
+        assert reason is not None
+        assert Decimal(reason.text.split("sub-score ")[1].rstrip(".")) > 0
+
+    async def test_too_few_peers_makes_the_subscore_unavailable(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence="High",
+            peers=[Decimal("0.5")] * 19,
+        )
+        assert self._valuation_reason(result) is None
+        missing_line = next(
+            line for line in result.limitations if line.startswith("Missing inputs:")
+        )
+        assert "only 19 companies with Medium+ fair values; 20 needed" in missing_line
+
+    @pytest.mark.parametrize("confidence", ["Low", "POOR", "MISSING"])
+    async def test_low_confidence_fair_value_is_not_used(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch,
+        confidence: str,
+    ) -> None:
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence=confidence
+        )
+        assert self._valuation_reason(result) is None
+        missing_line = next(
+            line for line in result.limitations if line.startswith("Missing inputs:")
+        )
+        assert "valuation scenarios" in missing_line
+
+    async def test_no_fair_value_is_missing_not_zero(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value=None, confidence="High"
+        )
+        assert self._valuation_reason(result) is None
+
+    async def test_scenarios_win_over_fair_value(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        result = await self._stance(
+            db_session, test_company, monkeypatch,
+            fair_value="1000", confidence="High", scenarios=True,
+        )
+        reason = self._valuation_reason(result)
+        assert reason is not None
+        assert "base" in reason.inputs and "fair_value" not in reason.inputs
+
+    @pytest.mark.parametrize("scenarios", [False, True])
+    async def test_currency_mismatch_blocks_the_valuation_subscore(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch,
+        scenarios: bool,
+    ) -> None:
+        mismatch = {
+            "status": "MISMATCH", "trading_currency": "USD", "statements_currency": "EGP",
+            "reason": "price in USD, statements in EGP",
+        }
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence="High",
+            scenarios=scenarios, currency=mismatch,
+        )
+        assert self._valuation_reason(result) is None
+        missing_line = next(
+            line for line in result.limitations if line.startswith("Missing inputs:")
+        )
+        assert "price in USD, statements in EGP" in missing_line
+        for target in result.targets.values():
+            assert target.status == "INSUFFICIENT_DATA"
+            assert target.reason == "price in USD, statements in EGP"
+
+    async def test_matching_currency_is_used_normally(
+        self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        match = {"status": "MATCH", "trading_currency": "EGP", "statements_currency": "EGP"}
+        result = await self._stance(
+            db_session, test_company, monkeypatch, fair_value="1000", confidence="High",
+            currency=match,
+        )
+        assert self._valuation_reason(result) is not None
+
+
 class TestScenarioOrderGuard:
     async def test_inverted_scenarios_become_insufficient(
         self, db_session: Any, test_company: Any, monkeypatch: pytest.MonkeyPatch
@@ -405,7 +570,7 @@ class TestTargetsAndStops:
         world.install(monkeypatch)
 
         result = await StanceService(db_session).compute(test_company.ticker)
-        assert result.rules_version == SIGNAL_RULES_VERSION == "signal-rules-2.0"
+        assert result.rules_version == SIGNAL_RULES_VERSION == "signal-rules-2.2"
         assert result.statement_freshness == date(2026, 5, 1)
         assert result.ticker == test_company.ticker
         assert result.company_id == str(test_company.id)
@@ -486,7 +651,7 @@ class TestStanceApi:
             "rules_version",
             "as_of",
         }
-        assert body["rules_version"] == "signal-rules-2.0"
+        assert body["rules_version"] == "signal-rules-2.2"
         assert body["limitations"] and body["limitations"][0] == COMPLIANCE_COPY
         assert set(body["targets"]) == {"bull", "base", "bear"}
         assert set(body["shariah"]) == {
@@ -511,7 +676,7 @@ class TestStanceApi:
         res = await client.get("/api/stance/radar?page_size=3")
         assert res.status_code == 200
         body = res.json()
-        assert body["rules_version"] == "signal-rules-2.0"
+        assert body["rules_version"] == "signal-rules-2.2"
         assert body["count"] == len(body["items"]) <= 3
         assert body["items"][0]["ticker"] == test_company.ticker
         for item in body["items"]:

@@ -1,4 +1,4 @@
-"""Pure stance rules (signal-rules-2.0): composite, thresholds, caps, levels."""
+"""Pure stance rules (signal-rules-2.2): composite, thresholds, caps, levels."""
 
 from decimal import Decimal
 
@@ -7,6 +7,7 @@ import pytest
 from app.signals.rules import (
     BUY_THRESHOLD,
     LOW_LIQUIDITY_CONFIDENCE_CAP,
+    MIN_MARKET_PEERS,
     REDUCE_THRESHOLD,
     STALE_STATEMENTS_CONFIDENCE_CAP,
     TECHNICAL_ONLY_CONFIDENCE_CAP,
@@ -14,8 +15,11 @@ from app.signals.rules import (
     Stance,
     composite,
     confidence_for,
+    fair_value_discount,
     liquidity,
+    market_median_discount,
     reference_levels,
+    relative_fair_value_subscore,
     score_subscore,
     stance_for,
     technical_view,
@@ -127,6 +131,66 @@ class TestValuationSubscore:
     def test_missing_bear_and_bull(self) -> None:
         assert valuation_subscore(D("50"), None, D("100"), None) == D("0.5")
         assert valuation_subscore(D("150"), None, D("100"), None) == D("-0.5")
+
+
+class TestFairValueSubscore:
+    """R46 S1/S2: discount = (fv - price) / fv; sub-score is relative to the market median."""
+
+    @pytest.mark.parametrize(
+        ("price", "fair_value", "discount"),
+        [
+            (D("100"), D("100"), D("0")),
+            (D("75"), D("100"), D("0.25")),
+            (D("125"), D("100"), D("-0.25")),
+        ],
+    )
+    def test_discount(self, price: Decimal, fair_value: Decimal, discount: Decimal) -> None:
+        assert fair_value_discount(price, fair_value) == discount
+
+    @pytest.mark.parametrize(
+        ("price", "fair_value"),
+        [(D("0"), D("100")), (D("-1"), D("100")), (D("50"), D("0")), (D("50"), D("-10"))],
+    )
+    def test_non_positive_inputs_have_no_discount(
+        self, price: Decimal, fair_value: Decimal
+    ) -> None:
+        assert fair_value_discount(price, fair_value) is None
+
+    @pytest.mark.parametrize(
+        ("discount", "median", "expected"),
+        [
+            (D("-0.4"), D("-0.4"), D("0")),  # at the median
+            (D("-0.15"), D("-0.4"), D("0.5")),  # 25 points cheaper than the market
+            (D("0.1"), D("-0.4"), D("1")),  # full scale
+            (D("0.9"), D("-0.4"), D("1")),  # clamped
+            (D("-0.65"), D("-0.4"), D("-0.5")),  # 25 points dearer (symmetric)
+            (D("-1.5"), D("-0.4"), D("-1")),  # clamped
+            (D("0.25"), D("0"), D("0.5")),  # a median of zero is the absolute S1 mapping
+        ],
+    )
+    def test_relative_mapping(self, discount: Decimal, median: Decimal, expected: Decimal) -> None:
+        assert relative_fair_value_subscore(discount, median) == expected
+
+    def test_symmetry(self) -> None:
+        for d in (D("0.1"), D("0.3"), D("0.45")):
+            assert relative_fair_value_subscore(d, D("0")) == -relative_fair_value_subscore(
+                -d, D("0")
+            )
+
+    def test_median_needs_the_minimum_peer_count(self) -> None:
+        assert MIN_MARKET_PEERS == 20
+        assert market_median_discount([D("0.1")] * 19) is None
+        assert market_median_discount([]) is None
+
+    def test_median_of_odd_and_even_sets(self) -> None:
+        odd = [D(str(i)) / 100 for i in range(21)]  # 0.00 .. 0.20 -> median 0.10
+        assert market_median_discount(odd) == D("0.1")
+        even = [D("0.1")] * 10 + [D("0.3")] * 10  # median is the mean of the middle pair
+        assert market_median_discount(even) == D("0.2")
+
+    def test_median_is_robust_to_outliers(self) -> None:
+        values = [D("0.1")] * 20 + [D("-50")]
+        assert market_median_discount(values) == D("0.1")
 
 
 class TestScoreSubscore:

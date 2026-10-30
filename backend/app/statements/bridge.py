@@ -17,13 +17,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from sqlalchemy import select
 
 from app.models.financial import FinancialDocument, FinancialPeriod, ReportingPeriodType
 from app.models.statements import ExtractionMethod
 from app.repositories.statements import StatementLineRepository
+from app.valuation.constants import FCFE_BASE_YEARS
 
 if TYPE_CHECKING:
     import uuid
@@ -35,6 +36,14 @@ if TYPE_CHECKING:
 BRIDGE_VERSION = "stmt-bridge-1.0"
 SourceTier = Literal["filing", "vendor"]
 ResolvedStatus = Literal["AVAILABLE", "INSUFFICIENT_DATA"]
+
+#: The shape of one FCFE year (R46 V2); the years averaged are ``FCFE_BASE_YEARS`` (V1).
+FCFE_DERIVATION = "(cfo - abs(capex) + net_borrowing) x parent_share"
+FCFE_BASE_METHOD = (
+    f"mean of the last {FCFE_BASE_YEARS} fiscal years of "
+    "(operating cash flow - capex + net borrowing) x parent share"
+)
+PARENT_SHARE_DERIVATION = "net_income / (net_income_to_parent - minority_income)"
 
 DPS_DERIVATION = "abs(dividends_paid) / shares_outstanding"
 #: How a derived DPS is named everywhere; it is never a *declared* DPS (analyst D-6/M4).
@@ -58,6 +67,8 @@ class LineValue:
     source_label_reported: str | None
     source_page: str | None
     published_date: date | None
+    #: Currency the line is reported in (statement currency, R46 C1); None when unknown.
+    currency: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +83,11 @@ class PeriodLines:
 
     def get(self, code: str) -> LineValue | None:
         return self.lines.get(code)
+
+    def currency(self) -> str | None:
+        """The one currency every line of the period is reported in; None if unknown/mixed."""
+        currencies = {lv.currency for lv in self.lines.values()}
+        return next(iter(currencies)) if len(currencies) == 1 and None not in currencies else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +210,7 @@ async def load_company_statements(
             source_label_reported=row.source_label_reported,
             source_page=row.source_page,
             published_date=row.published_date,
+            currency=row.currency,
         )
 
     out = [
@@ -303,6 +320,187 @@ def free_cash_flow(p: PeriodLines | None) -> Resolved:
         cfo.value - capex.value, "AVAILABLE", None, None, cfo.sources + capex.sources,
         derivation,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class FcfeYear:
+    """One fiscal year of true FCFE with every component (R46 V2); a gap names its line."""
+
+    fiscal_year: int
+    status: ResolvedStatus
+    reason: str | None
+    cfo: Decimal | None = None
+    capex: Decimal | None = None
+    net_borrowing: Decimal | None = None
+    parent_share: Decimal | None = None
+    fcfe: Decimal | None = None
+    sources: tuple[LineValue, ...] = field(default=())
+
+    def payload(self) -> dict[str, str | int | None]:
+        def opt(v: Decimal | None) -> str | None:
+            return str(v) if v is not None else None
+
+        return {
+            "fiscal_year": self.fiscal_year,
+            "status": self.status,
+            "reason": self.reason,
+            "cfo": opt(self.cfo),
+            "capex": opt(self.capex),
+            "net_borrowing": opt(self.net_borrowing),
+            "parent_share": opt(self.parent_share),
+            "fcfe": opt(self.fcfe),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FcfeBase:
+    """The FCFE valuation base: ``resolved`` is the mean, ``years`` the evidence."""
+
+    resolved: Resolved
+    years: tuple[FcfeYear, ...]
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "method": FCFE_BASE_METHOD,
+            "years_required": FCFE_BASE_YEARS,
+            "status": self.resolved.status,
+            "reason": self.resolved.reason,
+            "mean": str(self.resolved.value) if self.resolved.value is not None else None,
+            "years": [y.payload() for y in self.years],
+        }
+
+
+def parent_share(p: PeriodLines | None) -> Resolved:
+    """Share of consolidated earnings that belongs to the parent's common holders.
+
+    ``net_income / (net_income_to_parent - minority_income)``: net income to common over
+    net income including minorities (``minority_income`` keeps the vendor sign, negative
+    = earnings attributed to minorities). Exactly 1 when minorities are absent: a zero
+    income minority line, or no income line and no balance-sheet minority interests.
+    Balance-sheet minorities without the income line, or a non-positive net income
+    incl. minorities, leave the share unresolved (INSUFFICIENT_DATA), never 1. A share
+    above 1 (loss-making minorities) is capped at 1 so FCFE is never inflated.
+    """
+    if p is None:
+        return _missing("net_income", None, PARENT_SHARE_DERIVATION)
+    mi = line(p, "minority_income")
+    if mi.available and mi.value == 0:
+        return Resolved(
+            Decimal(1), "AVAILABLE", None, None, mi.sources, "no minority earnings: share 1"
+        )
+    if not mi.available:
+        bs_minority = line(p, "minority_interests")
+        if bs_minority.available and bs_minority.value not in (None, Decimal(0)):
+            return Resolved(
+                None, "INSUFFICIENT_DATA",
+                f"parent share unresolved: balance-sheet minority interests present but "
+                f"minority_income missing (FY{p.fiscal_year})",
+                "minority_income", (), PARENT_SHARE_DERIVATION,
+            )
+        return Resolved(
+            Decimal(1), "AVAILABLE", None, None, bs_minority.sources,
+            "no minority interests: share 1",
+        )
+    parent = line(p, "net_income_to_parent")
+    common = line(p, "net_income")
+    for part in (parent, common):
+        if not part.available or part.value is None:
+            return Resolved(
+                None, "INSUFFICIENT_DATA", part.reason, part.missing_input, (),
+                PARENT_SHARE_DERIVATION,
+            )
+    assert parent.value is not None and common.value is not None and mi.value is not None
+    total = parent.value - mi.value
+    if total <= 0:
+        return Resolved(
+            None, "INSUFFICIENT_DATA",
+            f"parent share undefined: net income incl. minorities is not positive "
+            f"(FY{p.fiscal_year})",
+            "net_income_to_parent", (), PARENT_SHARE_DERIVATION,
+        )
+    if common.value < 0:
+        return Resolved(
+            None, "INSUFFICIENT_DATA",
+            f"parent share undefined: net income to common is negative while net income "
+            f"incl. minorities is positive (FY{p.fiscal_year})",
+            "net_income", (), PARENT_SHARE_DERIVATION,
+        )
+    share = min(Decimal(1), common.value / total)
+    return Resolved(
+        share, "AVAILABLE", None, None, mi.sources + parent.sources + common.sources,
+        PARENT_SHARE_DERIVATION,
+    )
+
+
+def fcfe_year(p: PeriodLines) -> FcfeYear:
+    """True FCFE of one fiscal year; any missing component makes the year missing (never 0)."""
+    fy = p.fiscal_year
+    cfo = line(p, "cfo")
+    capex = capex_magnitude(p)
+    borrowing = line(p, "net_borrowing")
+    for part in (cfo, capex, borrowing):
+        if not part.available or part.value is None:
+            return FcfeYear(
+                fy, "INSUFFICIENT_DATA", part.reason, cfo.value, capex.value, borrowing.value
+            )
+    share = parent_share(p)
+    if not share.available or share.value is None:
+        return FcfeYear(
+            fy, "INSUFFICIENT_DATA", share.reason, cfo.value, capex.value, borrowing.value
+        )
+    assert cfo.value is not None and capex.value is not None and borrowing.value is not None
+    value = (cfo.value - capex.value + borrowing.value) * share.value
+    return FcfeYear(
+        fy, "AVAILABLE", None, cfo.value, capex.value, borrowing.value, share.value, value,
+        cfo.sources + capex.sources + borrowing.sources + share.sources,
+    )
+
+
+def fcfe_base(bundle: CompanyStatements, p: PeriodLines | None) -> FcfeBase:
+    """Mean true FCFE of the last ``FCFE_BASE_YEARS`` fiscal years ending at ``p``.
+
+    Needs every one of the consecutive years t, t-1, t-2; a missing period or a year
+    missing any component is INSUFFICIENT_DATA naming it (no shorter average, no
+    interpolation). The mean may be <= 0: the valuation model marks that INVALID.
+    """
+    if p is None:
+        return FcfeBase(_missing("cfo", None, FCFE_DERIVATION), ())
+    years: list[FcfeYear] = []
+    for back in range(FCFE_BASE_YEARS):
+        period = bundle.years_back(p, back)
+        if period is None:
+            years.append(
+                FcfeYear(
+                    p.fiscal_year - back,
+                    "INSUFFICIENT_DATA",
+                    f"no approved annual period FY{p.fiscal_year - back}",
+                )
+            )
+        else:
+            years.append(fcfe_year(period))
+    gaps = [f"FY{y.fiscal_year}: {y.reason}" for y in years if y.status != "AVAILABLE"]
+    if gaps:
+        return FcfeBase(
+            Resolved(
+                None, "INSUFFICIENT_DATA",
+                f"FCFE needs {FCFE_BASE_YEARS} fiscal years; " + "; ".join(gaps),
+                "fcfe", (), FCFE_DERIVATION,
+            ),
+            tuple(years),
+        )
+    total = sum((y.fcfe for y in years if y.fcfe is not None), Decimal(0))
+    sources = tuple(lv for y in years for lv in y.sources)
+    return FcfeBase(
+        Resolved(
+            total / Decimal(FCFE_BASE_YEARS), "AVAILABLE", None, None, sources, FCFE_DERIVATION
+        ),
+        tuple(years),
+    )
+
+
+def is_bank(p: PeriodLines | None) -> bool:
+    """A bank reports both net loans and customer deposits (R46 V3); sector is not used."""
+    return p is not None and p.get("net_loans") is not None and p.get("total_deposits") is not None
 
 
 def eps(p: PeriodLines | None) -> Resolved:

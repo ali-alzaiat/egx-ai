@@ -4,10 +4,13 @@ import FairValueCard from "../components/FairValueCard";
 import SensitivityTable from "../components/SensitivityTable";
 import AssumptionsTable from "../components/research/AssumptionsTable";
 import { TechnicalDetails } from "../components/research/parts";
+import BankModel from "../components/research/BankModel";
+import FcfeBaseTable from "../components/research/FcfeBaseTable";
 import { Reason } from "../components/research/reasons";
 import { Notice } from "../components/ui/Notice";
 import { EmptyState, ErrorState, LoadingState } from "../components/ui/States";
 import { useLang } from "../i18n/useLang";
+import { scalarInputEntries } from "../lib/fairValue";
 import { fmtDate } from "../lib/format";
 
 /**
@@ -27,7 +30,9 @@ export default function Valuation() {
 
   const asOf = fmtDate(locale, fairValue.as_of);
   const sources = Object.entries(fairValue.input_sources).filter(([, v]) => v !== null && v !== "");
-  const inputs = Object.entries(fairValue.inputs).filter(([, v]) => v !== null && v !== "");
+  const inputs = scalarInputEntries(fairValue.inputs);
+  const fcfeBase = fairValue.inputs.fcfe_base ?? null;
+  const isBank = fairValue.legs.intrinsic.model === "justified_pb";
 
   return (
     <div className="page">
@@ -44,6 +49,11 @@ export default function Valuation() {
       )}
 
       <FairValueCard fairValue={fairValue} />
+      {isBank ? (
+        <BankModel leg={fairValue.legs.intrinsic} detection={fairValue.profile.detection} />
+      ) : (
+        fcfeBase && <FcfeBaseTable base={fcfeBase} />
+      )}
       <AssumptionsTable fairValue={fairValue} />
       <SensitivityTable rows={fairValue.sensitivity} baseValue={fairValue.fair_value.value} />
 
@@ -60,8 +70,13 @@ export default function Valuation() {
           <span>{`profile = ${fairValue.profile.profile_id}`}</span>
           <span>{`primary_model = ${fairValue.profile.primary_model}`}</span>
           <span>{`fallback_model = ${fairValue.profile.fallback_model}`}</span>
+          {fairValue.profile.detection && <span>{`detection = ${fairValue.profile.detection}`}</span>}
+          {fairValue.fair_value.basis && <span>{`basis = ${fairValue.fair_value.basis}`}</span>}
+          {isBank && typeof fairValue.legs.intrinsic.assumptions.formula === "string" && (
+            <span>{`formula = ${fairValue.legs.intrinsic.assumptions.formula}`}</span>
+          )}
           {inputs.map(([key, value]) => (
-            <span key={`in-${key}`}>{`${key} = ${String(value)}`}</span>
+            <span key={`in-${key}`}>{`${key} = ${value}`}</span>
           ))}
           {sources.map(([key, value]) => (
             <span key={`src-${key}`}>{`${key} <- ${String(value)}`}</span>

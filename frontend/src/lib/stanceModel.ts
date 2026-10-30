@@ -4,9 +4,9 @@
  * other `rules_version` the UI shows no weights rather than guess.
  */
 
-export const KNOWN_RULES_VERSION = "signal-rules-2.0";
+export const KNOWN_RULES_VERSION = "signal-rules-2.2";
 
-/** Engine weights in the composite, as percent of model weight (signal-rules-2.0). */
+/** Engine weights in the composite, as percent of model weight (signal-rules-2.2). */
 const ENGINE_WEIGHTS: Readonly<Record<string, number>> = {
   technical: 40,
   valuation: 35,
@@ -58,7 +58,7 @@ export function visibleReasons(reasons: readonly { text: string }[]): string[] {
   return [...new Set(reasons.map((r) => r.text.trim()).filter((t) => t !== ""))];
 }
 
-/** Confidence caps and the statement-age limit of signal-rules-2.0 (backend signals/rules.py). */
+/** Confidence caps and the statement-age limit of signal-rules-2.2 (backend signals/rules.py). */
 export const CONFIDENCE_CAPS = {
   technicalOnly: 50,
   lowLiquidity: 30,

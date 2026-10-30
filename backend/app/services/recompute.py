@@ -542,7 +542,7 @@ class RecomputeService:
             raise LookupError(f"company {company_id} not found")
         company_stamp = (
             f"{company.industry or ''}|{company.egx_sector_id or ''}|"
-            f"{company.gics_sub_industry_id or ''}"
+            f"{company.gics_sub_industry_id or ''}|{company.trading_currency or ''}"
         )
         from app.repositories.valuation import ValuationProfileRepository
         from app.valuation.assumptions import resolve_assumptions

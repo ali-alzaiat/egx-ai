@@ -9,6 +9,7 @@ import {
   statusKey,
 } from "./research/labels";
 import { ProvisionalTag, ResearchSection } from "./research/parts";
+import ImpliedPrice from "./research/ImpliedPrice";
 import { MissingReason, Reason } from "./research/reasons";
 import DataTable, { type Column } from "./ui/DataTable";
 import { Missing } from "./ui/Missing";
@@ -56,11 +57,20 @@ function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
   const bear = fmtPrice(locale, fairValue.scenarios.bear.value);
   const bull = fmtPrice(locale, fairValue.scenarios.bull.value);
   const margin = fmtPct(locale, fairValue.confidence.required_discount);
+  const currency = fairValue.currency;
+  const mismatch = currency?.status === "MISMATCH";
+  // The fair value is always in the statements' currency; EGP is the common case and reads as the local unit.
+  const statementsCurrency = currency?.statements_currency ?? null;
+  const unit = statementsCurrency !== null && statementsCurrency !== "EGP" ? statementsCurrency : t("egp");
+  const basisNote =
+    fv.basis === "intrinsic_only" ? t("rv_basis_intrinsic_only") : null;
 
+  // The weight a leg actually carried: with one leg producing the value, it carries all of it.
+  const soleLeg = fv.basis === "intrinsic_only" ? "intrinsic" : fv.basis === "relative_only" ? "relative" : null;
   const legRows: LegRow[] = LEG_ORDER.map((name) => ({
     name,
     leg: fairValue.legs[name],
-    weight: fairValue.weights[name],
+    weight: soleLeg === null ? fairValue.weights[name] : name === soleLeg ? "1" : undefined,
   }));
   const legColumns: Column<LegRow>[] = [
     {
@@ -122,7 +132,7 @@ function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
             {headline !== null ? (
               <span className="rs-figure" dir="ltr">
                 {headline}
-                <span className="rs-figure-unit">{t("egp")}</span>
+                <span className="rs-figure-unit">{unit}</span>
               </span>
             ) : (
               <span className="rs-figure">
@@ -132,25 +142,40 @@ function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
           </div>
           <p className="rs-note">
             {price !== null && priceDate !== null
-              ? t("rv_price_line", { price, date: priceDate })
+              ? mismatch && currency?.trading_currency
+                ? t("rv_price_line_ccy", { price, currency: currency.trading_currency, date: priceDate })
+                : t("rv_price_line", { price, date: priceDate })
               : t("rv_price_missing")}
           </p>
           <p className="rs-sentence">
             {verdictKey ? (
               t(verdictKey)
+            ) : mismatch ? (
+              t("rv_verdict_currency")
             ) : (
               <>
                 {t("rv_verdict_none")} (<Reason reason={fv.reason} />)
               </>
             )}
           </p>
+          {fairValue.implied && !mismatch && <ImpliedPrice implied={fairValue.implied} />}
           <p className="rs-note" title={t("rv_confidence_title")}>
             {t("rv_confidence", {
               level: t(confidenceLabelKey(fairValue.confidence.level)),
               margin: margin ?? t("rs_no_data_reason"),
             })}
           </p>
+          {basisNote !== null && <p className="rs-note">{basisNote}</p>}
         </div>
+        {mismatch && currency && (
+          <Notice variant="warning">
+            {currency.trading_currency !== null && currency.statements_currency !== null ? (
+              t("rv_currency_mismatch", { price: currency.trading_currency, statements: currency.statements_currency })
+            ) : (
+              <Reason reason={currency.reason} />
+            )}
+          </Notice>
+        )}
         {degraded && (
           <Notice variant="warning">
             {t("rv_dq_notice", { status: t(dqStatusKey(dqStatus)) })}

@@ -1,4 +1,4 @@
-"""Pure stance rules (signal-rules-2.0): no I/O, no clock, no database.
+"""Pure stance rules (signal-rules-2.2): no I/O, no clock, no database.
 
 The composite is a weighted average over the engines that actually produced
 an input, so a missing engine lowers confidence instead of dragging the
@@ -7,6 +7,14 @@ stance toward ``reduce`` (the signal-rules-1.0 defect: missing engines scored
 version; changing one requires a version bump.
 
 Sub-scores live in [-1, 1]; the composite is scaled to [-100, 100].
+
+2.1 (R46 S1): when the scenario range is unavailable, the valuation sub-score comes from the
+fair-value discount, provided the fair value's confidence is at least Medium. Scenarios stay
+optional and win when present.
+
+2.2 (R46 S2): that sub-score is market-relative: the company's discount minus the median
+discount of every company with a Medium+ confidence fair value, so a market-wide
+"everything looks expensive" level is not read as a signal on each stock.
 """
 
 from __future__ import annotations
@@ -14,6 +22,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
+from statistics import median
+from typing import TYPE_CHECKING
 
 from app.technical.indicators import (
     IndicatorStatus,
@@ -23,7 +33,10 @@ from app.technical.indicators import (
     calculate_sma,
 )
 
-SIGNAL_RULES_VERSION = "signal-rules-2.0"
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+SIGNAL_RULES_VERSION = "signal-rules-2.2"
 
 # Engine weights in the composite (only engines with inputs are averaged).
 ENGINE_WEIGHTS: dict[str, Decimal] = {
@@ -33,6 +46,18 @@ ENGINE_WEIGHTS: dict[str, Decimal] = {
 }
 BUY_THRESHOLD = Decimal("25")
 REDUCE_THRESHOLD = Decimal("-25")
+
+# Fair-value discount -> valuation sub-score (R46 S1/S2). The discount is the same quantity
+# the fair-value verdict uses, ``(fair_value - price) / fair_value``. The sub-score is the
+# company's discount relative to the market median discount, on a linear symmetric scale:
+# ``(discount - market_median) / FAIR_VALUE_FULL_SCALE_DISCOUNT`` clamped to [-1, 1]. A
+# company 50 points cheaper than the median scores +1, 50 points dearer -1, exactly at the
+# median 0. The median is taken over companies whose fair-value confidence is in
+# ``FAIR_VALUE_CONFIDENCE_LEVELS`` and which have a price; with fewer than
+# ``MIN_MARKET_PEERS`` of them the median is not trusted and the sub-score is unavailable.
+FAIR_VALUE_FULL_SCALE_DISCOUNT = Decimal("0.5")
+MIN_MARKET_PEERS = 20
+FAIR_VALUE_CONFIDENCE_LEVELS: frozenset[str] = frozenset({"Medium", "High", "VeryHigh"})
 
 # Confidence caps.
 TECHNICAL_ONLY_CONFIDENCE_CAP = 50
@@ -214,6 +239,26 @@ def valuation_subscore(
     if bull is not None and price > bull:
         return Decimal("-1")
     return Decimal("-0.5")
+
+
+def fair_value_discount(price: Decimal, fair_value: Decimal) -> Decimal | None:
+    """``(fair_value - price) / fair_value``; None when either is not positive."""
+    if price <= 0 or fair_value <= 0:
+        return None
+    return (fair_value - price) / fair_value
+
+
+def market_median_discount(discounts: Sequence[Decimal]) -> Decimal | None:
+    """Median fair-value discount of the peer set; None below ``MIN_MARKET_PEERS``."""
+    if len(discounts) < MIN_MARKET_PEERS:
+        return None
+    return Decimal(str(median(discounts)))
+
+
+def relative_fair_value_subscore(discount: Decimal, market_median: Decimal) -> Decimal:
+    """Market-relative discount mapped linearly and symmetrically onto [-1, 1]."""
+    scaled = (discount - market_median) / FAIR_VALUE_FULL_SCALE_DISCOUNT
+    return max(Decimal("-1"), min(_ONE, scaled))
 
 
 def score_subscore(headline: Decimal) -> Decimal:

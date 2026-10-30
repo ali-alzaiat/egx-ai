@@ -23,6 +23,9 @@
 }
 .rs-figure-unit { font-size: var(--fs-ui); font-weight: 500; color: var(--text-3); margin-inline-start: var(--space-2); }
 .rs-sentence { font-size: var(--fs-ui); line-height: var(--lh-ui); color: var(--text); max-width: 72ch; }
+/* "What the price implies": sits under the verdict sentence it explains. */
+.rs-implied { display: flex; flex-direction: column; gap: var(--space-1); padding-block-start: var(--space-2); border-block-start: 1px solid var(--border); }
+.rs-implied-label { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--text-3); font-weight: 500; }
 .rs-tags { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 
 /* Reading text: max 72 characters per line. */

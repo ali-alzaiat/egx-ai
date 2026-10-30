@@ -1,4 +1,4 @@
-"""Pinned constants for Phase-3 fair value (methodology version 1.2).
+"""Pinned constants for Phase-3 fair value (methodology version 1.3).
 
 1.1 (R45 M5): the discount rate fades. Explicit-stage flows use the cost of equity
 (risk-free rate + equity risk premium); the Gordon terminal value is capitalised
@@ -10,6 +10,13 @@ from sourced rows (see ``app.valuation.assumptions``), not stored by hand.
 (four annual revenue points) capped at the sourced Egypt nominal GDP growth, not the
 latest single-year growth; the excess-returns and DDM terminal values use the same
 long-run cost of equity as the two-stage models.
+
+1.3 (owner rulings R46): the FCFE base is the mean of the last three fiscal years of true
+FCFE (operating cash flow - capex + net borrowing, times the parent share of earnings);
+stage-1 growth is floored at 0% (the nominal GDP cap is unchanged); banks, identified from
+statement lines (net loans + deposits), use justified P/B instead of FCFE; the relative
+(P/E) leg stays off until sourced target multiples exist, so fair value is the intrinsic
+leg alone.
 
 Sources:
 - 4-model split + P/E→P/S→P/B router: Simply Wall St valuation methodology,
@@ -29,7 +36,13 @@ Sources:
 
 from decimal import Decimal
 
-VALUATION_METHODOLOGY_VERSION = "1.2"
+VALUATION_METHODOLOGY_VERSION = "1.3"
+
+#: Fiscal years averaged into the FCFE base (R46 V1; implemented in ``app.statements.bridge``).
+FCFE_BASE_YEARS = 3
+
+#: Stage-1 growth floor (R46 V4): a negative revenue CAGR is not extrapolated for five years.
+STAGE1_GROWTH_FLOOR = Decimal("0")
 
 #: Explicit stage, in years, valued at the first-stage cost of equity before the terminal
 #: value is capitalised at the long-run cost of equity. One value for every model
@@ -41,11 +54,15 @@ DEFAULT_VALUATION_PROFILE_KEY = "default"
 
 # profile_key -> EGX sector scope (None = default fallback), primary intrinsic
 # model, fallback intrinsic model, preferred relative multiple basis.
-# Bank→Excess-Returns+P/B, general→FCFE+P/E-or-P/S (R25 V2).
+# Bank→justified P/B (R46 V3; was Excess-Returns), general→FCFE (R25 V2). The relative
+# leg is off for every profile until sourced target multiples exist (R46 V5).
+# A company uses the "banks" profile when its statement lines include net loans and
+# deposits (``bridge.is_bank``), whatever its sector row says.
+BANK_PROFILE_KEY = "banks"
 VALUATION_PROFILES: dict[str, dict[str, str | None]] = {
     "banks": {
         "egx_sector": "Banks",
-        "primary_model": "excess_returns",
+        "primary_model": "justified_pb",
         "fallback_model": "dividend_discount",
         "preferred_multiple": "pb",
     },
@@ -117,3 +134,11 @@ DISCOUNT_FIXED_NOTE = (
     "Discount rate is shown but fixed in v1; only revenue growth, operating "
     "margin, and exit multiple are adjustable."
 )
+
+# Implied-growth reverse calculation (R46 V6): bisection bounds for the stage-1 growth that
+# makes the two-stage model value equal the price, and the solver's stopping rule. Display
+# only: the implied value never feeds the verdict or the stance.
+IMPLIED_GROWTH_MIN = Decimal("-0.5")
+IMPLIED_GROWTH_MAX = Decimal("1.0")
+IMPLIED_SOLVER_TOLERANCE = Decimal("0.000001")
+IMPLIED_SOLVER_MAX_ITERATIONS = 100

@@ -48,7 +48,14 @@ class Company(Base):
     name_ar: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sector: Mapped[str | None] = mapped_column(String(100), nullable=True)
     industry: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    #: Defaulted to "EGP" when the provider has no profile: NOT a source of truth.
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EGP")
+    #: Currency the price series is quoted in, read from Yahoo's price metadata (R46 C1);
+    #: NULL = not checked yet or not reported. Never converted, only compared.
+    trading_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    trading_currency_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     shares_outstanding: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     free_float: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
     listing_date: Mapped[date | None] = mapped_column(Date, nullable=True)

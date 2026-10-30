@@ -35,6 +35,10 @@ const LINES: KeyMap = new Map<string, CopyKey>([
   ["capex", "rl_capex"],
   ["dividends_paid", "rl_dividends_paid"],
   ["weighted_avg_shares_basic", "rl_weighted_avg_shares_basic"],
+  ["net_borrowing", "rl_net_borrowing"],
+  ["net_income_to_parent", "rl_net_income_to_parent"],
+  ["minority_income", "rl_minority_income"],
+  ["minority_interests", "rl_minority_interests"],
 ]);
 export const lineLabelKey = (code: string | null | undefined): CopyKey | null => pick(LINES, code);
 
@@ -88,6 +92,7 @@ const MODELS: KeyMap = new Map<string, CopyKey>([
   ["dividend_discount", "rd_dividend_discount"],
   ["excess_returns", "rd_excess_returns"],
   ["affo_two_stage", "rd_affo_two_stage"],
+  ["justified_pb", "rd_justified_pb"],
 ]);
 export const modelLabelKey = (code: string | null | undefined): CopyKey | null => pick(MODELS, code);
 

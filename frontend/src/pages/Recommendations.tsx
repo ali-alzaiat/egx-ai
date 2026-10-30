@@ -1,5 +1,5 @@
 /*
- * Recommendations (signal-rules-2.0): model stances for the most-traded EGX
+ * Recommendations (signal-rules-2.2): model stances for the most-traded EGX
  * stocks with confidence, composite, ATR reference levels, liquidity and
  * Shariah side by side. One batch request (useStanceRadar); the Shariah-only
  * toggle narrows the server query to official EGX33 members, the stance and
