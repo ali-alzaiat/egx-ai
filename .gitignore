@@ -24,3 +24,4 @@ frontend/tsconfig.tsbuildinfo
 # Playwright MCP scratch dumps
 .playwright-mcp/
 backups/
+scripts/demo/out/

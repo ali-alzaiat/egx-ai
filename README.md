@@ -1,42 +1,65 @@
-# EGX AI — Stock Analysis & Shariah Screening Platform
+# EGX AI: research tool for Egyptian Exchange stocks
 
-AI-powered research tool for Egyptian Exchange (EGX) companies.
+A single-user research tool for Egyptian Exchange (EGX) companies: market data, financial
+statements, metrics, Shariah screening, valuation, technical signals, theses, alerts and an AI
+assistant that only explains figures the app has computed.
 
-## Features
+[![Demo: a 2-minute tour of EGX AI](docs/media/egx-ai-demo.gif)](docs/media/egx-ai-demo.mp4)
 
-- EGX market data ingestion
-- Company financial statements & ratios
-- Shariah screening (deterministic, configurable)
-- Valuation models (P/E, P/B, EV/EBITDA, DCF)
-- Technical analysis
-- AI-powered document analysis (RAG)
-- Investment thesis monitoring
-- Historical backtesting
-- Configurable alerts
+*Click the preview for the full demo video (MP4, about 2 minutes, English and Arabic).*
 
-## Tech Stack
+> EGX AI is a research aid, not investment advice. It never places trades, and its stances and
+> fair values are model outputs under stated assumptions.
 
-- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.x, PostgreSQL, pgvector
-- **Frontend:** React 19, TypeScript, Vite, TanStack Query
-- **AI:** OpenAI-compatible / Ollama abstraction
-- **Infrastructure:** Docker, Alembic
+## What it does
 
-## Quick Start
+| Area | What you get |
+|---|---|
+| Market data | The EGX company list and daily prices (Yahoo Finance), the EGX30 index stored daily, and a sync job you can run from the app |
+| Company hub | One page per company with tabs for price and signals, financials, valuation, score, Shariah, thesis, peers, disclosures and data quality |
+| Price chart | Candles with overlays, and chart patterns shown with their measured history |
+| Fundamentals | Financial statements from filings (XBRL, HTML or PDF, each value traced to its page) with human approval, plus provisional imports from saved vendor files that filings always outrank |
+| Metrics and valuation | Deterministic ratios, growth and margins, fair value models and an investment score, each with a methodology version |
+| Shariah | Our own screen next to official EGX33 membership, never merged |
+| Signals | A cross-sectional ranking and a rule-based stance (leans buy / neutral / leans reduce) with a liquidity gate |
+| Monitoring | Alert rules, thesis invalidation proposals for human review, and an events ledger |
+| Data quality | Coverage scores plus cross-checks: filing backing, agreement with a second source, accounting identities, price sanity and freshness |
+| AI assistant | Chat about a company or the market with the model of your choice (Claude, GPT or Gemini through LiteLLM). It calls read-only tools, every figure in its answer is checked against those tools' data, it can search recent news when the model supports it (news in words only), and it labels general answers |
+| Languages | English and Arabic, with a right-to-left layout and dark mode |
 
-### Prerequisites
+## Rules the code follows
 
-- Docker & Docker Compose
-- Python 3.12+
-- Node.js 22+
+The full list is in [AGENTS.md](AGENTS.md). The main ones:
 
-### 1. Clone & configure
+- Financial formulas are deterministic code with a methodology version; an LLM never computes a figure.
+- No fabricated data: missing inputs are `INSUFFICIENT_DATA`, never zero.
+- Every financial number has a source, and nothing uses data published after the date it describes.
+- Vendor data stays offline and is never republished; the UI never shows a vendor figure.
+- No trade execution and no personal investment advice.
+
+## Tech stack
+
+- **Backend:** Python 3.12+, FastAPI, SQLAlchemy 2 (async), Alembic, PostgreSQL 16 with pgvector
+- **Frontend:** React 19, TypeScript, Vite, TanStack Query, Tailwind with shadcn/ui, lightweight-charts
+- **AI:** LiteLLM gateway (Anthropic, OpenAI, Gemini), server-sent events for streaming
+- **Tooling:** pytest, ruff, mypy (strict), vitest, ESLint, Docker Compose, GitHub Actions
+
+## Quick start
+
+Prerequisites: Docker, Python 3.12+, Node.js 22+.
+
+### 1. Configure
 
 ```bash
 cp .env.example .env
-# Edit .env with your settings
 ```
 
-### 2. Start services
+Set `API_TOKEN` in `.env` to a random string of 32 or more characters. Every API route except
+health requires it; the Vite dev proxy adds it server-side, so it never reaches the browser.
+To save AI provider keys from the app, also set `AI_SECRETS_KEY` (the command to generate one is
+in `.env.example`).
+
+### 2. Database
 
 ```bash
 docker compose up -d postgres
@@ -46,19 +69,12 @@ docker compose up -d postgres
 
 ```bash
 cd backend
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-
-# Run migrations
-alembic upgrade head
-
-# Load real market data: EGX company list + prices, then official EGX33 Shariah membership
-python -m app.ingestion.sync
-python -m app.screening.egx33
-
-# Start dev server
-uvicorn app.main:app --reload --port 8000
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"     # macOS/Linux: .venv/bin/python
+.venv/Scripts/python -m alembic upgrade head
+.venv/Scripts/python -m app.ingestion.sync          # EGX company list, prices and EGX30
+.venv/Scripts/python -m app.screening.egx33         # official EGX33 Shariah membership
+.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### 4. Frontend
@@ -69,236 +85,69 @@ npm install
 npm run dev
 ```
 
-Frontend: http://localhost:5173
-Backend API: http://localhost:8000
-API docs: http://localhost:8000/docs
+Open http://localhost:5173. The API runs on http://localhost:8000; its `/docs` page needs
+`API_DOCS_ENABLED=true`.
 
-## Development Commands
+### 5. AI assistant (optional)
 
-```bash
-make dev          # Start all services
-make test         # Run all tests
-make lint         # Lint all code
-make format       # Format all code
-make migrate      # Run database migrations
-```
+Open **Admin → AI settings**, add a key for Anthropic, OpenAI or Gemini and pick a default
+model. The monthly spending cap and free-tier providers are set on the same page.
 
-## Phase 2 — Companies + Market Prices
-
-### Database Tables
-
-- **companies** — EGX-listed companies with ticker, ISIN, sector, industry, status
-- **daily_prices** — Historical OHLC prices with volume and provenance
-- **data_sources** — Tracks where data came from (EGX, SYNTHETIC, etc.)
-
-### API Endpoints
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/companies` | List companies (paginated, filterable) |
-| `GET /api/companies/{id}` | Get company by ID |
-| `GET /api/companies/ticker/{ticker}` | Get company by ticker |
-| `GET /api/companies/{id}/prices` | Get historical prices |
-| `GET /api/companies/{id}/prices/latest` | Get latest price |
-
-### Ingestion Architecture
-
-The ingestion layer uses a `MarketDataProvider` protocol. Current providers:
-
-- **FakeMarketDataProvider** — Synthetic data for development (clearly labeled `SYNTHETIC`)
-
-To add a real EGX provider, implement `MarketDataProvider` and register it in the ingestion service.
-
-### Development Data
-
-Run `python -m app.ingestion.sync` to discover the EGX universe and load real daily prices. Synthetic data is only created by tests and is always labeled `source_type = SYNTHETIC`.
-
-## Phase 3 — Financial Statements & Normalized Financial Data
-
-### Database Tables
-
-- **financial_periods** — Reporting periods (annual, quarterly) for each company
-- **financial_documents** — Source documents (annual reports, quarterly reports) with provenance
-- **financial_facts** — Individual financial data points with full traceability
-
-### Key Enums
-
-- **ReportingPeriodType**: ANNUAL, Q1, Q2, Q3, Q4, SEMI_ANNUAL, INTERIM
-- **FactType**: INCOME_STATEMENT, BALANCE_SHEET, CASH_FLOW, SHAREHOLDERS_EQUITY, NOTES
-- **DocumentStatus**: ORIGINAL, RESTATED, AMENDED, ADJUSTED
-- **FactStatus**: REPORTED, NORMALIZED, CALCULATED, INSUFFICIENT_DATA
-
-### API Endpoints
-
-| Endpoint | Description |
-|---|---|
-| `GET /api/financial/periods/{company_id}` | List financial periods for a company |
-| `GET /api/financial/documents/{period_id}` | List documents for a period |
-| `GET /api/financial/facts/{company_id}` | List financial facts (filterable by type, year, status) |
-| `GET /api/financial/facts/{company_id}/latest` | Get latest year's financial facts |
-
-### Normalization & Validation
-
-The ingestion layer includes deterministic normalization and validation:
-
-- **NormalizationService** — Maps reported labels to standardized labels (e.g., "Total Revenue" → "revenue")
-- **FinancialFactValidator** — Validates data quality with ERROR/WARNING distinction
-  - Errors: Missing required fields, invalid currency
-  - Warnings: Missing values, negative revenue, extremely large values
-
-### Financial Data Provider
-
-The `FinancialDataProvider` protocol is separate from `MarketDataProvider`:
-
-- **FakeFinancialDataProvider** — Generates synthetic financial statements for 10 EGX companies
-  - 5 years of annual periods per company
-  - Income statement, balance sheet, and cash flow data
-  - Deterministic variation based on ticker and year
-
-### Development Data
-
-Real financial statements arrive through the disclosure pipeline (Phase 13). Check coverage with `python -m app.dataquality.real_data`; phases that consume fundamentals are blocked until it reports at least 5 companies.
-
-### Phase 4: Financial Metrics
-
-The platform now includes a deterministic financial metrics engine:
-
-**17 Metric Definitions** across 7 categories:
-- Growth: Revenue, Net Income, EPS (YoY)
-- Margins: Gross, Operating, Net, Operating Cash Flow, Free Cash Flow
-- Profitability: ROE, ROA
-- Leverage: Debt-to-Equity, Debt-to-Assets
-- Liquidity: Current Ratio, Quick Ratio
-- Per-Share: EPS, Book Value Per Share
-
-**Key Features:**
-- Pure deterministic calculations using Decimal precision
-- Period comparison with publication date awareness (no look-ahead bias)
-- Provenance tracking for every calculation
-- Formula versioning for auditability
-- Synthetic data labeled with `source_type = SYNTHETIC`
-
-**Calculate Metrics:**
-```bash
-curl -X POST "http://localhost:8000/api/metrics/companies/{company_id}/calculate?period_id={period_id}"
-```
-
-**View Metrics:**
-```bash
-# Get all metrics for a company
-curl "http://localhost:8000/api/metrics/companies/{company_id}"
-
-# Get metrics for a specific period
-curl "http://localhost:8000/api/metrics/companies/{company_id}/periods/{period_id}"
-
-# Get a specific metric
-curl "http://localhost:8000/api/metrics/companies/{company_id}/periods/{period_id}/gross_margin"
-```
-
-## Project Structure
-
-```
-egx-ai/
-├── backend/          # FastAPI backend
-│   ├── app/          # Application code
-│   │   ├── api/      # API routes
-│   │   ├── core/     # Config, logging
-│   │   ├── db/       # Database setup
-│   │   ├── ingestion/# Data ingestion abstraction
-│   │   ├── metrics/  # Financial metrics engine
-│   │   ├── models/   # SQLAlchemy models
-│   │   ├── repositories/ # Data access
-│   │   ├── schemas/  # Pydantic schemas
-│   ├── tests/        # pytest tests
-│   └── alembic/      # Database migrations
-├── frontend/         # React frontend
-│   └── src/          # TypeScript source
-├── docs/             # Documentation
-├── scripts/          # Utility scripts
-└── docker-compose.yml
-```
-
-## Important Rules
-
-See [AGENTS.md](./AGENTS.md) for the full list of development rules.
-
-Key rules:
-- Financial calculations are deterministic (code, not LLM)
-- No fabricated data
-- Source attribution for all financial numbers
-- No look-ahead bias in backtesting
-- Shariah methodology is versioned and configurable
-
-## Phase Orchestration
-
-This project uses an autonomous phase orchestration system for controlled development.
-
-### How It Works
-
-1. **Phase Tracker**: `PHASES.md` tracks the status of each phase
-2. **Phase Specifications**: `docs/phases/` contains detailed requirements for each phase
-3. **Agents**: Specialized agents handle building, reviewing, testing, and architecture
-4. **Command**: `/next-phase` orchestrates the workflow
-
-### Phase Statuses
-
-- `NOT_STARTED` — Phase not yet begun
-- `IN_PROGRESS` — Currently being implemented
-- `BLOCKED` — Waiting on dependency or human decision
-- `READY_FOR_REVIEW` — Implementation complete, awaiting approval
-- `COMPLETE` — Approved and finalized
-
-### Workflow
+## Development
 
 ```bash
-# Start or continue the next phase
-/next-phase
+# backend/
+.venv/Scripts/python -m pytest            # uses a separate <db>_test database, never the dev one
+.venv/Scripts/python -m ruff check .
+.venv/Scripts/python -m mypy app
+
+# frontend/
+npm test                                  # vitest
+npm run lint
+npm run build                             # type check and production build
 ```
 
-The orchestrator will:
-1. Identify the current phase
-2. Read the phase specification
-3. Implement the phase (via phase-builder agent)
-4. Run verification (via test-engineer agent)
-5. Review implementation (via phase-reviewer agent)
-6. Check architecture (via architecture-reviewer agent)
-7. Generate completion report
-8. Stop and wait for approval
+A change is only green with zero errors and zero warnings across all of these. CI runs the
+same checks on every push and pull request.
 
-### Approval
-
-Human approval is required before marking a phase complete:
-
-```
-approve phase 4
-```
-
-### Agents
-
-- `phase-builder` — implements phase requirements
-- `phase-reviewer` — reviews against specification
-- `test-engineer` — runs verification suite
-- `architecture-reviewer` — ensures architectural integrity
-
-### Phase Specifications
-
-Each phase has a specification in `docs/phases/`:
+Useful data commands (from `backend/`):
 
 ```bash
-docs/phases/
-├── phase-01-foundation.md
-├── phase-02-market-data.md
-├── phase-03-financial-data.md
-├── phase-04-financial-metrics.md
-├── phase-05-shariah.md
-├── phase-06-valuation.md
-├── phase-07-technical-analysis.md
-├── phase-08-ai-rag.md
-├── phase-09-opportunity-detection.md
-├── phase-10-backtesting.md
-├── phase-11-alerts.md
-└── phase-12-production.md
+.venv/Scripts/python -m app.ingestion.sync --tickers COMI,SWDY   # refresh some tickers
+.venv/Scripts/python -m app.dataquality.real_data                # companies with real fundamentals
+.venv/Scripts/python -m app.signals.sanity                       # stance distribution check
+.venv/Scripts/python -m app.db.purge --status                    # inspect the dev database
 ```
+
+To re-record the demo video, run the app (with an AI key saved), then in a separate virtual
+environment `pip install -r scripts/demo/requirements.txt`, `python -m playwright install
+chromium`, `python scripts/demo/record.py`, and
+`python scripts/demo/post.py <path to ffmpeg> scripts/demo/out` (the `imageio-ffmpeg` package
+provides one). Copy the MP4 and GIF from `scripts/demo/out/` to `docs/media/`. The tour avoids
+screens that show statement amounts, which come from vendor files.
+
+## Project layout
+
+```
+backend/app/
+  api/            thin routers, one per domain, under /api/<domain>
+  <domain>/       service.py for I/O; pure modules for the maths (valuation/, signals/,
+                  metrics/, performance/, dataquality/, screening/, technical/, ...)
+  ai/             assistant: gateway, tools, orchestrator, number check, prompts
+  ingestion/      market data and disclosure pipelines
+  statements/     filing extraction, label ontology, approval, vendor import
+  models/ repositories/ schemas/   ORM tables, data access, API schemas
+backend/alembic/  numbered migrations
+frontend/src/
+  pages/ components/   screens and shared UI
+  api/client.ts        every server call, as TanStack Query hooks
+  i18n/                English and Arabic copy
+docs/             architecture notes and phase specs
+.workflow/        decisions, API contracts and the team workflow
+```
+
+[CLAUDE.md](CLAUDE.md) explains the architecture and data flow in more depth;
+[PHASES.md](PHASES.md) tracks the roadmap.
 
 ## License
 
