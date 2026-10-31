@@ -15,6 +15,7 @@ import type {
   AssistantStreamEvent,
   AlertRule,
   Company,
+  CrossCheckRun,
   DailyPrice,
   DataQualityListResponse,
   DataSource,
@@ -122,6 +123,36 @@ export function useDataQuality(companyId: string | undefined, scope?: string) {
         `/data-quality/companies/${companyId}${qs}`,
       ),
     enabled: !!companyId,
+  });
+}
+
+// ---- Data cross-checks (R50): /api/data-quality/companies/{id}/crosschecks ----
+
+const crossChecksKey = (companyId: string | undefined) => ["crossChecks", companyId] as const;
+
+/** Latest cross-check run for a company; `checks` is empty and `computed_at` null when it never ran. */
+export function useCrossChecks(companyId: string | undefined) {
+  return useQuery({
+    queryKey: crossChecksKey(companyId),
+    queryFn: () => fetchApi<CrossCheckRun>(`/data-quality/companies/${companyId}/crosschecks`),
+    enabled: !!companyId,
+    retry: retryUnless404,
+  });
+}
+
+/** POST .../crosschecks/run: runs the checks now and replaces the cached latest run. */
+export function useRunCrossChecks(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<CrossCheckRun> => {
+      const res = await fetch(`${API_BASE}/data-quality/companies/${companyId}/crosschecks/run`, { method: "POST" });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json();
+    },
+    onSuccess: (run) => {
+      queryClient.setQueryData(crossChecksKey(companyId), run);
+      void queryClient.invalidateQueries({ queryKey: crossChecksKey(companyId) });
+    },
   });
 }
 

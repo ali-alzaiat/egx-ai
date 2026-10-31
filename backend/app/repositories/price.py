@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -93,6 +94,18 @@ class PriceRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+    async def closes(
+        self, company_id: uuid.UUID, start: date | None = None, end: date | None = None
+    ) -> list[tuple[date, Decimal]]:
+        """(date, close) of one company within ``[start, end]``, oldest first."""
+        query = select(DailyPrice.date, DailyPrice.close).where(DailyPrice.company_id == company_id)
+        if start is not None:
+            query = query.where(DailyPrice.date >= start)
+        if end is not None:
+            query = query.where(DailyPrice.date <= end)
+        rows = await self.session.execute(query.order_by(DailyPrice.date))
+        return [(row[0], row[1]) for row in rows.all()]
 
     async def get_last(self, company_id: uuid.UUID, n: int) -> Sequence[DailyPrice]:
         """The ``n`` newest bars, newest first."""

@@ -7,6 +7,7 @@ import TechnicalAnalysis from "../../pages/TechnicalAnalysis";
 import Thesis from "../../pages/Thesis";
 import Valuation from "../../pages/Valuation";
 import Disclosures from "../../pages/Disclosures";
+import CrossChecksSection from "../CrossChecksSection";
 import DataQualityCard from "../DataQualityCard";
 import { LoadingState } from "../ui/States";
 import DailyPrices from "./DailyPrices";
@@ -68,5 +69,10 @@ export function QualityTab() {
   const { t } = useLang();
   const { data: company } = useCompanyByTicker(ticker);
   if (!company) return <LoadingState thing={t("loading_company")} />;
-  return <DataQualityCard companyId={company.id} />;
+  return (
+    <div className="page">
+      <CrossChecksSection companyId={company.id} ticker={company.ticker} />
+      <DataQualityCard companyId={company.id} />
+    </div>
+  );
 }

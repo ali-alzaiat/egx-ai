@@ -193,6 +193,34 @@ def _clear_stance_cache() -> None:
     stance_cache.clear()
 
 
+class NoIndexProvider:
+    """Index source that has no data: tests never reach Yahoo for the EGX30 benchmark."""
+
+    async def get_index_closes(
+        self, index_code: str, start_date: date, end_date: date
+    ) -> list[tuple[date, Decimal]]:
+        return []
+
+
+@pytest.fixture(autouse=True)
+def _no_index_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.ingestion import jobs
+
+    monkeypatch.setattr(jobs, "create_index_provider", lambda: NoIndexProvider())
+
+
+@pytest.fixture(autouse=True)
+def _reset_search_refusal() -> Any:
+    """The "provider refused web search today" memory is process-wide: clear it per test."""
+    from app.ai import search_refusal
+
+    search_refusal.reset()
+    search_refusal.set_clock(None)
+    yield
+    search_refusal.reset()
+    search_refusal.set_clock(None)
+
+
 @pytest.fixture(autouse=True)
 def api_token(monkeypatch: pytest.MonkeyPatch) -> str:
     """Configure a known API token for every test (the real one is env-only)."""

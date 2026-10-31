@@ -16,14 +16,14 @@ describe("chatReducer", () => {
   it("folds meta, status and a verified answer", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "meta", conversation_id: "c1", model: "m1" } },
+      { type: "event", event: { type: "meta", conversation_id: "c1", model: "m1", web_search: null } },
       { type: "event", event: { type: "status", stage: "tool", tool: "valuation" } },
     ]);
     expect(s.conversationId).toBe("c1");
     expect(s.progress).toEqual({ stage: "tool", tool: "valuation" });
     const done = run(
       [
-        { type: "event", event: { type: "answer", text: "A", checked: 4, sources: [{ tool: "valuation", ticker: "COMI" }] } },
+        { type: "event", event: { type: "answer", text: "A", checked: 4, sources: [{ tool: "valuation", ticker: "COMI" }], general: false, news: null } },
         { type: "event", event: { type: "done", input_tokens: 1, output_tokens: 1, cost_usd: null, month_spend_usd: null } },
       ],
       s,
@@ -36,7 +36,7 @@ describe("chatReducer", () => {
   it("an unverified event withholds the answer and settles", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "unverified", checked: 2, unverified: ["12%"], sources: [] } },
+      { type: "event", event: { type: "unverified", checked: 2, unverified: ["12%"], sources: [], news: null } },
     ]);
     expect(s.running).toBe(false);
     expect(s.turns[1]).toMatchObject({ kind: "unverified", unverified: ["12%"] });
@@ -45,7 +45,7 @@ describe("chatReducer", () => {
   it("an error event settles with its code", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "error", code: "NO_KEY", detail: null } },
+      { type: "event", event: { type: "error", code: "NO_KEY", detail: null, reason: null } },
     ]);
     expect(s.running).toBe(false);
     expect(s.turns[1]).toMatchObject({ kind: "error", code: "NO_KEY" });
@@ -60,7 +60,7 @@ describe("chatReducer", () => {
   it("closing after an answer adds nothing", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "answer", text: "A", checked: 1, sources: [] } },
+      { type: "event", event: { type: "answer", text: "A", checked: 1, sources: [], general: false, news: null } },
       { type: "closed" },
     ]);
     expect(s.turns).toHaveLength(2);
@@ -75,7 +75,7 @@ describe("chatReducer", () => {
   it("status events after the outcome are ignored", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "answer", text: "A", checked: 1, sources: [] } },
+      { type: "event", event: { type: "answer", text: "A", checked: 1, sources: [], general: false, news: null } },
       { type: "event", event: { type: "status", stage: "verifying", tool: null } },
     ]);
     expect(s.progress).toBeNull();
@@ -89,8 +89,8 @@ describe("chatReducer", () => {
   it("keeps the conversation id across turns and clears it on reset", () => {
     const s = run([
       { type: "send", text: "q" },
-      { type: "event", event: { type: "meta", conversation_id: "c1", model: null } },
-      { type: "event", event: { type: "answer", text: "A", checked: 0, sources: [] } },
+      { type: "event", event: { type: "meta", conversation_id: "c1", model: null, web_search: null } },
+      { type: "event", event: { type: "answer", text: "A", checked: 0, sources: [], general: false, news: null } },
       { type: "send", text: "q2" },
     ]);
     expect(s.conversationId).toBe("c1");
@@ -100,10 +100,65 @@ describe("chatReducer", () => {
 
   it("a meta event without a conversation id (explain) keeps the current one", () => {
     const s = run([
-      { type: "event", event: { type: "meta", conversation_id: "c1", model: null } },
-      { type: "event", event: { type: "meta", conversation_id: null, model: "m" } },
+      { type: "event", event: { type: "meta", conversation_id: "c1", model: null, web_search: null } },
+      { type: "event", event: { type: "meta", conversation_id: null, model: "m", web_search: null } },
     ]);
     expect(s.conversationId).toBe("c1");
+  });
+});
+
+describe("general answers, news and provider reasons", () => {
+  it("carries general, news and sources onto the answer turn", () => {
+    const s = run([
+      { type: "send", text: "q" },
+      {
+        type: "event",
+        event: {
+          type: "answer",
+          text: "A",
+          checked: 0,
+          general: true,
+          news: "refused",
+          sources: [{ tool: "web", url: "https://a.com/x", title: "A" }],
+        },
+      },
+    ]);
+    expect(s.turns[1]).toMatchObject({ kind: "answer", general: true, news: "refused" });
+    expect(s.turns[1]).toMatchObject({ sources: [{ tool: "web", url: "https://a.com/x" }] });
+  });
+
+  it("carries news onto an unverified notice", () => {
+    const s = run([
+      { type: "send", text: "q" },
+      { type: "event", event: { type: "unverified", checked: 1, unverified: ["9%"], sources: [], news: "unsupported" } },
+    ]);
+    expect(s.turns[1]).toMatchObject({ kind: "unverified", news: "unsupported" });
+  });
+
+  it("keeps the provider reason on an error turn", () => {
+    const s = run([
+      { type: "send", text: "q" },
+      { type: "event", event: { type: "error", code: "PROVIDER_ERROR", detail: "model x", reason: "quota" } },
+    ]);
+    expect(s.turns[1]).toMatchObject({ kind: "error", code: "PROVIDER_ERROR", reason: "quota" });
+  });
+
+  it("stored answers read general and news from the verification JSON", () => {
+    const turns = turnsFromConversation({
+      id: "c1",
+      title: "t",
+      ticker: null,
+      messages: [
+        { role: "assistant", content: "A", status: "answered", model: "m", verification: { general: true }, created_at: "x" },
+        { role: "assistant", content: "B", status: "answered", model: "m", verification: { general: "yes", news: "maybe" }, created_at: "x" },
+        { role: "assistant", content: "C", status: "answered", model: "m", verification: { checked: 1, news: "refused" }, created_at: "x" },
+        { role: "assistant", content: "", status: "unverified", model: "m", verification: { news: "unsupported" }, created_at: "x" },
+      ],
+    });
+    expect(turns[0]).toMatchObject({ general: true, news: null, checked: null });
+    expect(turns[1]).toMatchObject({ general: false, news: null });
+    expect(turns[2]).toMatchObject({ news: "refused" });
+    expect(turns[3]).toMatchObject({ kind: "unverified", news: "unsupported" });
   });
 });
 

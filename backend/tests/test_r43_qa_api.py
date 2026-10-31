@@ -1144,7 +1144,7 @@ async def test_migrations_have_no_model_drift_and_single_head() -> None:
     from alembic.script import ScriptDirectory
 
     cfg = Config("alembic.ini")
-    assert ScriptDirectory.from_config(cfg).get_heads() == ["027"]
+    assert ScriptDirectory.from_config(cfg).get_heads() == ["028"]
     await asyncio.to_thread(command.check, cfg)  # raises when models and migrations differ
 
 

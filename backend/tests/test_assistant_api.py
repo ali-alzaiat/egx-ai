@@ -335,8 +335,10 @@ async def test_chat_streams_progress_then_a_verified_answer_and_persists(
     ]
     meta = first(events, "meta")
     assert meta["model"] == "claude-sonnet-5-5" and meta["conversation_id"]
+    assert meta["web_search"] is True  # R50: Sonnet 5.5 can search the web
     answer = first(events, "answer")
     assert answer["verified"] is True and answer["checked"] >= 1
+    assert answer["general"] is False  # R50: a company-scoped answer is checked, not "general"
     assert {"tool": "price_summary", "ticker": ticker} in answer["sources"]
     assert {"tool": "company_overview", "ticker": ticker} in answer["sources"]
     done = first(events, "done")
@@ -583,6 +585,8 @@ async def test_explain_runs_the_card_tool_and_stores_without_a_conversation(
         client, "/explain", {"ticker": ticker, "card": "stance", "lang": "en"}
     )
     assert names(events)[0] == "meta" and first(events, "meta")["conversation_id"] is None
+    assert first(events, "meta")["web_search"] is False  # explain never searches
+    assert first(events, "answer")["general"] is False
     assert ("tool", "stance") in [(d["stage"], d.get("tool")) for n, d in events if n == "status"]
     answer = first(events, "answer")
     assert {"tool": "stance", "ticker": ticker} in answer["sources"]

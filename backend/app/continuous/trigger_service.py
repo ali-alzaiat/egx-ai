@@ -8,6 +8,7 @@
 - Evidence-quality gate: low-confidence parse -> unknown with reason, never broken
 """
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import date
@@ -21,6 +22,7 @@ from app.continuous.alert_service import AlertService
 from app.continuous.constants import CI_METHODOLOGY_VERSION
 from app.continuous.restatement_detector import RestatementDetector
 from app.continuous.watchlist_service import WatchlistService
+from app.dataquality.crosscheck_service import CrosscheckService
 from app.models.continuous import (
     ActorType,
     AlertFamily,
@@ -35,6 +37,8 @@ from app.repositories.thesis import ThesisRepository
 from app.thesis import thesis as thesis_engine
 from app.thesis.constants import PRECOMMITTED_ACTION, THESIS_METHODOLOGY_VERSION
 from app.thesis.service import ThesisService
+
+logger = logging.getLogger(__name__)
 
 
 def _norm_decimal(value: Decimal | None) -> str | None:
@@ -196,6 +200,8 @@ class TriggerService:
             )
             ledger_rows += 1
 
+        await self._refresh_crosschecks(company_id)
+
         return TriggerResult(
             alerts_fired=alerts_fired,
             checks_run=checks_run,
@@ -205,6 +211,14 @@ class TriggerService:
                 f"{checks_run} checks, {ledger_rows} ledger rows"
             ),
         )
+
+    async def _refresh_crosschecks(self, company_id: uuid.UUID) -> None:
+        """Re-run the data cross-checks now that facts landed (R50 B11). Best effort."""
+        try:
+            async with self.session.begin_nested():
+                await CrosscheckService(self.session).run(company_id)
+        except Exception:  # noqa: BLE001 - a check failure must not fail the trigger
+            logger.warning("cross-checks failed for company %s", company_id, exc_info=True)
 
     async def on_price_crossing(
         self, company_id: uuid.UUID, price: Decimal, as_of: date

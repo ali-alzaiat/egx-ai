@@ -21,6 +21,8 @@ EXPECTED_TOOLS = {
     "price_summary",
     "chart_patterns",
     "financial_metrics",
+    "company_performance",
+    "data_check",
     "search_companies",
     "screen_companies",
 }
@@ -57,6 +59,8 @@ def test_registry_has_the_contract_tools_and_valid_schemas() -> None:
         "price_summary",
         "chart_patterns",
         "financial_metrics",
+        "company_performance",
+        "data_check",
     ],
 )
 async def test_company_tools_return_a_sourced_envelope(

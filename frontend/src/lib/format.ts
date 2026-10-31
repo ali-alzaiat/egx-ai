@@ -146,6 +146,22 @@ export function fmtDate(locale: string, iso: string | null | undefined): string 
   }).format(d);
 }
 
+/** "22 Oct 2026, 14:05 UTC": a timestamp in UTC (the server's clock), so it reads the same everywhere. */
+export function fmtDateTime(locale: string, iso: string | null | undefined): string | null {
+  const d = parseIso(iso);
+  if (!d) return null;
+  const text = new Intl.DateTimeFormat(dateLocale(locale), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  }).format(d);
+  return `${text} UTC`;
+}
+
 /** Cycle "2026-08" to month and year: "Aug 2026". */
 export function fmtCycle(locale: string, cycle: string | null | undefined): string | null {
   if (!cycle || !/^\d{4}-\d{2}$/.test(cycle)) return null;

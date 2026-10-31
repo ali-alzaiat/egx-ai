@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { t } from "../i18n/dict";
 import {
   assistantErrorCopy,
   decodeAssistantEvent,
   httpErrorCode,
+  newsNoteKey,
   parseApiErrorBody,
   capInputValue,
   parseCapInput,
@@ -10,7 +12,10 @@ import {
   sourceHref,
   tickerFromPath,
   toolKey,
+  safeWebUrl,
+  sourceDomain,
   uniqueSources,
+  webSources,
 } from "./assistant";
 
 describe("decodeAssistantEvent", () => {
@@ -19,6 +24,7 @@ describe("decodeAssistantEvent", () => {
       type: "meta",
       conversation_id: "c1",
       model: "claude-sonnet-5-5",
+      web_search: null,
     });
     expect(decodeAssistantEvent({ event: "status", data: '{"stage":"tool","tool":"valuation"}' })).toEqual({
       type: "status",
@@ -38,17 +44,21 @@ describe("decodeAssistantEvent", () => {
         { tool: "investment_score", ticker: "COMI" },
         { tool: "search_companies", ticker: null },
       ],
+      general: false,
+      news: null,
     });
     expect(decodeAssistantEvent({ event: "unverified", data: '{"checked":2,"unverified":["12%",4],"sources":[]}' })).toEqual({
       type: "unverified",
       checked: 2,
       unverified: ["12%"],
       sources: [],
+      news: null,
     });
     expect(decodeAssistantEvent({ event: "error", data: '{"code":"NO_KEY","detail":"no key"}' })).toEqual({
       type: "error",
       code: "NO_KEY",
       detail: "no key",
+      reason: null,
     });
     expect(
       decodeAssistantEvent({ event: "done", data: '{"input_tokens":10,"output_tokens":5,"cost_usd":"0.0123","month_spend_usd":1.5}' }),
@@ -63,8 +73,71 @@ describe("decodeAssistantEvent", () => {
     expect(decodeAssistantEvent({ event: "answer", data: '{"verified":true}' })).toBeNull();
   });
 
+  it("decodes web_search, general and web sources, dropping unsafe URLs", () => {
+    expect(decodeAssistantEvent({ event: "meta", data: '{"conversation_id":"c1","model":"m","web_search":true}' })).toEqual({
+      type: "meta",
+      conversation_id: "c1",
+      model: "m",
+      web_search: true,
+    });
+    expect(decodeAssistantEvent({ event: "meta", data: '{"web_search":"yes"}' })).toMatchObject({ web_search: null });
+    const answer = decodeAssistantEvent({
+      event: "answer",
+      data: JSON.stringify({
+        text: "t",
+        checked: 0,
+        general: true,
+        news: null,
+        sources: [
+          { tool: "valuation", ticker: "COMI" },
+          { tool: "web", url: "https://www.reuters.com/markets/x", title: "Egypt rate decision" },
+          { tool: "web", url: "javascript:alert(1)", title: "bad" },
+          { tool: "web", url: "data:text/html,<b>x</b>", title: "bad" },
+          { tool: "web", url: "/relative", title: "bad" },
+          { tool: "web", title: "no url" },
+          { tool: "web", url: "http://example.com/a", title: 5 },
+        ],
+      }),
+    });
+    expect(answer).toEqual({
+      type: "answer",
+      text: "t",
+      checked: 0,
+      general: true,
+      news: null,
+      sources: [
+        { tool: "valuation", ticker: "COMI" },
+        { tool: "web", url: "https://www.reuters.com/markets/x", title: "Egypt rate decision" },
+        { tool: "web", url: "http://example.com/a", title: "" },
+      ],
+    });
+  });
+
+  it("decodes news and the provider reason defensively", () => {
+    for (const news of ["searched", "not_offered", "unsupported", "refused"]) {
+      expect(decodeAssistantEvent({ event: "answer", data: JSON.stringify({ text: "t", news }) })).toMatchObject({ news });
+      expect(decodeAssistantEvent({ event: "unverified", data: JSON.stringify({ news }) })).toMatchObject({ news });
+    }
+    expect(decodeAssistantEvent({ event: "answer", data: '{"text":"t","news":"maybe"}' })).toMatchObject({ news: null });
+    expect(decodeAssistantEvent({ event: "answer", data: '{"text":"t","news":5}' })).toMatchObject({ news: null });
+    expect(decodeAssistantEvent({ event: "answer", data: '{"text":"t"}' })).toMatchObject({ news: null });
+    expect(decodeAssistantEvent({ event: "error", data: '{"code":"PROVIDER_ERROR","detail":"d","reason":"quota"}' })).toEqual({
+      type: "error",
+      code: "PROVIDER_ERROR",
+      detail: "d",
+      reason: "quota",
+    });
+    expect(decodeAssistantEvent({ event: "error", data: '{"code":"PROVIDER_ERROR","reason":"weird"}' })).toMatchObject({ reason: null });
+    expect(decodeAssistantEvent({ event: "error", data: '{"code":"PROVIDER_ERROR"}' })).toMatchObject({ reason: null });
+  });
+
+  it("general is true only for a real true", () => {
+    expect(decodeAssistantEvent({ event: "answer", data: '{"text":"t","general":"true"}' })).toMatchObject({ general: false });
+    expect(decodeAssistantEvent({ event: "answer", data: '{"text":"t"}' })).toMatchObject({ general: false });
+  });
+
   it("keeps a missing error code visible as UNKNOWN instead of guessing", () => {
-    expect(decodeAssistantEvent({ event: "error", data: "{}" })).toEqual({ type: "error", code: "UNKNOWN", detail: null });
+    expect(decodeAssistantEvent({ event: "error", data: "{}" })).toEqual({ type: "error", code: "UNKNOWN", detail: null, reason: null });
   });
 });
 
@@ -97,6 +170,29 @@ describe("error codes", () => {
     expect(assistantErrorCopy("NO_KEY").settings).toBe(true);
     expect(assistantErrorCopy("CAP_REACHED").settings).toBe(true);
     expect(assistantErrorCopy("PROVIDER_ERROR").settings).toBe(false);
+  });
+
+  it("gives a provider error its reason-specific line, and never says try again for quota", () => {
+    expect(assistantErrorCopy("PROVIDER_ERROR", "quota")).toEqual({ key: "assistant_err_prov_quota", settings: true });
+    expect(assistantErrorCopy("PROVIDER_ERROR", "rate_limit")).toEqual({ key: "assistant_err_prov_rate_limit", settings: false });
+    expect(assistantErrorCopy("PROVIDER_ERROR", "auth")).toEqual({ key: "assistant_err_prov_auth", settings: true });
+    expect(assistantErrorCopy("PROVIDER_ERROR", "unavailable").key).toBe("assistant_err_prov_unavailable");
+    expect(assistantErrorCopy("PROVIDER_ERROR", "bad_request").key).toBe("assistant_err_prov_bad_request");
+    expect(t("assistant_err_prov_quota", "en").toLowerCase()).not.toContain("try again");
+    expect(t("assistant_err_prov_rate_limit", "en")).toContain("Try again");
+  });
+
+  it("uses the generic provider copy when the reason is missing or unknown", () => {
+    expect(assistantErrorCopy("PROVIDER_ERROR", null).key).toBe("assistant_err_provider");
+    expect(assistantErrorCopy("PROVIDER_ERROR").key).toBe("assistant_err_provider");
+    expect(assistantErrorCopy("PROVIDER_ERROR", "unknown").key).toBe("assistant_err_provider");
+    expect(assistantErrorCopy("NO_KEY", "quota").key).toBe("assistant_err_no_key");
+  });
+
+  it("picks the news note from the news field only", () => {
+    expect(newsNoteKey("unsupported")).toBe("assistant_news_not_checked");
+    expect(newsNoteKey("refused")).toBe("assistant_news_refused");
+    for (const quiet of ["searched", "not_offered", null] as const) expect(newsNoteKey(quiet)).toBeNull();
   });
 
   it("falls back to generic copy for a code it does not know", () => {
@@ -145,6 +241,36 @@ describe("sources", () => {
   it("names the known tools only", () => {
     expect(toolKey("valuation")).toBe("assistant_tool_valuation");
     expect(toolKey("drop_tables")).toBeNull();
+  });
+});
+
+describe("web sources", () => {
+  it("accepts only absolute http(s) URLs", () => {
+    expect(safeWebUrl("https://a.com/x?y=1")).toBe("https://a.com/x?y=1");
+    expect(safeWebUrl("  http://a.com ")).toBe("http://a.com/");
+    for (const bad of ["javascript:alert(1)", "data:text/plain,x", "ftp://a.com", "//a.com", "a.com", "", "  ", null, 5, {}]) {
+      expect(safeWebUrl(bad)).toBeNull();
+    }
+  });
+
+  it("shows the site's domain without www", () => {
+    expect(sourceDomain("https://www.reuters.com/markets/x")).toBe("reuters.com");
+    expect(sourceDomain("https://news.Example.co.uk:8443/a?b=c")).toBe("news.example.co.uk");
+    expect(sourceDomain("http://WWW.ahram.org.eg/x")).toBe("ahram.org.eg");
+    expect(sourceDomain("javascript:alert(1)")).toBeNull();
+    expect(sourceDomain("not a url")).toBeNull();
+  });
+
+  it("splits data chips from web chips and dedupes each", () => {
+    const sources = [
+      { tool: "valuation", ticker: "COMI" },
+      { tool: "web" as const, url: "https://a.com/1", title: "A" },
+      { tool: "valuation", ticker: "COMI" },
+      { tool: "web" as const, url: "https://a.com/1", title: "A again" },
+      { tool: "web" as const, url: "https://b.com/2", title: "B" },
+    ];
+    expect(uniqueSources(sources)).toEqual([{ tool: "valuation", ticker: "COMI" }]);
+    expect(webSources(sources).map((s) => s.url)).toEqual(["https://a.com/1", "https://b.com/2"]);
   });
 });
 

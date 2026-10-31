@@ -30,6 +30,7 @@ CARD_TOOLS = {
     "valuation": "valuation",
     "stance": "stance",
     "shariah": "shariah_status",
+    "data_check": "data_check",
 }
 
 

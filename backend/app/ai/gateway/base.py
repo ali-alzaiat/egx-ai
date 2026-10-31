@@ -42,21 +42,35 @@ class TextDelta:
 
 
 @dataclass(frozen=True)
+class Citation:
+    """A web source the vendor cited (R50 B3/B4): built from vendor metadata, never model text."""
+
+    url: str
+    title: str
+
+
+@dataclass(frozen=True)
 class Done:
-    """End of one model call. ``None`` = the provider did not report it (never guessed)."""
+    """End of one model call. ``None`` = the provider did not report it (never guessed).
+
+    ``cost_usd`` includes web-search fees when the call searched. ``web_searches`` is the
+    number of searches the vendor reports (None = not reported).
+    """
 
     input_tokens: int | None
     output_tokens: int | None
     cost_usd: Decimal | None
+    web_searches: int | None = None
 
 
-ChatEvent = TextDelta | ToolCall | Done
+ChatEvent = TextDelta | ToolCall | Citation | Done
 
 
 class ProviderError(Exception):
     """A provider failure with a stable code and a message already scrubbed of API keys.
 
-    ``code`` is one of ``auth``, ``rate_limit``, ``unavailable``, ``bad_request``, ``unknown``.
+    ``code`` is one of ``auth``, ``rate_limit``, ``quota``, ``unavailable``, ``bad_request``,
+    ``unknown``.
     """
 
     def __init__(self, code: str, message: str) -> None:
@@ -66,7 +80,11 @@ class ProviderError(Exception):
 
 
 class ChatProvider(Protocol):
-    """Streams one model call. ``model`` is a catalog id; the provider derives the vendor."""
+    """Streams one model call. ``model`` is a catalog id; the provider derives the vendor.
+
+    ``web_search`` lets the model use its vendor's web search for this call;
+    ``max_web_searches`` caps the searches where the vendor supports a cap.
+    """
 
     def stream(
         self,
@@ -75,4 +93,6 @@ class ChatProvider(Protocol):
         messages: Sequence[ChatMessage],
         tools: Sequence[ToolSpec],
         max_tokens: int,
+        web_search: bool = False,
+        max_web_searches: int = 3,
     ) -> AsyncIterator[ChatEvent]: ...

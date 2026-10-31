@@ -221,7 +221,7 @@ class ChatBody(BaseModel):
 
 class ExplainBody(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
-    card: Literal["score", "valuation", "stance", "shariah"]
+    card: Literal["score", "valuation", "stance", "shariah", "data_check"]
     model: str | None = Field(default=None, max_length=100)
     lang: Literal["en", "ar"] = "en"
 

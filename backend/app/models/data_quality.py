@@ -6,6 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -70,4 +72,29 @@ class DataQualityAssessment(Base):
             "ix_data_quality_assessment_company_scope",
             "company_id", "scope", text("as_of DESC"),
         ),
+    )
+
+
+class DataCrosscheck(Base):
+    """One deterministic cross-check result (R50 B11); each run appends, the newest run wins."""
+
+    __tablename__ = "data_crosschecks"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
+    )
+    check_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, server_default="{}")
+    methodology_version: Mapped[str] = mapped_column(String(20), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pass', 'warn', 'fail', 'insufficient_data')",
+            name="ck_data_crosschecks_status",
+        ),
+        Index("ix_data_crosschecks_company_computed", "company_id", text("computed_at DESC")),
     )

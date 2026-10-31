@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.catalog import CatalogModel, get_model
@@ -27,8 +28,17 @@ from app.ai.constants import (
 from app.ai.gateway.base import ChatMessage, ChatProvider, ToolCall
 from app.ai.keys import KeyStore, ResolvedKey
 from app.ai.orchestrator import Progress, ToolRecord, TurnResult, Usage, run_turn
-from app.ai.prompts import EXPLAIN_PROMPTS, LANGUAGE_NAMES, SCOPE_CONTEXT, SYSTEM_PROMPT
+from app.ai.prompts import (
+    EXPLAIN_PROMPTS,
+    LANGUAGE_NAMES,
+    SCOPE_CONTEXT,
+    SEARCH_OFF,
+    SEARCH_ON,
+    SEARCH_REFUSED,
+    SYSTEM_PROMPT,
+)
 from app.ai.redact import scrub
+from app.ai.search_refusal import is_refused
 from app.ai.service import AssistantService, make_title
 from app.ai.sse import format_event
 from app.ai.tools import CARD_TOOLS, TOOLS, execute_tool, to_json, tool_specs
@@ -38,15 +48,30 @@ from app.models.market import Company
 logger = logging.getLogger(__name__)
 
 
-def _system_prompt(lang: str) -> str:
+def _system_prompt(lang: str, web_search: bool | None = None, refused: bool = False) -> str:
+    """The system prompt. ``web_search`` says whether the model may search (None = say nothing);
+    ``refused`` says its provider already refused search today."""
     name = LANGUAGE_NAMES.get(lang, "English")
-    return f"{SYSTEM_PROMPT}\nReply in {name} unless the user writes in another language."
+    prompt = f"{SYSTEM_PROMPT}\nReply in {name} unless the user writes in another language."
+    if web_search is None:
+        return prompt
+    if web_search and refused:
+        return f"{prompt}\n{SEARCH_REFUSED}"
+    return f"{prompt}\n{SEARCH_ON if web_search else SEARCH_OFF}"
 
 
 def _tool_calls_json(records: list[ToolRecord]) -> list[dict[str, Any]]:
     return [
         {"name": r.name, "arguments": r.arguments, "ok": r.ok, "ticker": r.ticker} for r in records
     ]
+
+
+async def _company_index(session: AsyncSession) -> tuple[set[str], list[str]]:
+    """Every ticker and English / Arabic name of our companies, read once per turn (R50 B8)."""
+    rows = (await session.execute(select(Company.ticker, Company.name, Company.name_ar))).all()
+    tickers = {r[0] for r in rows if r[0]}
+    names = [n for r in rows for n in (r[1], r[2]) if n]
+    return tickers, names
 
 
 def _done_frame(usage: Usage, month_spend: Decimal | None) -> str:
@@ -63,9 +88,14 @@ def _done_frame(usage: Usage, month_spend: Decimal | None) -> str:
     )
 
 
-def _error_frames(code: str, detail: str, month_spend: Decimal | None) -> list[str]:
+def _error_frames(
+    code: str, detail: str, month_spend: Decimal | None, reason: str | None = None
+) -> list[str]:
+    data: dict[str, Any] = {"code": code, "detail": detail}
+    if reason is not None:
+        data["reason"] = reason
     return [
-        format_event("error", {"code": code, "detail": detail}),
+        format_event("error", data),
         _done_frame(Usage(), month_spend),
     ]
 
@@ -132,7 +162,12 @@ async def stream_chat(
         return
     entry, key = resolved.entry, resolved.key
 
-    messages: list[ChatMessage] = [ChatMessage("system", _system_prompt(lang))]
+    messages: list[ChatMessage] = [
+        ChatMessage(
+            "system",
+            _system_prompt(lang, entry.web_search, is_refused(entry.provider)),
+        )
+    ]
     seed: list[ToolRecord] = []
     if company is not None:
         arguments = {"ticker": company.ticker}
@@ -169,6 +204,9 @@ async def stream_chat(
         messages=messages,
         user_text=message,
         seed=seed,
+        web_search=entry.web_search,
+        news="searched" if entry.web_search else "unsupported",
+        company_index=await _company_index(session),
     ):
         yield frame
 
@@ -193,7 +231,10 @@ async def stream_explain(
 
     tool_name = CARD_TOOLS[card]
     arguments = {"ticker": company.ticker}
-    yield format_event("meta", {"conversation_id": None, "model": entry.id})
+    # Explain runs one fixed tool and never searches the web, whatever the model can do.
+    yield format_event(
+        "meta", {"conversation_id": None, "model": entry.id, "web_search": False}
+    )
     yield format_event("status", {"stage": "tool", "tool": tool_name})
     outcome = await execute_tool(session, tool_name, arguments)
     reason = None if outcome.ok else str(outcome.output.get("detail") or "Data unavailable.")
@@ -237,6 +278,9 @@ async def _run(
     user_text: str,
     seed: list[ToolRecord],
     emit_meta: bool = True,
+    web_search: bool = False,
+    news: str = "not_offered",
+    company_index: tuple[set[str], list[str]] | None = None,
 ) -> AsyncIterator[str]:
     session = svc.session
     if emit_meta:
@@ -245,6 +289,7 @@ async def _run(
             {
                 "conversation_id": str(conversation_id) if conversation_id else None,
                 "model": entry.id,
+                "web_search": web_search,
             },
         )
     result: TurnResult | None = None
@@ -268,6 +313,11 @@ async def _run(
             allow_call=allow_call,
             user_text=user_text,
             seed_records=seed,
+            web_search=web_search,
+            provider_name=entry.provider,
+            news=news,
+            known_tickers=company_index[0] if company_index else None,
+            known_names=company_index[1] if company_index else (),
         ):
             if isinstance(item, Progress):
                 data: dict[str, Any] = {"stage": item.stage}
@@ -282,7 +332,9 @@ async def _run(
             type(exc).__name__,
             scrub(str(exc), key.api_key)[:300],
         )
-        for frame in _error_frames("PROVIDER_ERROR", "The assistant failed unexpectedly.", None):
+        for frame in _error_frames(
+            "PROVIDER_ERROR", "The assistant failed unexpectedly.", None, reason="unknown"
+        ):
             yield frame
         return
     assert result is not None
@@ -300,6 +352,8 @@ async def _run(
                 "text": result.text,
                 "verified": True,
                 "checked": result.verification.checked,
+                "general": result.general,
+                "news": result.news,
                 "sources": sources,
             },
         )
@@ -310,14 +364,16 @@ async def _run(
             {
                 "checked": result.verification.checked,
                 "unverified": result.verification.unverified,
+                "news": result.news,
                 "sources": sources,
             },
         )
     else:
-        yield format_event(
-            "error",
-            {"code": result.error_code or "PROVIDER_ERROR", "detail": result.error_detail or ""},
-        )
+        code = result.error_code or "PROVIDER_ERROR"
+        error: dict[str, Any] = {"code": code, "detail": result.error_detail or ""}
+        if code == "PROVIDER_ERROR":
+            error["reason"] = result.error_reason or "unknown"
+        yield format_event("error", error)
     yield _done_frame(result.usage, await svc.month_spend())
 
 
@@ -331,8 +387,14 @@ async def _persist(
     verification: dict[str, Any] | None = (
         result.verification.as_dict() if result.verification is not None else None
     )
+    if result.general:
+        verification = {"general": True}
+    if verification is not None and result.status in (STATUS_ANSWERED, STATUS_UNVERIFIED):
+        verification["news"] = result.news
     if result.status in (STATUS_ERROR, STATUS_CAP_REACHED):
         verification = {"error": result.error_code, "detail": result.error_detail}
+        if result.error_reason:
+            verification["reason"] = result.error_reason
     if result.retried and verification is not None:
         verification["retried"] = True
     if conversation_id is None and result.usage.calls == 0:
@@ -345,7 +407,15 @@ async def _persist(
         provider=entry.provider,
         model=entry.id,
         prompt_version=AI_PROMPT_VERSION,
-        tool_calls=json.loads(json.dumps(_tool_calls_json(result.tool_records), default=str)),
+        tool_calls=json.loads(
+            json.dumps(
+                [
+                    *_tool_calls_json(result.tool_records),
+                    *({"name": "web", "url": c.url, "title": c.title} for c in result.citations),
+                ],
+                default=str,
+            )
+        ),
         verification=verification,
         input_tokens=result.usage.input_tokens,
         output_tokens=result.usage.output_tokens,

@@ -1483,7 +1483,7 @@ export type FormingStats = FormingStatsOk | FormingStatsMissing;
 
 export type AssistantProviderId = "anthropic" | "openai" | "gemini";
 export type AssistantLang = "en" | "ar";
-export type AssistantCard = "score" | "valuation" | "stance" | "shariah";
+export type AssistantCard = "score" | "valuation" | "stance" | "shariah" | "data_check";
 
 export interface AssistantModel {
   id: string;
@@ -1491,6 +1491,8 @@ export interface AssistantModel {
   provider: AssistantProviderId;
   /** The provider has a key (saved in the UI or in .env). */
   available: boolean;
+  /** The model can search the web for news (R50). */
+  web_search: boolean;
 }
 
 export interface AssistantModelsResponse {
@@ -1570,19 +1572,49 @@ export interface AssistantExplainRequest {
   lang: AssistantLang;
 }
 
+/** Whether news was checked for an answer (R50 B16): searched | not_offered | unsupported | refused. Unknown values decode to null. */
+export type AssistantNews = "searched" | "not_offered" | "unsupported" | "refused";
+
+/** Why a provider call failed (R50 B15). Unknown values decode to null. */
+export type AssistantProviderReason = "auth" | "rate_limit" | "quota" | "unavailable" | "bad_request" | "unknown";
+
 export type AssistantStage = "thinking" | "tool" | "verifying" | "retrying";
 
-export interface AssistantSource {
+/** A figure's origin: a data tool (optionally for one company). */
+export interface AssistantDataSource {
   tool: string;
   ticker?: string | null;
 }
 
+/** A web page the model's news search cited (R50). Only http(s) URLs survive decoding. */
+export interface AssistantWebSource {
+  tool: "web";
+  url: string;
+  title: string;
+}
+
+export type AssistantSource = AssistantDataSource | AssistantWebSource;
+
 export type AssistantStreamEvent =
-  | { type: "meta"; conversation_id: string | null; model: string | null }
+  | {
+      type: "meta";
+      conversation_id: string | null;
+      model: string | null;
+      /** Whether this model can search the web this turn; null when the server did not say. */
+      web_search: boolean | null;
+    }
   | { type: "status"; stage: AssistantStage; tool: string | null }
-  | { type: "answer"; text: string; checked: number; sources: AssistantSource[] }
-  | { type: "unverified"; checked: number; unverified: string[]; sources: AssistantSource[] }
-  | { type: "error"; code: string; detail: string | null }
+  | {
+      type: "answer";
+      text: string;
+      checked: number;
+      sources: AssistantSource[];
+      /** General information, not checked against our data (R50). */
+      general: boolean;
+      news: AssistantNews | null;
+    }
+  | { type: "unverified"; checked: number; unverified: string[]; sources: AssistantSource[]; news: AssistantNews | null }
+  | { type: "error"; code: string; detail: string | null; reason: AssistantProviderReason | null }
   | {
       type: "done";
       input_tokens: number | null;
@@ -1590,3 +1622,24 @@ export type AssistantStreamEvent =
       cost_usd: string | number | null;
       month_spend_usd: string | number | null;
     };
+
+// ---- Data cross-checks (R50 contract section 3): GET/POST /api/data-quality/companies/{id}/crosschecks[/run] ----
+
+export type CrossCheckStatus = "pass" | "warn" | "fail" | "insufficient_data";
+
+export interface CrossCheck {
+  code: string;
+  status: CrossCheckStatus;
+  detail: string;
+  /** Backend-owned shape; shown as key/value text only. */
+  evidence: unknown;
+}
+
+export interface CrossCheckRun {
+  company_id: string;
+  /** Null when the checks have never run (then `checks` is empty). */
+  computed_at: string | null;
+  methodology_version: string | null;
+  overall: CrossCheckStatus | null;
+  checks: CrossCheck[];
+}

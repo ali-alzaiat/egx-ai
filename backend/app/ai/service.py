@@ -135,6 +135,7 @@ class AssistantService:
                     "label": m.label,
                     "provider": m.provider,
                     "available": m.provider in available,
+                    "web_search": m.web_search,
                 }
                 for m in CATALOG
             ],

@@ -3,6 +3,7 @@ import {
   fmtChange,
   fmtCycle,
   fmtDate,
+  fmtDateTime,
   fmtEgpCompact,
   fmtEgpMillions,
   fmtInt,
@@ -37,6 +38,9 @@ describe("missing values return null, never 0/NaN/Never", () => {
   it("dates and cycles", () => {
     expect(fmtDate(EN, null)).toBeNull();
     expect(fmtDate(EN, "not a date")).toBeNull();
+    expect(fmtDateTime(EN, null)).toBeNull();
+    expect(fmtDateTime(EN, "nope")).toBeNull();
+    expect(fmtDateTime(EN, "2026-10-22T14:05:00Z")).toBe("22 Oct 2026, 14:05 UTC");
     expect(fmtCycle(EN, "2026-13x")).toBeNull();
     expect(formatAsOf(null)).toBe("—");
   });

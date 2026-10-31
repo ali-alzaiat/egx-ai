@@ -153,3 +153,17 @@ class DailyPrice(Base):
         Index("ix_daily_prices_date", "date"),
         Index("ix_daily_prices_company_date", "company_id", "date"),
     )
+
+
+class IndexPrice(Base):
+    """One daily close of a market index (R50 B10), e.g. EGX30 from Yahoo ``^CASE30``."""
+
+    __tablename__ = "index_prices"
+
+    index_code: Mapped[str] = mapped_column(String(20), primary_key=True)
+    trade_date: Mapped[date] = mapped_column(Date, primary_key=True)
+    close: Mapped[Decimal] = mapped_column(Numeric(20, 4), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

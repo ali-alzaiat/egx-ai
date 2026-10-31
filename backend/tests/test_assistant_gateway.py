@@ -286,6 +286,57 @@ def test_translate_error_codes() -> None:
     assert translate_error(RuntimeError("x"), "k").code == "unknown"
 
 
+class RateLimitError(Exception):
+    """Stands in for LiteLLM's class of the same name (classification is by class name)."""
+
+
+class MidStreamFallbackError(Exception):
+    """Stands in for LiteLLM's wrapper: the real error sits in ``original_exception``."""
+
+    def __init__(self, message: str, original_exception: BaseException) -> None:
+        super().__init__(message)
+        self.original_exception = original_exception
+
+
+def test_translate_error_unwraps_litellm_wrappers_and_still_scrubs_the_key() -> None:
+    inner = RateLimitError(f"429 quota hit for key {SECRET}")
+    wrapped = MidStreamFallbackError(f"stream failed with key {SECRET}", inner)
+    err = translate_error(wrapped, SECRET)
+    assert err.code == "rate_limit"
+    assert SECRET not in err.message and "MidStreamFallbackError" in err.message
+
+    # __cause__ and __context__ are followed too, and the innermost known class wins.
+    try:
+        try:
+            raise RateLimitError("429")
+        except RateLimitError as caught:
+            raise RuntimeError("wrapped") from caught
+    except RuntimeError as outer:
+        assert translate_error(outer, SECRET).code == "rate_limit"
+    nested = MidStreamFallbackError("a", MidStreamFallbackError("b", RateLimitError("c")))
+    assert translate_error(nested, SECRET).code == "rate_limit"
+
+
+def test_translate_error_maps_quota_text_to_quota_and_leaves_the_rest_unknown() -> None:
+    quota = RuntimeError("429 You exceeded your current quota, please check your plan")
+    assert translate_error(quota, SECRET).code == "quota"
+    assert translate_error(RuntimeError("RESOURCE_EXHAUSTED: try later"), SECRET).code == "quota"
+    wrapped = MidStreamFallbackError("x", RuntimeError("status RESOURCE_EXHAUSTED"))
+    assert translate_error(wrapped, SECRET).code == "quota"
+    # A RateLimitError whose text says the quota is gone is quota; a plain one stays rate_limit.
+    assert translate_error(RateLimitError("exceeded your current quota"), SECRET).code == "quota"
+    wrapped_rate = MidStreamFallbackError("x", RateLimitError("429 too many requests"))
+    assert translate_error(wrapped_rate, SECRET).code == "rate_limit"
+    inner = RateLimitError("You exceeded your current quota")
+    real = MidStreamFallbackError(f"key {SECRET}", inner)
+    err = translate_error(real, SECRET)
+    assert err.code == "quota" and SECRET not in err.message
+    assert translate_error(RuntimeError("boom"), SECRET).code == "unknown"
+    cyc = MidStreamFallbackError("x", RuntimeError("y"))
+    cyc.original_exception.__context__ = cyc  # a cycle must not loop forever
+    assert translate_error(cyc, SECRET).code == "unknown"
+
+
 def test_litellm_logger_filter_scrubs_key_shapes(caplog: pytest.LogCaptureFixture) -> None:
     load_litellm()
     record = logging.LogRecord(

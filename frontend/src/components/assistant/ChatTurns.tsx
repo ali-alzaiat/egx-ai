@@ -4,11 +4,11 @@ import { Alert } from "@/components/shadcn/alert";
 import { Badge } from "@/components/shadcn/badge";
 import { useLang } from "../../i18n/useLang";
 import { parseAnswer, type Inline } from "../../lib/answerText";
-import { assistantErrorCopy, sourceHref, toolKey, uniqueSources } from "../../lib/assistant";
+import { assistantErrorCopy, newsNoteKey, sourceDomain, sourceHref, toolKey, uniqueSources, webSources } from "../../lib/assistant";
 import type { ChatTurn } from "../../lib/assistantChat";
-import type { AssistantSource } from "../../types";
+import type { AssistantNews, AssistantProviderReason, AssistantSource } from "../../types";
 import { ForeignText } from "../../pages/shared/ForeignText";
-import { CheckIcon, WarningIcon } from "../ui/icons";
+import { CheckIcon, ExternalLinkIcon, InfoIcon, WarningIcon } from "../ui/icons";
 
 function Inlines({ items }: { items: readonly Inline[] }) {
   return (
@@ -62,10 +62,14 @@ function AnswerBody({ text }: { text: string }) {
   );
 }
 
+const CHIP =
+  "inline-flex min-h-8 items-center rounded-full border border-border bg-secondary px-3 text-meta text-text-2 no-underline";
+
 function SourceChips({ sources, onNavigate }: { sources: readonly AssistantSource[]; onNavigate?: () => void }) {
   const { t } = useLang();
   const unique = uniqueSources(sources);
-  if (unique.length === 0) return null;
+  const web = webSources(sources);
+  if (unique.length === 0 && web.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-meta text-muted-foreground">{t("assistant_sources")}</span>
@@ -79,16 +83,34 @@ function SourceChips({ sources, onNavigate }: { sources: readonly AssistantSourc
           </>
         );
         const href = sourceHref(source);
-        const chip =
-          "inline-flex min-h-8 items-center rounded-full border border-border bg-secondary px-3 text-meta text-text-2 no-underline";
         return href ? (
-          <Link key={`${source.tool}|${source.ticker ?? ""}`} to={href} onClick={onNavigate} className={`${chip} hover:bg-accent hover:text-foreground`}>
+          <Link key={`${source.tool}|${source.ticker ?? ""}`} to={href} onClick={onNavigate} className={`${CHIP} hover:bg-accent hover:text-foreground`}>
             {label}
           </Link>
         ) : (
-          <span key={`${source.tool}|${source.ticker ?? ""}`} className={chip}>
+          <span key={`${source.tool}|${source.ticker ?? ""}`} className={CHIP}>
             {label}
           </span>
+        );
+      })}
+      {web.map((source) => {
+        const domain = sourceDomain(source.url);
+        if (domain === null) return null;
+        return (
+          <a
+            key={source.url}
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={source.title === "" ? undefined : source.title}
+            className={`${CHIP} max-w-full gap-1.5 hover:bg-accent hover:text-foreground`}
+          >
+            <span dir="ltr" className="min-w-0 truncate">
+              {domain}
+            </span>
+            <ExternalLinkIcon size={12} aria-hidden="true" className="shrink-0" />
+            <span className="sr-only">{t("assistant_web_new_tab")}</span>
+          </a>
         );
       })}
     </div>
@@ -108,10 +130,39 @@ function CheckedNote({ checked }: { checked: number | null }) {
   );
 }
 
-function ErrorTurn({ code, detail, onNavigate }: { code: string; detail: string | null; onNavigate?: () => void }) {
+function GeneralNote() {
   const { t } = useLang();
-  const copy = assistantErrorCopy(code);
-  const showDetail = detail !== null && detail.trim() !== "" && !copy.settings;
+  return (
+    <p className="flex items-center gap-1.5 text-meta text-text-2">
+      <InfoIcon size={14} className="shrink-0" />
+      <span>{t("assistant_general_note")}</span>
+    </p>
+  );
+}
+
+function NewsNote({ news }: { news: AssistantNews | null }) {
+  const { t } = useLang();
+  const key = newsNoteKey(news);
+  return key === null ? null : <p className="text-meta text-muted-foreground">{t(key)}</p>;
+}
+
+function ErrorTurn({
+  code,
+  detail,
+  reason,
+  onNavigate,
+}: {
+  code: string;
+  detail: string | null;
+  reason: AssistantProviderReason | null;
+  onNavigate?: () => void;
+}) {
+  const { t } = useLang();
+  const copy = assistantErrorCopy(code, reason);
+  const text = detail !== null ? detail.trim() : "";
+  // A provider error with a known reason keeps its code and the provider's own words under Details.
+  const codeLine = code === "PROVIDER_ERROR" && reason ? `${code} · ${reason}` : null;
+  const showDetail = codeLine !== null || (text !== "" && !copy.settings);
   return (
     <Alert variant={copy.settings ? "warning" : "destructive"} role="alert">
       <WarningIcon size={20} />
@@ -125,9 +176,16 @@ function ErrorTurn({ code, detail, onNavigate }: { code: string; detail: string 
         {showDetail && (
           <details className="text-meta text-text-2">
             <summary className="cursor-pointer">{t("assistant_error_details")}</summary>
-            <p className="mt-1 break-words">
-              <ForeignText>{detail.trim().slice(0, 300)}</ForeignText>
-            </p>
+            {codeLine !== null && (
+              <p dir="ltr" className="mt-1 break-words">
+                {codeLine}
+              </p>
+            )}
+            {text !== "" && (
+              <p className="mt-1 break-words">
+                <ForeignText>{text.slice(0, 300)}</ForeignText>
+              </p>
+            )}
           </details>
         )}
       </div>
@@ -149,7 +207,8 @@ export const TurnView = memo(function TurnView({ turn, onNavigate }: { turn: Cha
       return (
         <article className="flex flex-col gap-3 rounded-md border border-border bg-card p-3" aria-label={t("assistant_assistant")}>
           <AnswerBody text={turn.text} />
-          <CheckedNote checked={turn.checked} />
+          {turn.general ? <GeneralNote /> : <CheckedNote checked={turn.checked} />}
+          <NewsNote news={turn.news} />
           <SourceChips sources={turn.sources} onNavigate={onNavigate} />
         </article>
       );
@@ -168,12 +227,13 @@ export const TurnView = memo(function TurnView({ turn, onNavigate }: { turn: Cha
                 </span>
               </p>
             )}
+            <NewsNote news={turn.news} />
             <SourceChips sources={turn.sources} onNavigate={onNavigate} />
           </div>
         </Alert>
       );
     case "error":
-      return <ErrorTurn code={turn.code} detail={turn.detail} onNavigate={onNavigate} />;
+      return <ErrorTurn code={turn.code} detail={turn.detail} reason={turn.reason} onNavigate={onNavigate} />;
     case "stopped":
       return <Badge variant="muted" className="self-start">{t("assistant_stopped")}</Badge>;
   }

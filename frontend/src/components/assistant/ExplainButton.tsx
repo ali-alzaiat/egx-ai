@@ -10,6 +10,7 @@ const CARD_KEY = {
   valuation: "assistant_card_valuation",
   stance: "assistant_card_stance",
   shariah: "assistant_card_shariah",
+  data_check: "assistant_card_data_check",
 } as const satisfies Record<AssistantCard, string>;
 
 /** "Explain this" on a result card: opens the side panel and asks the assistant to explain that card's figures. */

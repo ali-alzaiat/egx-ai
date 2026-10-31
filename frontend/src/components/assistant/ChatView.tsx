@@ -113,7 +113,7 @@ export function ChatView({ chat, ticker, modelChoice, onModelPick, onModelResolv
           {available.length === 0 && <option value="">{t("assistant_model_none")}</option>}
           {available.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.label}
+              {m.web_search ? t("assistant_model_searches", { label: m.label }) : m.label}
             </option>
           ))}
         </select>

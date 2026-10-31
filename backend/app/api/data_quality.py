@@ -6,6 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dataquality.crosscheck_service import CrosscheckService
 from app.dataquality.scores import METHODOLOGY_VERSION
 from app.dataquality.service import DataQualityService
 from app.db.session import get_session
@@ -46,6 +47,26 @@ async def get_data_quality_assessments(
         "scale": SCALE,
         "disclaimer": DISCLAIMER,
     }
+
+
+@router.get("/companies/{company_id}/crosschecks")
+async def get_crosschecks(
+    company_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
+    """The newest stored cross-check run; ``checks: []`` and ``computed_at: null`` if never run."""
+    await _ensure_company_exists(session, company_id)
+    return await CrosscheckService(session).latest(company_id)
+
+
+@router.post("/companies/{company_id}/crosschecks/run")
+async def run_crosschecks(
+    company_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, object]:
+    """Run the cross-checks now and return the stored run."""
+    await _ensure_company_exists(session, company_id)
+    return await CrosscheckService(session).run(company_id)
 
 
 @router.post("/companies/{company_id}/assess")

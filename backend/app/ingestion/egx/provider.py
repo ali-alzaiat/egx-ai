@@ -242,6 +242,37 @@ def _bar_from_row(ticker: str, idx: Any, row: Any) -> DailyPriceData | None:
     )
 
 
+#: Index code stored in ``index_prices`` -> Yahoo symbol.
+INDEX_SYMBOLS = {"EGX30": "^CASE30"}
+INDEX_SOURCE = "yahoo_finance"
+
+
+class YahooIndexProvider:
+    """Daily closes of a market index from Yahoo Finance (R50 B10). No synthetic fallback."""
+
+    async def get_index_closes(
+        self, index_code: str, start_date: date, end_date: date
+    ) -> list[tuple[date, Decimal]]:
+        """Positive closes, oldest first. Raises on an unknown code; [] when Yahoo has none."""
+        symbol = INDEX_SYMBOLS[index_code]
+
+        def _load() -> Any:
+            return _yfinance().Ticker(symbol).history(
+                start=start_date, end=end_date, interval="1d", auto_adjust=False
+            )
+
+        hist = await anyio.to_thread.run_sync(_load)
+        if hist is None or hist.empty:
+            return []
+        closes: dict[date, Decimal] = {}
+        for idx, row in hist.iterrows():
+            close = _dec(row.get("Close"), PRICE_QUANT)
+            if close is None or close <= 0:
+                continue
+            closes[idx.date() if hasattr(idx, "date") else idx] = close
+        return sorted(closes.items())
+
+
 def create_egx_provider(use_live_universe: bool = True) -> EGXMarketDataProvider:
     """Create the EGX price provider."""
     return EGXMarketDataProvider(use_live_universe=use_live_universe)

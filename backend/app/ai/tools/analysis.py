@@ -1,5 +1,6 @@
 """Per-company analysis tools: score, valuation, stance, Shariah. Each calls the router's code."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -128,6 +129,53 @@ async def _shariah_status(session: AsyncSession, args: dict[str, Any]) -> dict[s
     )
 
 
+async def _company_performance(session: AsyncSession, args: dict[str, Any]) -> dict[str, Any]:
+    from app.performance.constants import PERFORMANCE_SOURCE
+    from app.performance.service import PerformanceService
+
+    company = await resolve_company(session, args)
+    today = datetime.now(UTC).date()
+    data = await PerformanceService(session).company_performance(company.id, today)
+    return envelope(
+        "company_performance",
+        ticker=company.ticker,
+        as_of=first_text(data.get("price_as_of")),
+        methodology={"performance": data.pop("methodology_version")},
+        source=PERFORMANCE_SOURCE,
+        data=data,
+    )
+
+
+DATA_CHECK_SOURCE = "EGX AI data cross-checks over stored prices and approved statement lines"
+
+
+async def _data_check(session: AsyncSession, args: dict[str, Any]) -> dict[str, Any]:
+    from app.dataquality.crosscheck_service import CrosscheckService
+
+    company = await resolve_company(session, args)
+    service = CrosscheckService(session)
+    data = await service.latest(company.id)
+    if data["computed_at"] is None:
+        data = await service.run(company.id)  # never run yet: run once so there is an answer
+    data = strip_noise(data)
+    version = data.pop("methodology_version")
+    computed_at = data.get("computed_at")
+    return envelope(
+        "data_check",
+        ticker=company.ticker,
+        as_of=computed_at[:10] if isinstance(computed_at, str) else None,
+        methodology={"crosscheck": version},
+        source=DATA_CHECK_SOURCE,
+        data=data,
+    )
+
+
+def _data_check_insufficient(output: dict[str, Any]) -> str | None:
+    if not output.get("data", {}).get("checks"):
+        return "No data cross-checks could be computed for this company yet."
+    return None
+
+
 TICKER_ONLY = object_schema({"ticker": TICKER_PROPERTY}, ["ticker"])
 
 ANALYSIS_TOOLS: tuple[ToolDef, ...] = (
@@ -160,6 +208,29 @@ ANALYSIS_TOOLS: tuple[ToolDef, ...] = (
         ),
         parameters=TICKER_ONLY,
         run=_stance,
+    ),
+    ToolDef(
+        name="company_performance",
+        description=(
+            "Performance of one company: price returns over 1M / 3M / 6M / YTD / 1Y next to "
+            "the EGX30 index and the difference, plus revenue and net income TTM and "
+            "year-over-year change and the TTM net margin, all computed in code. Fractions: "
+            "0.12 means 12%. Windows the data does not reach are INSUFFICIENT_DATA."
+        ),
+        parameters=TICKER_ONLY,
+        run=_company_performance,
+    ),
+    ToolDef(
+        name="data_check",
+        description=(
+            "Data cross-checks of one company: whether our figures are backed by filings, agree "
+            "with a second source, satisfy accounting identities, have sane prices and are "
+            "fresh. Each check is pass / warn / fail / insufficient_data with its evidence; "
+            "`overall` is the worst. It never contains vendor figures."
+        ),
+        parameters=TICKER_ONLY,
+        run=_data_check,
+        insufficient=_data_check_insufficient,
     ),
     ToolDef(
         name="shariah_status",

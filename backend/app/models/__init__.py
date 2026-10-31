@@ -11,7 +11,7 @@ from app.models.continuous import (
     Watchlist,
     WatchlistEntry,
 )
-from app.models.data_quality import DataQualityAssessment, DataQualityStatusDB
+from app.models.data_quality import DataCrosscheck, DataQualityAssessment, DataQualityStatusDB
 from app.models.disclosure import DisclosureFactDiff, DisclosureFiling
 from app.models.financial import (
     DocumentStatus,
@@ -32,7 +32,14 @@ from app.models.industry import (
     GicsSubIndustry,
     IndustryMetricProfile,
 )
-from app.models.market import Company, CompanyStatus, DailyPrice, DataSource, DataSourceType
+from app.models.market import (
+    Company,
+    CompanyStatus,
+    DailyPrice,
+    DataSource,
+    DataSourceType,
+    IndexPrice,
+)
 from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
 from app.models.scores import IndustryScoreProfile, InvestmentScore
 from app.models.screening import (
@@ -89,6 +96,7 @@ __all__ = [
     "ComputeState",
     "CompanyStatus",
     "DailyPrice",
+    "DataCrosscheck",
     "DataQualityAssessment",
     "DataQualityStatusDB",
     "DataSource",
@@ -118,6 +126,7 @@ __all__ = [
     "GicsSubIndustry",
     "IndicatorStatusDB",
     "IndicatorTypeDB",
+    "IndexPrice",
     "IndustryMetricProfile",
     "IndustryScoreProfile",
     "IndustryValuationProfile",

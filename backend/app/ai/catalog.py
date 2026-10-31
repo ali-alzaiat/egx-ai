@@ -28,6 +28,9 @@ class CatalogModel:
     id: str
     label: str
     provider: str
+    #: The vendor's own web search can be switched on through LiteLLM ``web_search_options``
+    #: (R50 B3). Only entries LiteLLM 1.105.1 can search with are true; a test asserts it.
+    web_search: bool = False
 
     @property
     def litellm_model(self) -> str:
@@ -42,14 +45,14 @@ class CatalogModel:
 
 # Order matters: the first available model becomes the default when none is saved.
 CATALOG: tuple[CatalogModel, ...] = (
-    CatalogModel("claude-sonnet-5-5", "Claude Sonnet 5.5", "anthropic"),
-    CatalogModel("claude-opus-5-5", "Claude Opus 5.5", "anthropic"),
+    CatalogModel("claude-sonnet-5-5", "Claude Sonnet 5.5", "anthropic", web_search=True),
+    CatalogModel("claude-opus-5-5", "Claude Opus 5.5", "anthropic", web_search=True),
     # claude-haiku-5-5 is not in LiteLLM 1.105.1's cost map; haiku 4.5 is the newest Haiku there.
     CatalogModel("claude-haiku-4-5", "Claude Haiku 4.5", "anthropic"),
     CatalogModel("gpt-5.5", "GPT-5.5", "openai"),
     CatalogModel("gpt-5.4-mini", "GPT-5.4 mini", "openai"),
-    CatalogModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)", "gemini"),
-    CatalogModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "gemini"),
+    CatalogModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro (preview)", "gemini", web_search=True),
+    CatalogModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite", "gemini", web_search=True),
 )
 
 _BY_ID = {m.id: m for m in CATALOG}

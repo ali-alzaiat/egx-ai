@@ -18,6 +18,7 @@ export const ASSISTANT_COPY = {
 
   // ---- Chat view ----
   assistant_model: { en: "Model", ar: "النموذج" },
+  assistant_model_searches: { en: "{label} · searches news", ar: "{label} · يبحث في الأخبار" },
   assistant_model_none: { en: "No model available", ar: "لا يوجد نموذج متاح" },
   assistant_no_models: {
     en: "No AI provider has a key yet, so the assistant can't answer.",
@@ -58,6 +59,16 @@ export const ASSISTANT_COPY = {
   assistant_checked: { en: "Figures checked against our data ({n})", ar: "أرقام روجعت على بياناتنا ({n})" },
   assistant_checked_none: { en: "No figures to check", ar: "لا توجد أرقام للمراجعة" },
   assistant_sources: { en: "Sources", ar: "المصادر" },
+  assistant_web_new_tab: { en: "(opens in a new tab)", ar: "(يفتح في تبويب جديد)" },
+  assistant_general_note: {
+    en: "General information, not checked against our data",
+    ar: "معلومات عامة، لم تُراجَع على بياناتنا",
+  },
+  assistant_news_refused: {
+    en: "News not checked: the provider refused web search for this key",
+    ar: "لم تُفحص الأخبار: رفض المزوّد البحث في الويب لهذا المفتاح",
+  },
+  assistant_news_not_checked: { en: "News not checked with this model", ar: "لم تُفحص الأخبار بهذا النموذج" },
   assistant_unverified_title: { en: "Couldn't verify the figures", ar: "تعذّر التحقق من الأرقام" },
   assistant_unverified_body: {
     en: "The answer was held back because some figures didn't match our data. Try asking again, or check the numbers on the company pages.",
@@ -78,6 +89,8 @@ export const ASSISTANT_COPY = {
   assistant_tool_financial_metrics: { en: "Financial metrics", ar: "المؤشرات المالية" },
   assistant_tool_search_companies: { en: "Company search", ar: "البحث عن الشركات" },
   assistant_tool_screen_companies: { en: "Company screen", ar: "فرز الشركات" },
+  assistant_tool_company_performance: { en: "Performance", ar: "الأداء" },
+  assistant_tool_data_check: { en: "Data cross-checks", ar: "فحوص البيانات المتقاطعة" },
 
   // ---- Errors ----
   assistant_err_no_key: {
@@ -91,6 +104,26 @@ export const ASSISTANT_COPY = {
   assistant_err_provider: {
     en: "The model provider returned an error. Try again, or pick another model.",
     ar: "أعاد مزوّد النموذج خطأً. حاول مرة أخرى أو اختر نموذجاً آخر.",
+  },
+  assistant_err_prov_auth: {
+    en: "The provider rejected this key. Check the key in AI settings, then ask again.",
+    ar: "رفض المزوّد هذا المفتاح. تحقق من المفتاح في إعدادات الذكاء الاصطناعي ثم اسأل مرة أخرى.",
+  },
+  assistant_err_prov_rate_limit: {
+    en: "The provider is limiting requests right now. Try again shortly.",
+    ar: "يحدّ المزوّد من الطلبات حالياً. حاول مرة أخرى بعد قليل.",
+  },
+  assistant_err_prov_quota: {
+    en: "This key has no quota left for this model. Pick another model, or enable billing for the key.",
+    ar: "لا تتبقى حصة لهذا المفتاح مع هذا النموذج. اختر نموذجاً آخر، أو فعّل الفوترة للمفتاح.",
+  },
+  assistant_err_prov_unavailable: {
+    en: "The model provider is unavailable right now. Try again in a few minutes, or pick another model.",
+    ar: "مزوّد النموذج غير متاح حالياً. حاول مرة أخرى بعد دقائق، أو اختر نموذجاً آخر.",
+  },
+  assistant_err_prov_bad_request: {
+    en: "The provider could not accept this request. Rephrase or shorten the question, or pick another model.",
+    ar: "لم يستطع المزوّد قبول هذا الطلب. أعد صياغة السؤال أو اختصره، أو اختر نموذجاً آخر.",
   },
   assistant_err_insufficient: {
     en: "We don't have enough data to answer that.",
@@ -151,10 +184,140 @@ export const ASSISTANT_COPY = {
   assistant_card_valuation: { en: "valuation", ar: "التقييم" },
   assistant_card_stance: { en: "stance", ar: "الموقف" },
   assistant_card_shariah: { en: "Shariah status", ar: "الحالة الشرعية" },
+  assistant_card_data_check: { en: "data cross-checks", ar: "الفحوص المتقاطعة للبيانات" },
+  assistant_explain_prompt_data_check: { en: "Explain the data cross-checks for {ticker}", ar: "اشرح الفحوص المتقاطعة لبيانات شركة {ticker}" },
   assistant_explain_prompt_score: { en: "Explain the investment score for {ticker}", ar: "اشرح درجة الاستثمار لشركة {ticker}" },
   assistant_explain_prompt_valuation: { en: "Explain the valuation for {ticker}", ar: "اشرح التقييم لشركة {ticker}" },
   assistant_explain_prompt_stance: { en: "Explain the stance for {ticker}", ar: "اشرح الموقف لشركة {ticker}" },
   assistant_explain_prompt_shariah: { en: "Explain the Shariah status for {ticker}", ar: "اشرح الحالة الشرعية لشركة {ticker}" },
+
+  // ---- Quality tab: data cross-checks (R50) ----
+  xc_title: { en: "Cross-checks", ar: "الفحوص المتقاطعة" },
+  xc_intro: {
+    en: "Automatic checks that compare this company's filings, vendor data and prices with each other. They flag problems in the data; they do not change it.",
+    ar: "فحوص تلقائية تقارن إفصاحات الشركة وبيانات المزوّدين والأسعار ببعضها. تُبرز مشكلات في البيانات ولا تغيّرها.",
+  },
+  xc_overall: { en: "Overall", ar: "الحالة العامة" },
+  xc_run: { en: "Run checks now", ar: "شغّل الفحوص الآن" },
+  xc_running: { en: "Running checks…", ar: "جارٍ تشغيل الفحوص…" },
+  xc_run_failed: { en: "Couldn't run the checks. Try again.", ar: "تعذّر تشغيل الفحوص. حاول مرة أخرى." },
+  xc_empty: {
+    en: "The cross-checks haven't been run for this company yet. Select Run checks now to run them.",
+    ar: "لم تُشغَّل الفحوص المتقاطعة لهذه الشركة بعد. اختر «شغّل الفحوص الآن» لتشغيلها.",
+  },
+  xc_footnote: {
+    en: "Methodology {version}. Computed {time}.",
+    ar: "المنهجية {version}. حُسبت في {time}.",
+  },
+  xc_status_pass: { en: "Pass", ar: "سليم" },
+  xc_status_warn: { en: "Warning", ar: "تحذير" },
+  xc_status_fail: { en: "Fail", ar: "فشل" },
+  xc_status_insufficient: { en: "Not enough data", ar: "بيانات غير كافية" },
+  xc_none: { en: "None", ar: "لا يوجد" },
+  xc_row_lines: { en: "Lines checked", ar: "الأسطر المفحوصة" },
+  xc_row_filing_backed: { en: "Backed by a filing", ar: "مدعومة بإفصاح" },
+  xc_row_vendor_only: { en: "Vendor files only", ar: "من ملفات المزوّد فقط" },
+  xc_row_other: { en: "No filing or vendor source", ar: "بلا إفصاح أو ملف مزوّد" },
+  xc_row_share: { en: "Filing-backed share", ar: "نسبة المدعوم بإفصاح" },
+  xc_row_closes: { en: "Closes checked", ar: "أسعار الإغلاق المفحوصة" },
+  xc_row_nonpos: { en: "Non-positive closes", ar: "إغلاقات صفرية أو سالبة" },
+  xc_row_breaches: { en: "Moves beyond the daily limit", ar: "تحركات تتجاوز الحد اليومي" },
+  xc_row_splits: { en: "Possible splits", ar: "احتمال وجود تجزئة للسهم" },
+  xc_row_gaps: { en: "Gaps in the price history", ar: "فجوات في تاريخ الأسعار" },
+  xc_row_as_of: { en: "Checked as of", ar: "تاريخ الفحص" },
+  xc_row_last_close: { en: "Last close", ar: "آخر إغلاق" },
+  xc_row_price_age: { en: "Price age (trading days)", ar: "عمر السعر (أيام تداول)" },
+  xc_row_period_end: { en: "Latest reported period ends", ar: "نهاية أحدث فترة مُبلَّغ عنها" },
+  xc_row_quarters: { en: "Quarters behind", ar: "أرباع متأخرة" },
+  xc_row_compared: { en: "Figures compared", ar: "أرقام تمت مقارنتها" },
+  xc_row_within_1: { en: "Within 1%", ar: "ضمن 1%" },
+  xc_row_1_to_5: { en: "Between 1% and 5% apart", ar: "فارق بين 1% و5%" },
+  xc_row_over_5: { en: "More than 5% apart", ar: "فارق أكثر من 5%" },
+  xc_row_differing: { en: "Differing figures", ar: "الأرقام المختلفة" },
+  xc_row_evaluated: { en: "Identity checks run", ar: "فحوص المعادلات المنفّذة" },
+  xc_row_off: { en: "Checks that are off", ar: "الفحوص غير المتطابقة" },
+  xc_row_off_items: { en: "Identities that are off", ar: "المعادلات غير المتطابقة" },
+  xc_band_within: { en: "within 1%", ar: "ضمن 1%" },
+  xc_band_1_to_5: { en: "1% to 5% apart", ar: "فارق من 1% إلى 5%" },
+  xc_band_over_5: { en: "more than 5% apart", ar: "فارق أكثر من 5%" },
+  xc_identity_balance: { en: "Assets = liabilities + equity", ar: "الأصول = الالتزامات + حقوق الملكية" },
+  xc_identity_split: { en: "Assets = current + non-current assets", ar: "الأصول = المتداولة + غير المتداولة" },
+  xc_identity_gross: { en: "Gross profit = revenue − cost of revenue", ar: "مجمل الربح = الإيرادات − تكلفة الإيرادات" },
+  xc_item_source: { en: "{period} · {code}: {band} (our value {value})", ar: "{period} · {code}: {band} (قيمتنا {value})" },
+  xc_item_move: { en: "{date}: {change}", ar: "{date}: {change}" },
+  xc_item_gap: { en: "{from} to {to}: {days} trading days missing", ar: "من {from} إلى {to}: {days} من أيام التداول مفقودة" },
+  xc_item_identity: { en: "{period} · {identity}: off by {diff}", ar: "{period} · {identity}: الفارق {diff}" },
+  xc_item_identity_values: {
+    en: "{period} · {identity}: off by {diff} (left side {left}, right side {right})",
+    ar: "{period} · {identity}: الفارق {diff} (الطرف الأيسر {left}، الطرف الأيمن {right})",
+  },
+  xc_sum_prov_ok: {
+    en: "{backed} of {lines} approved statement lines are backed by a filing ({share}).",
+    ar: "{backed} من {lines} من أسطر القوائم المعتمدة مدعومة بإفصاح ({share}).",
+  },
+  xc_sum_prov_vendor: {
+    en: "None of the {lines} approved statement lines is confirmed by a filing yet; the figures come from vendor files.",
+    ar: "لم يؤكد أي إفصاح بعد أياً من {lines} من أسطر القوائم المعتمدة؛ الأرقام من ملفات المزوّد.",
+  },
+  xc_sum_prov_none: {
+    en: "None of the {lines} approved statement lines has a source: no filing and no vendor file.",
+    ar: "لا مصدر لأي من {lines} من أسطر القوائم المعتمدة: لا إفصاح ولا ملف مزوّد.",
+  },
+  xc_sum_prov_empty: {
+    en: "There are no approved statement lines for this company.",
+    ar: "لا توجد أسطر قوائم معتمدة لهذه الشركة.",
+  },
+  xc_sum_xs_ok: {
+    en: "All {compared} compared figures agree with the vendor files within 1%.",
+    ar: "كل الأرقام التي تمت مقارنتها ({compared}) تتفق مع ملفات المزوّد ضمن 1%.",
+  },
+  xc_sum_xs_off: {
+    en: "{off} of {compared} compared figures differ from the vendor files by 1% or more.",
+    ar: "{off} من {compared} من الأرقام المقارَنة تختلف عن ملفات المزوّد بنسبة 1% أو أكثر.",
+  },
+  xc_sum_xs_empty: {
+    en: "No period and line has both a filing-backed value and a vendor value to compare.",
+    ar: "لا توجد فترة وبند لهما قيمة مدعومة بإفصاح وقيمة من المزوّد للمقارنة.",
+  },
+  xc_sum_id_ok: {
+    en: "All {evaluated} accounting identity checks hold within tolerance.",
+    ar: "كل فحوص المعادلات المحاسبية ({evaluated}) متطابقة ضمن الحد المسموح.",
+  },
+  xc_sum_id_off: {
+    en: "{off} of {evaluated} accounting identity checks are off by more than the tolerance.",
+    ar: "{off} من {evaluated} من فحوص المعادلات المحاسبية تتجاوز الفارق المسموح.",
+  },
+  xc_sum_id_empty: {
+    en: "No period has all the lines needed for an accounting identity.",
+    ar: "لا توجد فترة فيها كل الأسطر اللازمة لمعادلة محاسبية.",
+  },
+  xc_sum_px_ok: {
+    en: "{n} closes in the last year are positive, within the daily limit and without long gaps.",
+    ar: "{n} من إغلاقات السنة الأخيرة موجبة وضمن الحد اليومي وبلا فجوات طويلة.",
+  },
+  xc_sum_px_nonpos: { en: "Non-positive closes: {n}.", ar: "إغلاقات صفرية أو سالبة: {n}." },
+  xc_sum_px_breach: {
+    en: "One-day moves beyond the daily limit without a split: {n}.",
+    ar: "تحركات في يوم واحد تتجاوز الحد اليومي بلا تجزئة: {n}.",
+  },
+  xc_sum_px_gaps: { en: "Gaps in the price history: {n}.", ar: "فجوات في تاريخ الأسعار: {n}." },
+  xc_sum_px_splits: { en: "Possible splits noted: {n}.", ar: "حالات احتمال تجزئة مرصودة: {n}." },
+  xc_sum_px_empty: { en: "There are fewer than two closes in the last year.", ar: "يوجد أقل من إغلاقين في السنة الأخيرة." },
+  xc_sum_fr_price: {
+    en: "Last close on {date}; trading days since: {age}.",
+    ar: "آخر إغلاق في {date}؛ أيام التداول منذ ذلك: {age}.",
+  },
+  xc_sum_fr_no_price: { en: "No stored price.", ar: "لا يوجد سعر محفوظ." },
+  xc_sum_fr_period: {
+    en: "Latest reported period ended {date}; quarters behind: {n}.",
+    ar: "انتهت أحدث فترة مُبلَّغ عنها في {date}؛ الأرباع المتأخرة: {n}.",
+  },
+  xc_sum_fr_no_period: { en: "No reported period.", ar: "لا توجد فترة مُبلَّغ عنها." },
+  xc_check_provenance: { en: "Provenance (filing-backed figures)", ar: "المصدر (أرقام مدعومة بإفصاحات)" },
+  xc_check_cross_source: { en: "Filing vs vendor figures", ar: "الإفصاحات مقابل بيانات المزوّد" },
+  xc_check_accounting_identity: { en: "Accounting identities", ar: "المعادلات المحاسبية" },
+  xc_check_price_sanity: { en: "Price sanity", ar: "سلامة الأسعار" },
+  xc_check_freshness: { en: "Freshness", ar: "حداثة البيانات" },
 
   // ---- Admin > AI settings ----
   aiset_title: { en: "AI settings", ar: "إعدادات الذكاء الاصطناعي" },

@@ -15,6 +15,12 @@ ERROR_CODES = frozenset(
 )
 
 
+#: Why a PROVIDER_ERROR happened; the UI picks its main line from this (R50 B16).
+ERROR_REASONS = frozenset(
+    {"auth", "rate_limit", "quota", "unavailable", "bad_request", "unknown"}
+)
+
+
 def _default(value: Any) -> Any:
     if isinstance(value, Decimal):
         return str(value)
@@ -27,6 +33,9 @@ def format_event(name: str, data: dict[str, Any]) -> str:
         raise ValueError(f"unknown SSE event: {name}")
     if name == "error" and data.get("code") not in ERROR_CODES:
         raise ValueError(f"unknown error code: {data.get('code')}")
+    is_provider_error = name == "error" and data.get("code") == "PROVIDER_ERROR"
+    if is_provider_error and data.get("reason") not in ERROR_REASONS:
+        raise ValueError(f"PROVIDER_ERROR needs a known reason, got {data.get('reason')}")
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=_default)
     # U+2028/2029 are valid JSON but split lines in some SSE parsers.
     payload = payload.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")

@@ -196,6 +196,16 @@ class StatementLineRepository:
                 best[key] = row
         return list(best.values())
 
+    async def approved_lines(self, company_id: uuid.UUID) -> list[FinancialStatementLine]:
+        """Every approved/auto_validated line (all sources), for cross-source comparison."""
+        rows = await self.session.execute(
+            select(FinancialStatementLine).where(
+                FinancialStatementLine.company_id == company_id,
+                FinancialStatementLine.ext_status.in_(CalculationStatuses),
+            )
+        )
+        return list(rows.scalars().all())
+
     async def list_candidates(
         self,
         company_id: uuid.UUID | None = None,

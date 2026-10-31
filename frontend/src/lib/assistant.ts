@@ -1,5 +1,13 @@
 import type { CopyKey } from "../i18n";
-import type { AssistantSource, AssistantStage, AssistantStreamEvent } from "../types";
+import type {
+  AssistantDataSource,
+  AssistantNews,
+  AssistantProviderReason,
+  AssistantSource,
+  AssistantStage,
+  AssistantStreamEvent,
+  AssistantWebSource,
+} from "../types";
 import type { SseMessage } from "./sse";
 
 /** Pure helpers for the AI assistant (R49): stream decoding, error bodies, source links, error copy. */
@@ -28,6 +36,48 @@ function stageOf(v: unknown): AssistantStage | null {
   return STAGES.find((s) => s === v) ?? null;
 }
 
+function bool(v: unknown): boolean | null {
+  return typeof v === "boolean" ? v : null;
+}
+
+/** The URL as a string only when it is an absolute http(s) link; javascript:, data:, relative and malformed values give null. */
+export function safeWebUrl(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const text = v.trim();
+  if (text === "") return null;
+  try {
+    const url = new URL(text);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The site a link points to, for a chip label: the host without a leading "www."; null for a URL that is not http(s). */
+export function sourceDomain(url: string): string | null {
+  const safe = safeWebUrl(url);
+  if (safe === null) return null;
+  const host = new URL(safe).hostname.replace(/^www\./i, "");
+  return host === "" ? null : host;
+}
+
+const NEWS: readonly AssistantNews[] = ["searched", "not_offered", "unsupported", "refused"];
+
+/** A `news` value from the stream or stored verification JSON; anything else is null. */
+export function newsOf(v: unknown): AssistantNews | null {
+  return NEWS.find((n) => n === v) ?? null;
+}
+
+const REASONS: readonly AssistantProviderReason[] = ["auth", "rate_limit", "quota", "unavailable", "bad_request", "unknown"];
+
+function reasonOf(v: unknown): AssistantProviderReason | null {
+  return REASONS.find((r) => r === v) ?? null;
+}
+
+export function isWebSource(source: AssistantSource): source is AssistantWebSource {
+  return source.tool === "web" && "url" in source;
+}
+
 export function parseSources(v: unknown): AssistantSource[] {
   if (!Array.isArray(v)) return [];
   const out: AssistantSource[] = [];
@@ -35,6 +85,12 @@ export function parseSources(v: unknown): AssistantSource[] {
     if (!isRec(item)) continue;
     const tool = str(item.tool);
     if (tool === null || tool === "") continue;
+    if (tool === "web") {
+      // A web source without a safe http(s) URL is dropped, never shown as a link.
+      const url = safeWebUrl(item.url);
+      if (url !== null) out.push({ tool: "web", url, title: str(item.title)?.trim() ?? "" });
+      continue;
+    }
     out.push({ tool, ticker: str(item.ticker) });
   }
   return out;
@@ -55,7 +111,12 @@ export function decodeAssistantEvent(msg: SseMessage): AssistantStreamEvent | nu
   if (!isRec(body)) return null;
   switch (msg.event) {
     case "meta":
-      return { type: "meta", conversation_id: str(body.conversation_id), model: str(body.model) };
+      return {
+        type: "meta",
+        conversation_id: str(body.conversation_id),
+        model: str(body.model),
+        web_search: bool(body.web_search),
+      };
     case "status": {
       const stage = stageOf(body.stage);
       return stage === null ? null : { type: "status", stage, tool: str(body.tool) };
@@ -63,7 +124,14 @@ export function decodeAssistantEvent(msg: SseMessage): AssistantStreamEvent | nu
     case "answer": {
       const text = str(body.text);
       if (text === null) return null;
-      return { type: "answer", text, checked: num(body.checked) ?? 0, sources: parseSources(body.sources) };
+      return {
+        type: "answer",
+        text,
+        checked: num(body.checked) ?? 0,
+        sources: parseSources(body.sources),
+        general: body.general === true,
+        news: newsOf(body.news),
+      };
     }
     case "unverified":
       return {
@@ -71,9 +139,10 @@ export function decodeAssistantEvent(msg: SseMessage): AssistantStreamEvent | nu
         checked: num(body.checked) ?? 0,
         unverified: strings(body.unverified),
         sources: parseSources(body.sources),
+        news: newsOf(body.news),
       };
     case "error":
-      return { type: "error", code: str(body.code) ?? "UNKNOWN", detail: str(body.detail) };
+      return { type: "error", code: str(body.code) ?? "UNKNOWN", detail: str(body.detail), reason: reasonOf(body.reason) };
     case "done":
       return {
         type: "done",
@@ -130,8 +199,31 @@ const ERROR_COPY: Record<string, AssistantErrorCopy> = {
 
 const FALLBACK_COPY: AssistantErrorCopy = { key: "assistant_err_generic", settings: false };
 
-export function assistantErrorCopy(code: string): AssistantErrorCopy {
+/** Reason-specific copy for a provider error (R50 B15): what happened and what to do. */
+const REASON_COPY: Record<AssistantProviderReason, AssistantErrorCopy> = {
+  auth: { key: "assistant_err_prov_auth", settings: true },
+  rate_limit: { key: "assistant_err_prov_rate_limit", settings: false },
+  quota: { key: "assistant_err_prov_quota", settings: true },
+  unavailable: { key: "assistant_err_prov_unavailable", settings: false },
+  bad_request: { key: "assistant_err_prov_bad_request", settings: false },
+  unknown: ERROR_COPY.PROVIDER_ERROR ?? FALLBACK_COPY,
+};
+
+export function assistantErrorCopy(code: string, reason?: AssistantProviderReason | null): AssistantErrorCopy {
+  if (code === "PROVIDER_ERROR" && reason) return REASON_COPY[reason];
   return ERROR_COPY[code] ?? FALLBACK_COPY;
+}
+
+/** The note under an answer about news, or null when there is nothing to say (searched, not offered, unknown). */
+export function newsNoteKey(news: AssistantNews | null): CopyKey | null {
+  switch (news) {
+    case "unsupported":
+      return "assistant_news_not_checked";
+    case "refused":
+      return "assistant_news_refused";
+    default:
+      return null;
+  }
 }
 
 /** Chat error code for a request that failed before the stream started. */
@@ -142,7 +234,7 @@ export function httpErrorCode(status: number, code: string | null): string {
 }
 
 /** Where a source chip links: the company tab that shows the same figures. */
-export function sourceHref(source: AssistantSource): string | null {
+export function sourceHref(source: AssistantDataSource): string | null {
   const ticker = source.ticker?.trim();
   if (!ticker) return null;
   const base = `/companies/${encodeURIComponent(ticker)}`;
@@ -175,6 +267,8 @@ const TOOL_KEYS: Record<string, CopyKey> = {
   financial_metrics: "assistant_tool_financial_metrics",
   search_companies: "assistant_tool_search_companies",
   screen_companies: "assistant_tool_screen_companies",
+  company_performance: "assistant_tool_company_performance",
+  data_check: "assistant_tool_data_check",
 };
 
 /** Copy key naming a tool; null for tools this build does not know (the raw name is shown). */
@@ -182,14 +276,27 @@ export function toolKey(tool: string): CopyKey | null {
   return TOOL_KEYS[tool] ?? null;
 }
 
-/** One chip per tool+ticker pair, in first-seen order. */
-export function uniqueSources(sources: readonly AssistantSource[]): AssistantSource[] {
+/** One chip per tool+ticker pair, in first-seen order. Web sources are not included: see `webSources`. */
+export function uniqueSources(sources: readonly AssistantSource[]): AssistantDataSource[] {
   const seen = new Set<string>();
-  const out: AssistantSource[] = [];
+  const out: AssistantDataSource[] = [];
   for (const s of sources) {
+    if (isWebSource(s)) continue;
     const id = `${s.tool}|${s.ticker ?? ""}`;
     if (seen.has(id)) continue;
     seen.add(id);
+    out.push(s);
+  }
+  return out;
+}
+
+/** Cited web pages, one per URL, in first-seen order. */
+export function webSources(sources: readonly AssistantSource[]): AssistantWebSource[] {
+  const seen = new Set<string>();
+  const out: AssistantWebSource[] = [];
+  for (const s of sources) {
+    if (!isWebSource(s) || seen.has(s.url)) continue;
+    seen.add(s.url);
     out.push(s);
   }
   return out;

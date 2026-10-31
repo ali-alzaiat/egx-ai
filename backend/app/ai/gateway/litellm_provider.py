@@ -13,11 +13,13 @@ from collections.abc import AsyncIterator, Sequence
 from decimal import ROUND_UP, Decimal
 from functools import cache
 from typing import Any
+from urllib.parse import urlparse
 
-from app.ai.catalog import get_model
+from app.ai.catalog import CatalogModel, get_model
 from app.ai.gateway.base import (
     ChatEvent,
     ChatMessage,
+    Citation,
     Done,
     ProviderError,
     TextDelta,
@@ -31,6 +33,13 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT_SECONDS = 90
 _LITELLM_LOGGERS = ("LiteLLM", "LiteLLM Router", "LiteLLM Proxy")
 _MAX_ERROR_CHARS = 300
+_MAX_URL_CHARS = 2000
+_MAX_TITLE_CHARS = 300
+
+# The hosted web-search tool of Anthropic. LiteLLM 1.105.1 only builds it from
+# `web_search_options` with `max_uses` of 1, 5 or 10 (`search_context_size`), so the tool is passed
+# directly in `tools`: LiteLLM forwards its `max_uses` untouched, which gives the exact cap of 3.
+ANTHROPIC_WEB_SEARCH_TOOL = "web_search_20250305"
 
 
 class _ScrubFilter(logging.Filter):
@@ -107,27 +116,64 @@ def to_wire_tools(tools: Sequence[ToolSpec]) -> list[dict[str, Any]]:
     ]
 
 
+_AUTH_ERRORS = ("AuthenticationError", "PermissionDeniedError")
+_UNAVAILABLE_ERRORS = (
+    "ServiceUnavailableError",
+    "InternalServerError",
+    "APIConnectionError",
+    "Timeout",
+    "APITimeoutError",
+    "BadGatewayError",
+)
+_BAD_REQUEST_ERRORS = ("BadRequestError", "NotFoundError", "ContextWindowExceededError")
+_QUOTA_MARKERS = ("exceeded your current quota", "quota exceeded", "resource_exhausted")
+#: How many wrapper layers (`original_exception`, `__cause__`, `__context__`) are followed.
+_MAX_UNWRAP_DEPTH = 4
+
+
+def _error_chain(exc: BaseException) -> list[BaseException]:
+    """`exc` and the exceptions it wraps, outermost first (LiteLLM wraps stream errors)."""
+    chain: list[BaseException] = [exc]
+    current: BaseException = exc
+    for _ in range(_MAX_UNWRAP_DEPTH):
+        inner = getattr(current, "original_exception", None)
+        if not isinstance(inner, BaseException):
+            inner = current.__cause__ or current.__context__
+        if inner is None or any(inner is seen for seen in chain):
+            break
+        chain.append(inner)
+        current = inner
+    return chain
+
+
+def _classify(name: str) -> str | None:
+    if name in _AUTH_ERRORS:
+        return "auth"
+    if name == "RateLimitError":
+        return "rate_limit"
+    if name in _UNAVAILABLE_ERRORS:
+        return "unavailable"
+    if name in _BAD_REQUEST_ERRORS:
+        return "bad_request"
+    return None
+
+
 def translate_error(exc: BaseException, api_key: str) -> ProviderError:
-    """Map any exception to a ProviderError whose text has the key scrubbed out."""
-    name = type(exc).__name__
-    if name in ("AuthenticationError", "PermissionDeniedError"):
-        code = "auth"
-    elif name == "RateLimitError":
-        code = "rate_limit"
-    elif name in (
-        "ServiceUnavailableError",
-        "InternalServerError",
-        "APIConnectionError",
-        "Timeout",
-        "APITimeoutError",
-        "BadGatewayError",
-    ):
-        code = "unavailable"
-    elif name in ("BadRequestError", "NotFoundError", "ContextWindowExceededError"):
-        code = "bad_request"
-    else:
-        code = "unknown"
-    message = scrub(f"{name}: {exc}", api_key)[:_MAX_ERROR_CHARS]
+    """Map any exception to a ProviderError whose text has the key scrubbed out.
+
+    Wrappers (such as LiteLLM's MidStreamFallbackError) are unwrapped and the innermost
+    known class decides the code; a quota-exhausted text is `quota` (not `rate_limit`) whether
+    or not the class is recognised.
+    """
+    chain = _error_chain(exc)
+    code = next((c for c in map(_classify, (type(e).__name__ for e in reversed(chain))) if c), None)
+    if code in (None, "rate_limit"):
+        # A 429 that says the quota is used up will not clear by retrying: its own code.
+        text = " ".join(str(e) for e in chain).lower()
+        if any(marker in text for marker in _QUOTA_MARKERS):
+            code = "quota"
+    code = code or "unknown"
+    message = scrub(f"{type(exc).__name__}: {exc}", api_key)[:_MAX_ERROR_CHARS]
     return ProviderError(code, message)
 
 
@@ -164,22 +210,105 @@ def _collect_tool_delta(partial: dict[int, _PartialCall], tc: Any) -> None:
         current.arguments += fn.arguments
 
 
+def _field(obj: Any, name: str) -> Any:
+    """`obj[name]` for a dict, `obj.name` for an object, else None."""
+    if isinstance(obj, dict):
+        return obj.get(name)
+    return getattr(obj, name, None)
+
+
+def safe_citation(url: Any, title: Any) -> Citation | None:
+    """A citation with an http(s) URL only; anything else (javascript:, data:, ...) is dropped."""
+    if not isinstance(url, str):
+        return None
+    url = url.strip()
+    if not url or len(url) > _MAX_URL_CHARS:
+        return None
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    text = title.strip() if isinstance(title, str) else ""
+    return Citation(url, (text or parsed.netloc)[:_MAX_TITLE_CHARS])
+
+
+def citations_from_delta(delta: Any) -> list[Citation]:
+    """Citations the vendor attached to one streamed delta.
+
+    Anthropic: `provider_specific_fields["citation"]` (a web_search_result_location).
+    Gemini: `annotations` of type `url_citation`. Model text is never read.
+    """
+    found: list[Citation] = []
+    fields = _field(delta, "provider_specific_fields")
+    if isinstance(fields, dict):
+        raw = fields.get("citation")
+        if raw is not None:
+            citation = safe_citation(_field(raw, "url"), _field(raw, "title"))
+            if citation is not None:
+                found.append(citation)
+    for annotation in _field(delta, "annotations") or []:
+        if _field(annotation, "type") != "url_citation":
+            continue
+        inner = _field(annotation, "url_citation")
+        citation = safe_citation(_field(inner, "url"), _field(inner, "title"))
+        if citation is not None:
+            found.append(citation)
+    return found
+
+
+def _reported_searches(usage: Any) -> int | None:
+    """Web searches the vendor reports in a usage object (Anthropic or Gemini), else None."""
+    for source in (_field(usage, "server_tool_use"), _field(usage, "prompt_tokens_details")):
+        count = _field(source, "web_search_requests")
+        if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
+            return count
+    return None
+
+
+def _search_price(litellm: Any, entry_key: str) -> Decimal | None:
+    """USD per web search from LiteLLM's cost map; None when the model has no listed price."""
+    try:
+        pricing = litellm.model_cost[entry_key]["search_context_cost_per_query"]
+        return Decimal(str(pricing["search_context_size_medium"]))
+    except (KeyError, TypeError, ArithmeticError):
+        return None
+
+
+def _quantize_cost(total: Decimal) -> Decimal:
+    # Stored with 6 decimals; round up so the monthly cap is never under-counted.
+    return total.quantize(Decimal("0.000001"), rounding=ROUND_UP)
+
+
 def _cost(
-    litellm: Any, entry_key: str, provider: str, tokens_in: int, tokens_out: int
+    litellm: Any,
+    entry: CatalogModel,
+    tokens_in: int,
+    tokens_out: int,
+    *,
+    searches: int | None = 0,
 ) -> Decimal | None:
+    """Token cost plus `searches` x the model's search price (None searches = unknown)."""
     try:
         prompt_cost, completion_cost = litellm.cost_per_token(
-            model=entry_key,
+            model=entry.cost_key,
             prompt_tokens=tokens_in,
             completion_tokens=tokens_out,
-            custom_llm_provider=provider,
+            custom_llm_provider=entry.provider,
         )
         # Float noise (0.0032000000000000001) is rounded away before the final rounding.
         total = Decimal(str(round(float(prompt_cost) + float(completion_cost), 10)))
-        # Stored with 6 decimals; round up so the monthly cap is never under-counted.
-        return total.quantize(Decimal("0.000001"), rounding=ROUND_UP)
     except Exception:
         return None  # unpriced: reported as unknown, never as zero
+    if searches is None:
+        return None  # searched, but the number of searches is unknown
+    if searches > 0:
+        price = _search_price(litellm, entry.cost_key)
+        if price is None:
+            return None  # the model has no listed search price: unknown, never zero
+        total += price * searches
+    return _quantize_cost(total)
 
 
 class LiteLLMProvider:
@@ -192,10 +321,13 @@ class LiteLLMProvider:
         messages: Sequence[ChatMessage],
         tools: Sequence[ToolSpec],
         max_tokens: int,
+        web_search: bool = False,
+        max_web_searches: int = 3,
     ) -> AsyncIterator[ChatEvent]:
         entry = get_model(model)
         if entry is None:
             raise ProviderError("bad_request", "Unknown model")
+        searching = web_search and entry.web_search
         litellm = load_litellm()
         kwargs: dict[str, Any] = {
             "model": entry.litellm_model,
@@ -209,11 +341,26 @@ class LiteLLMProvider:
         if entry.provider == "openai":
             # Anthropic and Gemini report usage in the final chunk without being asked.
             kwargs["stream_options"] = {"include_usage": True}
-        if tools:
-            kwargs["tools"] = to_wire_tools(tools)
+        wire_tools = to_wire_tools(tools)
+        if searching and entry.provider == "anthropic":
+            wire_tools.append(
+                {
+                    "type": ANTHROPIC_WEB_SEARCH_TOOL,
+                    "name": "web_search",
+                    "max_uses": max(1, max_web_searches),
+                }
+            )
+        elif searching and entry.provider == "gemini":
+            # Without the flag LiteLLM drops the search tool when function tools are present.
+            kwargs["web_search_options"] = {"search_context_size": "medium"}
+            kwargs["include_server_side_tool_invocations"] = True
+        if wire_tools:
+            kwargs["tools"] = wire_tools
         partial: dict[int, _PartialCall] = {}
         input_tokens: int | None = None
         output_tokens: int | None = None
+        reported_searches: int | None = None
+        cited: dict[str, Citation] = {}
         try:
             response = await litellm.acompletion(**kwargs)
             async for chunk in response:
@@ -221,10 +368,18 @@ class LiteLLMProvider:
                 if usage is not None:
                     input_tokens = getattr(usage, "prompt_tokens", None)
                     output_tokens = getattr(usage, "completion_tokens", None)
+                    found = _reported_searches(usage)
+                    if found is not None:
+                        reported_searches = found
                 for choice in getattr(chunk, "choices", None) or []:
                     delta = choice.delta
                     if delta is None:
                         continue
+                    if searching:
+                        for citation in citations_from_delta(delta):
+                            if citation.url not in cited:
+                                cited[citation.url] = citation
+                                yield citation
                     if delta.content:
                         yield TextDelta(delta.content)
                     for tc in getattr(delta, "tool_calls", None) or []:
@@ -235,8 +390,13 @@ class LiteLLMProvider:
                     yield ToolCall(call.call_id, call.name, _parse_arguments(call.arguments))
             cost = None
             if input_tokens is not None and output_tokens is not None:
-                cost = _cost(litellm, entry.cost_key, entry.provider, input_tokens, output_tokens)
-            yield Done(input_tokens, output_tokens, cost)
+                searches: int | None = 0  # a call without search tools cannot have searched
+                if searching:
+                    searches = reported_searches
+                    if searches is None and not cited:
+                        searches = 0  # no search usage and no citation: it did not search
+                cost = _cost(litellm, entry, input_tokens, output_tokens, searches=searches)
+            yield Done(input_tokens, output_tokens, cost, reported_searches)
         except ProviderError:
             raise
         except Exception as exc:

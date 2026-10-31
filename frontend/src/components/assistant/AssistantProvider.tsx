@@ -17,6 +17,7 @@ const PROMPT_KEY = {
   valuation: "assistant_explain_prompt_valuation",
   stance: "assistant_explain_prompt_stance",
   shariah: "assistant_explain_prompt_shariah",
+  data_check: "assistant_explain_prompt_data_check",
 } as const satisfies Record<AssistantCard, string>;
 
 /**
