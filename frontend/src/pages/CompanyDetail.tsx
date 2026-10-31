@@ -6,14 +6,14 @@ import PriceHistory from "../components/hub/PriceHistory";
 import { fiftyTwoWeekRange, useYearPrices } from "../components/hub/priceData";
 import { ReasonMissing } from "../components/hub/Reason";
 import SectionLink from "../components/hub/SectionLink";
+import { ReasonLine } from "../components/hub/StanceText";
 import { Egx33Note, ShariahBadge, StanceBadge, Tag } from "../components/ui/Badges";
-import { BackendText } from "../components/ui/BackendText";
 import { Missing } from "../components/ui/Missing";
 import { StatStrip, type StatItem } from "../components/ui/StatStrip";
 import { ValueSkeleton } from "../components/ui/States";
 import { useLang } from "../i18n/useLang";
 import { fmtDate, fmtEgpCompact, fmtInt, fmtPct, fmtPrice, toNumber } from "../lib/format";
-import { visibleReasons } from "../lib/stanceModel";
+import { visibleReasonEntries } from "../lib/stanceModel";
 import type { Company, ComputeMeta, DataQualityScore } from "../types";
 
 const DQ_SCOPES = ["price_history", "company_profile", "financial_statements"] as const;
@@ -112,7 +112,7 @@ export default function CompanyDetail() {
     },
   ];
 
-  const reason = s ? visibleReasons(s.reasons)[0] : undefined;
+  const reason = s ? visibleReasonEntries(s.reasons)[0] : undefined;
   const fv = fairValue.data;
   const fvMeta: Partial<ComputeMeta> = fv ?? {};
   const fvValue = fv ? fmtPrice(locale, fv.fair_value.value) : null;
@@ -138,7 +138,7 @@ export default function CompanyDetail() {
                   <StanceBadge stance={s.stance} confidence={s.confidence} reasonsCount={s.reasons.length} rules={s.rules_version} />
                   {s.confidence > 0 && <span className="text-note">{t("stance_confidence", { c: s.confidence })}</span>}
                 </p>
-                <p className="glance-text">{reason ? <BackendText>{reason}</BackendText> : t("stance_not_assessed_tooltip")}</p>
+                <p className="glance-text">{reason ? <ReasonLine entry={reason} /> : t("stance_not_assessed_tooltip")}</p>
               </>
             ) : (
               <Missing localized={t("load_error_thing", { thing: t("ov_glance_stance") })} />

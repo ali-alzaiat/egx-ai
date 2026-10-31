@@ -642,6 +642,7 @@ class TestStanceApi:
             "coverage",
             "reasons",
             "limitations",
+            "limitation_items",
             "targets",
             "stop_level",
             "reference_levels",
@@ -660,7 +661,7 @@ class TestStanceApi:
         }
         assert body["stance"] in {"buy", "hold", "reduce"}
         for reason in body["reasons"]:
-            assert set(reason) == {"engine", "inputs", "text"}
+            assert set(reason) == {"engine", "inputs", "text", "parts"}
 
     @pytest.mark.parametrize("query", ["page_size=200", "page_size=0", "shariah=other"])
     async def test_radar_validation_422(

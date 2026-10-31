@@ -123,6 +123,22 @@ export function fmtScore(locale: string, value: Numeric): string | null {
   return withSign(r, nf(locale, { maximumFractionDigits: 0 }).format(Math.abs(r)));
 }
 
+/**
+ * A decimal string the API already rounded ("37.88", "+0.5", "-4.6", "50,000"): shown with the same number of
+ * decimals and the sign it carries (U+2212 for minus). No rounding happens here, so the UI never prints a
+ * different number than the one the backend computed.
+ */
+export function fmtAsPrinted(locale: string, value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const match = /^([+-]?)(\d[\d,]*)(?:\.(\d+))?$/.exec(value.trim());
+  if (!match) return null;
+  const [, sign = "", whole = "", frac = ""] = match;
+  const n = Number(`${whole.replace(/,/g, "")}${frac ? `.${frac}` : ""}`);
+  if (!Number.isFinite(n)) return null;
+  const body = nf(locale, { minimumFractionDigits: frac.length, maximumFractionDigits: frac.length }).format(n);
+  return sign === "-" ? `${MINUS}${body}` : `${sign}${body}`;
+}
+
 function dateLocale(locale: string): string {
   return locale === "en" ? "en-GB" : locale;
 }

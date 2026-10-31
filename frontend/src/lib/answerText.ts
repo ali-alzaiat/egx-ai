@@ -15,15 +15,26 @@ export type AnswerBlock =
   | { kind: "ul"; items: Inline[][] }
   | { kind: "ol"; items: Inline[][] };
 
+/** A pair of backticks around at least one character. A lone backtick has no pair and stays literal. */
+const CODE_SPAN = /`([^`]+)`/g;
+const MASK_OPEN = "";
+const MASK_CLOSE = "";
+const MASK = new RegExp(`${MASK_OPEN}(\\d+)${MASK_CLOSE}`, "g");
+
 export function parseInline(text: string): Inline[] {
-  const parts = text.split("**");
+  // Backticked text is shown as plain text without the backticks (the prompt asks models for plain words, but some
+  // still quote names). Its content is masked while ** is read, so a marker inside it stays literal.
+  const spans: string[] = [];
+  const masked = text.replace(CODE_SPAN, (_match, content: string) => `${MASK_OPEN}${spans.push(content) - 1}${MASK_CLOSE}`);
+  const parts = masked.split("**");
   const out: Inline[] = [];
   parts.forEach((part, i) => {
     if (part === "") return;
     // An odd count of ** leaves the last marker literal rather than bolding the rest.
     const closed = i < parts.length - 1 || parts.length % 2 === 1;
     const bold = i % 2 === 1 && closed;
-    out.push({ text: !bold && i % 2 === 1 ? `**${part}` : part, bold });
+    const raw = !bold && i % 2 === 1 ? `**${part}` : part;
+    out.push({ text: raw.replace(MASK, (match, index: string) => spans[Number(index)] ?? match), bold });
   });
   return out;
 }

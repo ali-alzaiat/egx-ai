@@ -8,7 +8,8 @@ returned it, allowing for display rounding and percent <-> fraction (12% vs 0.12
 Accepted forms: Western and Arabic-Indic digits, ``,`` / ``٬`` thousands, ``٫`` decimals,
 ``%`` / ``٪``, and the units k, m, mn, bn, b, thousand, million, billion, trillion and the
 Arabic ألف, مليون, مليار, تريليون. Sign is ignored (the model may say "fell 5.2%" for -5.2).
-Ignored on purpose: years 1900-2100 written alone, dates and times, list ordinals ("1."),
+Ignored on purpose: years 1900-2100 written alone, dates (numeric, or a day beside an English or
+Arabic month name: the tools stamp ``as_of`` as an ISO date) and times, list ordinals ("1."),
 ordinal suffixes (3rd), identifiers like Q3 / FY2025 and hyphenated compounds (52-week).
 """
 
@@ -45,11 +46,20 @@ _SCALES = {
     "تريليون": Decimal(1_000_000_000_000),
 }
 
+_MONTHS = (
+    r"(?:January|February|March|April|May|June|July|August|September|October|November|December"
+    r"|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec)\b\.?"
+    r"|يناير|فبراير|مارس|أبريل|إبريل|ابريل|مايو|يونيو|يونيه|يوليو|يوليه|أغسطس|اغسطس|سبتمبر"
+    r"|أكتوبر|اكتوبر|نوفمبر|ديسمبر|كانون الثاني|كانون الأول|شباط|آذار|نيسان|أيار|حزيران|تموز"
+    r"|آب|أيلول|تشرين الأول|تشرين الثاني"
+)
 _NOISE = re.compile(
     r"\d{4}-\d{1,2}-\d{1,2}(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?"  # ISO dates / datetimes
     r"|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}"  # 30/10/2026
     r"|\d{4}/\d{2,4}"  # fiscal 2025/26
     r"|\d{1,2}:\d{2}(?::\d{2})?"  # clock times
+    rf"|(?<!\d)\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{_MONTHS})"  # 31 October, 31 أكتوبر
+    rf"|(?:{_MONTHS})\s+\d{{1,2}}(?:st|nd|rd|th)?(?!\d)"  # October 31
 )
 
 _NUMBER = re.compile(

@@ -62,9 +62,19 @@ def _serialize(result: StanceResult) -> dict[str, Any]:
         "score": str(result.score) if result.score is not None else None,
         "coverage": str(result.coverage),
         "reasons": [
-            {"engine": r.engine, "inputs": r.inputs, "text": r.text} for r in result.reasons
+            {
+                "engine": r.engine,
+                "inputs": r.inputs,
+                "text": r.text,
+                "parts": [{"code": p.code, "params": p.params} for p in r.parts],
+            }
+            for r in result.reasons
         ],
         "limitations": result.limitations,
+        "limitation_items": [
+            {"code": item.code, "params": item.params, "text": item.text}
+            for item in result.limitation_items
+        ],
         "targets": {k: _level(v) for k, v in result.targets.items()},
         "stop_level": _level(result.stop_level),
         "reference_levels": _reference_levels(result.reference_levels),

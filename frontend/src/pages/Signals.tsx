@@ -1,11 +1,12 @@
 import "../components/hub/hubPages.css";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { useCompanyByTicker, useStance } from "../api/client";
 import { ExplainButton } from "../components/assistant/ExplainButton";
 import { useYearPrices } from "../components/hub/priceData";
 import { ReasonMissing } from "../components/hub/Reason";
+import { LimitationLine, ReasonLine } from "../components/hub/StanceText";
 import { StanceBadge, Tag, isNotAssessed } from "../components/ui/Badges";
 import { BackendText } from "../components/ui/BackendText";
 import { InfoPopover } from "../components/ui/InfoPopover";
@@ -20,8 +21,8 @@ import {
   engineCoverage,
   engineWeight,
   isSwingHorizon,
-  visibleLimitations,
-  visibleReasons,
+  visibleLimitationEntries,
+  visibleReasonEntries,
   joinList,
   type CompositeEngine,
 } from "../lib/stanceModel";
@@ -97,16 +98,14 @@ function StanceBlock({ s }: { s: StanceResult }) {
   );
 }
 
-function BulletList({ title, items }: { title: string; items: readonly string[] }) {
+function BulletList({ title, items }: { title: string; items: readonly { key: string; content: ReactNode }[] }) {
   if (items.length === 0) return null;
   return (
     <section>
       <h2 className="section-title">{title}</h2>
       <ul className="bullet-list">
-        {items.map((text) => (
-          <li key={text}>
-            <BackendText>{text}</BackendText>
-          </li>
+        {items.map((item) => (
+          <li key={item.key}>{item.content}</li>
         ))}
       </ul>
     </section>
@@ -206,8 +205,17 @@ export default function Signals() {
   return (
     <>
       <StanceBlock s={data} />
-      <BulletList title={t("signals_why")} items={visibleReasons(data.reasons)} />
-      <BulletList title={t("signals_limitations")} items={visibleLimitations(data.limitations)} />
+      <BulletList
+        title={t("signals_why")}
+        items={visibleReasonEntries(data.reasons).map((entry) => ({ key: entry.text, content: <ReasonLine entry={entry} /> }))}
+      />
+      <BulletList
+        title={t("signals_limitations")}
+        items={visibleLimitationEntries(data.limitations, data.limitation_items).map((entry) => ({
+          key: entry.text,
+          content: <LimitationLine entry={entry} />,
+        }))}
+      />
       <ReferenceLevels s={data} />
       <Liquidity s={data} />
     </>

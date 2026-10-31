@@ -62,6 +62,15 @@
   padding: var(--space-6) var(--gutter);
   max-width: var(--content-max);
 }
+/* The assistant panel is 420px wide, fixed to the inline-end edge (AssistantPanel). From 1280px up it pushes the
+   page aside instead of covering it; below that it stays an overlay. The max-width grows by the same 420px, so
+   a very wide window keeps its full-width content and the page only shrinks where the panel would cover it. */
+@media (min-width: 1280px) {
+  .main-content.assistant-beside {
+    padding-inline-end: 420px;
+    max-width: calc(var(--content-max) + 420px - var(--gutter));
+  }
+}
 .skip-link {
   position: absolute; inset-inline-start: var(--space-2); top: -48px;
   background: var(--surface); border: 1px solid var(--border-strong);

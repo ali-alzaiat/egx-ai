@@ -83,6 +83,24 @@ def test_years_dates_ordinals_and_identifiers_are_ignored() -> None:
     assert result.checked == 0
 
 
+def test_dates_with_month_names_are_ignored() -> None:
+    for answer in (
+        "Data as of 31 October 2026.",
+        "As of October 31, 2026 and Oct. 29.",
+        "on the 31st of October",
+        "البيانات حتى 31 أكتوبر 2026.",
+        "حتى ٣١ تشرين الأول ٢٠٢٦",
+    ):
+        result = verify(answer, [TOOL])
+        assert result.verified, answer
+        assert result.checked == 0, answer
+
+
+def test_a_day_without_a_month_is_still_checked() -> None:
+    assert check("Up 31% in October.") == (False, ["31%"])
+    assert not check("Fair value is 31 EGP in October.")[0]
+
+
 def test_user_numbers_count_as_given() -> None:
     assert not check("You hold 500 shares.")[0]
     assert check("You hold 500 shares.", user_text="I own 500 shares")[0]

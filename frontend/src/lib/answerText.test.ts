@@ -17,6 +17,26 @@ describe("parseInline", () => {
     ]);
   });
 
+  it("renders a pair of backticks as plain text without the backticks", () => {
+    expect(parseInline("see `company_performance` data")).toEqual([{ text: "see company_performance data", bold: false }]);
+    expect(parseInline("`a` and `b`")).toEqual([{ text: "a and b", bold: false }]);
+  });
+
+  it("leaves an unpaired backtick literal", () => {
+    expect(parseInline("a ` b")).toEqual([{ text: "a ` b", bold: false }]);
+    expect(parseInline("`a` and `b")).toEqual([{ text: "a and `b", bold: false }]);
+    expect(parseInline("empty `` pair")).toEqual([{ text: "empty `` pair", bold: false }]);
+  });
+
+  it("keeps ** inside backticks literal and bold around them", () => {
+    expect(parseInline("`**x**`")).toEqual([{ text: "**x**", bold: false }]);
+    expect(parseInline("a **the `warn` status** b")).toEqual([
+      { text: "a ", bold: false },
+      { text: "the warn status", bold: true },
+      { text: " b", bold: false },
+    ]);
+  });
+
   it("keeps numbers and Arabic text untouched", () => {
     expect(parseInline("الإجمالي 72.5% من 100")).toEqual([{ text: "الإجمالي 72.5% من 100", bold: false }]);
   });

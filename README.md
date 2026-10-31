@@ -123,7 +123,8 @@ To re-record the demo video, run the app (with an AI key saved), then in a separ
 environment `pip install -r scripts/demo/requirements.txt`, `python -m playwright install
 chromium`, `python scripts/demo/record.py`, and
 `python scripts/demo/post.py <path to ffmpeg> scripts/demo/out` (the `imageio-ffmpeg` package
-provides one). Copy the MP4 and GIF from `scripts/demo/out/` to `docs/media/`. The tour avoids
+provides one; the captions use Windows' Segoe UI font, set in `post.py`). Copy the MP4 and GIF
+from `scripts/demo/out/` to `docs/media/`. The tour avoids
 screens that show statement amounts, which come from vendor files.
 
 ## Project layout

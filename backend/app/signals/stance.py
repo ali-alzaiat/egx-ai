@@ -10,7 +10,7 @@ limitations list.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -57,6 +57,8 @@ __all__ = [
     "LEVELS_COPY",
     "SIGNAL_RULES_VERSION",
     "STOP_COPY",
+    "LimitationItem",
+    "ReasonPart",
     "Stance",
     "StanceResult",
     "StanceService",
@@ -75,10 +77,28 @@ LEVELS_COPY = (
 )
 
 
+@dataclass(frozen=True)
+class ReasonPart:
+    """One sentence of a reason as a code plus parameters (strings as the English prints them)."""
+
+    code: str
+    params: dict[str, str]
+
+
 @dataclass
 class Reason:
     engine: str
     inputs: dict[str, str]
+    text: str
+    parts: list[ReasonPart] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LimitationItem:
+    """One limitation as a code plus parameters, with the English sentence as the fallback."""
+
+    code: str
+    params: dict[str, str]
     text: str
 
 
@@ -108,6 +128,7 @@ class StanceResult:
     statement_freshness: date | None
     rules_version: str
     as_of: datetime
+    limitation_items: list[LimitationItem] = field(default_factory=list)
 
 
 def _decimal(raw: Any) -> Decimal | None:
@@ -139,9 +160,17 @@ class StanceService:
             raise HTTPException(status_code=404, detail="Company not found")
 
         as_of = datetime.now(UTC)
-        limitations: list[str] = [COMPLIANCE_COPY]
+        limitations: list[str] = []
+        limitation_items: list[LimitationItem] = []
+
+        def limit(code: str, text: str, params: dict[str, str] | None = None) -> None:
+            limitations.append(text)
+            limitation_items.append(LimitationItem(code, params or {}, text))
+
+        limit("compliance_footer", COMPLIANCE_COPY)
         reasons: list[Reason] = []
         missing: list[str] = []
+        missing_codes: list[str] = []
         subscores: dict[str, Decimal | None] = {}
 
         # Prices (newest first from the repository; rules want oldest first)
@@ -157,6 +186,7 @@ class StanceService:
         view = technical_view(bars)
         if view is None:
             missing.append("technical indicators")
+            missing_codes.append("technical")
             subscores["technical"] = None
         else:
             subscores["technical"] = view.subscore
@@ -165,10 +195,18 @@ class StanceService:
                     engine="technical",
                     inputs=view.inputs,
                     text=" ".join(c.detail for c in view.components),
+                    parts=[ReasonPart(c.code, dict(c.params)) for c in view.components],
                 )
             )
             for note in view.notes:
-                reasons.append(Reason(engine="volume", inputs=view.inputs, text=note))
+                reasons.append(
+                    Reason(
+                        engine="volume",
+                        inputs=view.inputs,
+                        text=note.text,
+                        parts=[ReasonPart(note.code, dict(note.params))],
+                    )
+                )
 
         # Valuation: scenarios win; else the market-relative fair-value discount (R46 S2)
         payload = await self._valuation_payload(company.id)
@@ -188,6 +226,7 @@ class StanceService:
             fv_sub, fv_reason, fv_note = await self._fair_value_view(payload, current_price)
         if currency_reason is not None:
             missing.append("valuation (" + currency_reason + ")")
+            missing_codes.append("valuation")
             subscores["valuation"] = None
         elif fv_sub is not None and fv_reason is not None:
             subscores["valuation"] = fv_sub
@@ -197,6 +236,7 @@ class StanceService:
                 "valuation scenarios or fair value"
                 + (f" ({fv_note})" if fv_note else " (Medium+ confidence)")
             )
+            missing_codes.append("valuation")
             subscores["valuation"] = None
         else:
             sub = valuation_subscore(current_price, bear, base, bull)
@@ -211,6 +251,7 @@ class StanceService:
                         "price": str(current_price),
                     },
                     text=f"Price vs scenario range: sub-score {sub:+}.",
+                    parts=[ReasonPart("scenario_range", {"subscore": f"{sub:+}"})],
                 )
             )
 
@@ -218,6 +259,7 @@ class StanceService:
         headline = await self._headline(company.id)
         if headline is None:
             missing.append("investment score")
+            missing_codes.append("score")
             subscores["score"] = None
         else:
             sub = score_subscore(headline)
@@ -227,6 +269,12 @@ class StanceService:
                     engine="score",
                     inputs={"headline": str(headline)},
                     text=f"Investment score {headline}: sub-score {sub:+.2f}.",
+                    parts=[
+                        ReasonPart(
+                            "investment_score",
+                            {"headline": str(headline), "subscore": f"{sub:+.2f}"},
+                        )
+                    ],
                 )
             )
 
@@ -236,19 +284,25 @@ class StanceService:
         freshness = max(dates) if dates else None
         stale = False
         if freshness is None:
-            limitations.append("Statement freshness unknown.")
+            limit("statement_freshness_unknown", "Statement freshness unknown.")
         else:
             age = (date.today() - freshness).days
             stale = age > STALE_STATEMENT_DAYS
             if stale:
-                limitations.append(f"Statement freshness {age} days (>{STALE_STATEMENT_DAYS}).")
+                limit(
+                    "statement_stale",
+                    f"Statement freshness {age} days (>{STALE_STATEMENT_DAYS}).",
+                    {"days": str(age), "max_days": str(STALE_STATEMENT_DAYS)},
+                )
 
         # Liquidity gate
         liq = liquidity(bars)
         if liq.low:
-            limitations.append(
+            limit(
+                "low_liquidity",
                 f"LOW LIQUIDITY: average value traded below EGP {LOW_LIQUIDITY_EGP:,} "
-                f"over {liq.window} sessions; levels may not be executable."
+                f"over {liq.window} sessions; levels may not be executable.",
+                {"min_egp": f"{LOW_LIQUIDITY_EGP:,}", "window": str(liq.window)},
             )
 
         # Composite → stance + confidence
@@ -258,7 +312,7 @@ class StanceService:
         )
         if score is None:
             stance, confidence = Stance.HOLD, 0
-            limitations.append("No engine produced an input: stance defaults to hold.")
+            limit("no_engine_input", "No engine produced an input: stance defaults to hold.")
         else:
             stance = stance_for(score)
             confidence = confidence_for(
@@ -269,16 +323,20 @@ class StanceService:
                 stale_statements=stale,
             )
         if technical_only:
-            limitations.append("Technical-only stance: no fundamentals available yet.")
+            limit("technical_only", "Technical-only stance: no fundamentals available yet.")
         if missing:
-            limitations.append("Missing inputs: " + ", ".join(missing) + ".")
+            limit(
+                "missing_inputs",
+                "Missing inputs: " + ", ".join(missing) + ".",
+                {"inputs": ",".join(missing_codes)},
+            )
 
         # Reference levels + stop
         levels = reference_levels(bars)
         if levels is not None:
-            limitations.append(LEVELS_COPY)
+            limit("levels_band", LEVELS_COPY)
         stop_level = self._stop_level(entry_price, stop_pct, levels, bars)
-        limitations.append(STOP_COPY)
+        limit("stop_reference", STOP_COPY)
 
         if shariah is None:
             shariah = (await shariah_statuses(self.session, [company.id]))[company.id]
@@ -301,6 +359,7 @@ class StanceService:
             statement_freshness=freshness,
             rules_version=SIGNAL_RULES_VERSION,
             as_of=as_of,
+            limitation_items=limitation_items,
         )
 
     async def compute_cached(
@@ -381,6 +440,18 @@ class StanceService:
                 f"{1 - market:.2f}x ({len(peers)} companies, {level} confidence): "
                 f"sub-score {sub:+.2f}."
             ),
+            parts=[
+                ReasonPart(
+                    "fair_value_vs_market",
+                    {
+                        "ratio": f"{1 - discount:.2f}",
+                        "market_ratio": f"{1 - market:.2f}",
+                        "peers": str(len(peers)),
+                        "confidence": level,
+                        "subscore": f"{sub:+.2f}",
+                    },
+                )
+            ],
         )
         return sub, reason, None
 

@@ -1,6 +1,6 @@
 """R49 assistant constants. Bump AI_PROMPT_VERSION on any prompt or tool change."""
 
-AI_PROMPT_VERSION = "assistant-1.2"
+AI_PROMPT_VERSION = "assistant-1.3"
 
 #: Model -> tools -> model rounds before the model is asked for a final answer without tools.
 MAX_TOOL_ROUNDS = 6

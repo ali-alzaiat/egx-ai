@@ -28,7 +28,7 @@ def _statuses(events: list[tuple[str, dict]]) -> list[str]:  # type: ignore[type
 
 
 def test_prompt_version_is_bumped() -> None:
-    assert AI_PROMPT_VERSION == "assistant-1.2"
+    assert AI_PROMPT_VERSION == "assistant-1.3"
 
 
 async def test_models_list_marks_the_search_capable_models(client: AsyncClient) -> None:
@@ -85,7 +85,7 @@ async def test_chat_turns_on_search_for_a_capable_model_and_lists_web_sources_la
     stored = (
         await db_session.execute(select(AiMessage).where(AiMessage.role == "assistant"))
     ).scalar_one()
-    assert stored.prompt_version == "assistant-1.2"
+    assert stored.prompt_version == "assistant-1.3"
     assert {"name": "web", "url": "https://news.test/a", "title": "News A"} in stored.tool_calls
 
 

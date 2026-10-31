@@ -107,11 +107,29 @@ class Bar:
 
 @dataclass(frozen=True)
 class Component:
-    """One directional technical vote in {-1, 0, +1} with its explanation."""
+    """One directional technical vote in {-1, 0, +1} with its explanation.
+
+    ``name`` doubles as the reason-part code; ``params`` holds the values exactly as the
+    English ``detail`` prints them, so a client can write the sentence in another language.
+    """
 
     name: str
     vote: int
     detail: str
+    params: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def code(self) -> str:
+        return self.name
+
+
+@dataclass(frozen=True)
+class Note:
+    """A non-voting technical note (e.g. unusual volume) with its code and parameters."""
+
+    code: str
+    params: dict[str, str]
+    text: str
 
 
 @dataclass
@@ -119,7 +137,7 @@ class TechnicalView:
     subscore: Decimal
     components: list[Component]
     inputs: dict[str, str]
-    notes: list[str] = field(default_factory=list)
+    notes: list[Note] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -157,7 +175,7 @@ def technical_view(bars: list[Bar]) -> TechnicalView | None:
     price = closes[-1]
     components: list[Component] = []
     inputs: dict[str, str] = {"price": str(price)}
-    notes: list[str] = []
+    notes: list[Note] = []
 
     sma20_r = calculate_sma(closes, 20)
     sma50_r = calculate_sma(closes, 50)
@@ -171,26 +189,42 @@ def technical_view(bars: list[Bar]) -> TechnicalView | None:
         inputs[trend_label.lower()] = str(trend_ma)
         vote = 1 if price > trend_ma else -1 if price < trend_ma else 0
         side = "above" if vote > 0 else "below" if vote < 0 else "at"
-        components.append(Component("trend", vote, f"Price {side} {trend_label}."))
+        components.append(
+            Component(
+                "trend",
+                vote,
+                f"Price {side} {trend_label}.",
+                {"side": side, "ma": trend_label},
+            )
+        )
 
     if sma50 is not None and sma200 is not None:
         inputs["sma200"] = str(sma200)
         vote = 1 if sma50 > sma200 else -1 if sma50 < sma200 else 0
         side = "above" if vote > 0 else "below" if vote < 0 else "at"
-        components.append(Component("long_trend", vote, f"SMA50 {side} SMA200."))
+        components.append(
+            Component("long_trend", vote, f"SMA50 {side} SMA200.", {"side": side})
+        )
 
     rsi_r = calculate_rsi(closes, RSI_PERIOD)
     rsi = _available(rsi_r.value, rsi_r.status)
     if rsi is not None:
         inputs["rsi14"] = str(rsi)
         if rsi >= RSI_OVERBOUGHT:
-            components.append(Component("rsi", 0, f"RSI {rsi} overbought: no momentum credit."))
+            rsi_vote, rsi_state = 0, "overbought"
+            rsi_text = f"RSI {rsi} overbought: no momentum credit."
         elif rsi <= RSI_OVERSOLD:
-            components.append(Component("rsi", 0, f"RSI {rsi} oversold: no momentum penalty."))
+            rsi_vote, rsi_state = 0, "oversold"
+            rsi_text = f"RSI {rsi} oversold: no momentum penalty."
         elif rsi > RSI_MIDLINE:
-            components.append(Component("rsi", 1, f"RSI {rsi} above 50."))
+            rsi_vote, rsi_state = 1, "above_50"
+            rsi_text = f"RSI {rsi} above 50."
         else:
-            components.append(Component("rsi", -1, f"RSI {rsi} below 50."))
+            rsi_vote, rsi_state = -1, "below_50"
+            rsi_text = f"RSI {rsi} below 50."
+        components.append(
+            Component("rsi", rsi_vote, rsi_text, {"value": str(rsi), "state": rsi_state})
+        )
 
     macd_r = calculate_macd(closes)
     macd = _available(macd_r.value, macd_r.status)
@@ -198,18 +232,41 @@ def technical_view(bars: list[Bar]) -> TechnicalView | None:
         inputs["macd_line"] = str(macd)
         vote = 1 if macd > 0 else -1 if macd < 0 else 0
         side = "positive" if vote > 0 else "negative" if vote < 0 else "flat"
-        components.append(Component("macd", vote, f"MACD line {side} (EMA12 vs EMA26)."))
+        components.append(
+            Component("macd", vote, f"MACD line {side} (EMA12 vs EMA26).", {"side": side})
+        )
 
     if len(closes) > MOMENTUM_BARS and closes[-1 - MOMENTUM_BARS] > 0:
         change = closes[-1] / closes[-1 - MOMENTUM_BARS] - _ONE
         inputs["momentum_20d"] = str(_q(change, "0.0001"))
         pct = _q(change * _HUNDRED, "0.1")
         if change > MOMENTUM_BAND:
-            components.append(Component("momentum", 1, f"Up {pct}% over 20 sessions."))
+            components.append(
+                Component(
+                    "momentum",
+                    1,
+                    f"Up {pct}% over 20 sessions.",
+                    {"direction": "up", "pct": str(pct)},
+                )
+            )
         elif change < -MOMENTUM_BAND:
-            components.append(Component("momentum", -1, f"Down {abs(pct)}% over 20 sessions."))
+            components.append(
+                Component(
+                    "momentum",
+                    -1,
+                    f"Down {abs(pct)}% over 20 sessions.",
+                    {"direction": "down", "pct": str(abs(pct))},
+                )
+            )
         else:
-            components.append(Component("momentum", 0, f"Flat ({pct}%) over 20 sessions."))
+            components.append(
+                Component(
+                    "momentum",
+                    0,
+                    f"Flat ({pct}%) over 20 sessions.",
+                    {"direction": "flat", "pct": str(pct)},
+                )
+            )
 
     volumes = [b.volume for b in bars[-(LIQUIDITY_WINDOW + 1):] if b.volume is not None]
     if len(volumes) == LIQUIDITY_WINDOW + 1:
@@ -219,7 +276,14 @@ def technical_view(bars: list[Bar]) -> TechnicalView | None:
             ratio = Decimal(volumes[-1]) / avg
             inputs["volume_ratio_20d"] = str(_q(ratio))
             if ratio >= VOLUME_SURGE_RATIO:
-                notes.append(f"Unusual volume: {_q(ratio, '0.1')}x the 20-session average.")
+                shown = str(_q(ratio, "0.1"))
+                notes.append(
+                    Note(
+                        "volume_unusual",
+                        {"ratio": shown},
+                        f"Unusual volume: {shown}x the 20-session average.",
+                    )
+                )
 
     if not components:
         return None

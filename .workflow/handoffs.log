@@ -149,3 +149,4 @@
 2026-10-24 | user -> router -> staff-backend | R45 fade horizon = 5y for all models
 2026-10-24 | router (fast lane) | backend valuation | fade horizon applied to FCFE/AFFO stable stage (years 6-10 at long-run rate); tests updated
 2026-10-31 | user -> router -> staff-backend + staff-frontend | R50 AI analysis (B1-B17): performance tool + EGX30/sector benchmark, cross-checks on the Quality tab, web search with refusal fallback, research lean, education label; prompt assistant-1.2 after live check
+2026-10-31 | user -> router -> staff-backend + staff-frontend | R51 demo fixes: stance reason/limitation codes (EN/AR), assistant panel pushes content at >=1280px, plain-word answers (prompt assistant-1.3), UTF-8 universe decode, figure check ignores month-name dates, chart keeps range on resize, header grid by container width; demo re-recorded with captions strip

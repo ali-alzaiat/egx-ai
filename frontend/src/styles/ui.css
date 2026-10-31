@@ -187,11 +187,14 @@ a.stock-ticker:hover { text-decoration: underline; }
 .hub-change[data-dir="up"] { color: var(--gain); }
 .hub-change[data-dir="down"] { color: var(--loss); }
 .hub-change[data-dir="flat"] { color: var(--neutral); }
-/* Hero: the close tile is wider than the three facts beside it. */
-@media (min-width: 768px) {
+/* Hero: the close tile is wider than the three facts beside it. Sized by the header's own width, not the
+   viewport, so a page narrowed by the assistant panel gets a 2x2 grid instead of four squeezed tiles. */
+.hub-header { container-type: inline-size; }
+.hub-header .stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container (min-width: 720px) {
   .hub-header .stat-strip { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
 }
-@media (max-width: 767px) {
+@container (max-width: 479px) {
   .hub-header .stat-item-hero, .hub-header .stat-item:last-child { grid-column: 1 / -1; }
 }
 

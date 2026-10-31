@@ -10,6 +10,7 @@ implementing :class:`UniverseSource`.
 
 from __future__ import annotations
 
+import codecs
 import csv
 import io
 import logging
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 TICKER_RE = re.compile(r"^[A-Z0-9]{1,10}$")
+_CHARSET_RE = re.compile(r"charset\s*=\s*[\"']?([\w.:-]+)", re.IGNORECASE)
 
 DEFAULT_LISTING_URL = "https://stockanalysis.com/list/egyptian-stock-exchange/"
 DEFAULT_SNAPSHOT_PATH = Path(__file__).resolve().parents[4] / "data" / "egx_universe.csv"
@@ -63,6 +65,22 @@ class UniverseSnapshot:
 
     def __len__(self) -> int:
         return len(self.entries)
+
+
+def decode_listing(content: bytes, content_type: str | None) -> str:
+    """Decode a listing response body: the declared charset, else UTF-8, never Latin-1.
+
+    ``requests`` falls back to ISO-8859-1 for ``text/*`` responses without a charset, which
+    garbled accented letters in company names into mojibake. A missing or unknown charset
+    is decoded as UTF-8 (undecodable bytes become U+FFFD rather than raising).
+    """
+    match = _CHARSET_RE.search(content_type or "")
+    if match is not None:
+        try:
+            return content.decode(codecs.lookup(match.group(1)).name, errors="replace")
+        except LookupError:
+            pass
+    return content.decode("utf-8", errors="replace")
 
 
 class UniverseDiscoveryError(RuntimeError):
@@ -149,7 +167,7 @@ class PublicListingUniverseSource:
 
             response = requests.get(self.url, headers=BROWSER_HEADERS, timeout=self.timeout)
             response.raise_for_status()
-            return response.text
+            return decode_listing(response.content, response.headers.get("Content-Type"))
 
         html = await anyio.to_thread.run_sync(_get)
         entries = self.parse(html)

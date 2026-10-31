@@ -27,6 +27,12 @@ export interface AssistantPanelState {
 
 export const AssistantActionsContext = createContext<AssistantActions | null>(null);
 export const AssistantPanelContext = createContext<AssistantPanelState | null>(null);
+/** Only whether the panel is open, for the page layout: it must not re-render with every streamed word of an answer. */
+export const AssistantOpenContext = createContext<boolean>(false);
+
+export function useAssistantOpen(): boolean {
+  return useContext(AssistantOpenContext);
+}
 
 export function useAssistantActions(): AssistantActions {
   const ctx = useContext(AssistantActionsContext);

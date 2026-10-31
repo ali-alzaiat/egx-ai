@@ -2,6 +2,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent 
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useLang } from "../../i18n/useLang";
 import { AssistantLauncher } from "../assistant/AssistantLauncher";
+import { useAssistantOpen } from "../assistant/assistantContext";
 import { AssistantProvider } from "../assistant/AssistantProvider";
 import type { CopyKey } from "../../i18n";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -232,6 +233,10 @@ function ShellLayout() {
   }, []);
 
   const titleKey = routeTitleKey(pathname);
+  // On wide screens the open assistant panel (fixed, inline-end) pushes the page aside instead of covering it (R51);
+  // below 1280px the CSS leaves it an overlay. The launcher hides the panel on /assistant.
+  const assistantOpen = useAssistantOpen();
+  const assistantBeside = assistantOpen && pathname !== "/assistant";
 
   return (
     <div className="layout">
@@ -281,7 +286,7 @@ function ShellLayout() {
       )}
       {menuOpen && <Drawer onClose={closeMenu} />}
 
-      <main id="main" className="main-content">
+      <main id="main" className={assistantBeside ? "main-content assistant-beside" : "main-content"}>
         <Suspense fallback={<LoadingState />}>
           <Outlet />
         </Suspense>

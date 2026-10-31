@@ -5,6 +5,7 @@ import { tickerFromPath } from "../../lib/assistant";
 import type { AssistantCard } from "../../types";
 import {
   AssistantActionsContext,
+  AssistantOpenContext,
   AssistantPanelContext,
   type AssistantActions,
   type AssistantPanelState,
@@ -55,7 +56,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
 
   return (
     <AssistantActionsContext.Provider value={actions}>
-      <AssistantPanelContext.Provider value={panel}>{children}</AssistantPanelContext.Provider>
+      <AssistantOpenContext.Provider value={open}>
+        <AssistantPanelContext.Provider value={panel}>{children}</AssistantPanelContext.Provider>
+      </AssistantOpenContext.Provider>
     </AssistantActionsContext.Provider>
   );
 }

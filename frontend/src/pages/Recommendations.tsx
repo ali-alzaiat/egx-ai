@@ -191,17 +191,16 @@ export default function Recommendations() {
     );
   }, [t, locale, rules, narrow]);
 
-  const stanceOptions = STANCE_FILTERS.map((value) => ({
-    value,
-    label:
-      value === "all"
-        ? t("reco_filter_all")
-        : `${t(value === "buy" ? "stance_buy" : value === "hold" ? "stance_hold" : "stance_reduce")} ${fmtInt(locale, counts[value])}`,
-  }));
+  // While loading there is nothing to count yet: "0" would read as an empty result.
+  const stanceOptions = STANCE_FILTERS.map((value) => {
+    if (value === "all") return { value, label: t("reco_filter_all") };
+    const name = t(value === "buy" ? "stance_buy" : value === "hold" ? "stance_hold" : "stance_reduce");
+    return { value, label: isLoading ? name : `${name} ${fmtInt(locale, counts[value])}` };
+  });
 
   const asOf = fmtDate(locale, market.data?.price_date);
   const meta = [
-    countText(t, locale, rows.length, "stocks_count"),
+    isLoading ? null : countText(t, locale, rows.length, "stocks_count"),
     rules ? t("rules_label", { rules }) : null,
   ]
     .filter((part): part is string => part !== null)

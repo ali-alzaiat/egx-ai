@@ -1029,10 +1029,23 @@ export interface TargetLevel {
   reason: string | null
 }
 
+/** One sentence of a stance reason as a code plus parameters (R51); `params` are strings as the English text prints them. */
+export interface StancePart {
+  code: string
+  params: Record<string, string>
+}
+
+/** One limitation as a code plus parameters, with the English sentence as the fallback (R51). */
+export interface LimitationItem extends StancePart {
+  text: string
+}
+
 export interface StanceReason {
   engine: string
   inputs: Record<string, string>
   text: string
+  /** One per sentence in `text`, same order. Absent on stored or older payloads. */
+  parts?: StancePart[]
 }
 
 /** Our verdict and EGX33 membership side by side — never merged. */
@@ -1070,6 +1083,8 @@ export interface StanceResult {
   coverage: string
   reasons: StanceReason[]
   limitations: string[]
+  /** Same order and length as `limitations`. Absent on stored or older payloads. */
+  limitation_items?: LimitationItem[]
   targets: Record<string, TargetLevel>
   stop_level: TargetLevel
   reference_levels: ReferenceLevels | null

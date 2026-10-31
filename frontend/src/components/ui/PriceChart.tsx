@@ -85,6 +85,8 @@ function chartOptions(p: ChartPalette, locale: string, withCone: boolean): Chart
       fixRightEdge: !withCone,
       // Five years of bars in a narrow plot is well under half a pixel per bar.
       minBarSpacing: 0.05,
+      // A side panel opening (patterns, the assistant) narrows the plot: keep the same dates in view.
+      lockVisibleTimeRangeOnResize: true,
       timeVisible: false,
       tickMarkFormatter: (time: Time, type: number) => {
         const iso = timeToIso(time);

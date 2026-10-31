@@ -4,6 +4,8 @@
  * other `rules_version` the UI shows no weights rather than guess.
  */
 
+import type { LimitationItem, StancePart } from "../types";
+
 export const KNOWN_RULES_VERSION = "signal-rules-2.2";
 
 /** Engine weights in the composite, as percent of model weight (signal-rules-2.2). */
@@ -56,6 +58,59 @@ export function visibleLimitations(limitations: readonly string[]): string[] {
 /** Reason sentences, exact duplicates removed. */
 export function visibleReasons(reasons: readonly { text: string }[]): string[] {
   return [...new Set(reasons.map((r) => r.text.trim()).filter((t) => t !== ""))];
+}
+
+/** A reason to list: the English text (always) and its codes (when the API sent them). */
+export interface ReasonEntry {
+  text: string;
+  parts: readonly StancePart[] | undefined;
+}
+
+/** `visibleReasons` that keeps each reason's codes, so the page can write the sentence in its own language. */
+export function visibleReasonEntries(reasons: readonly { text: string; parts?: readonly StancePart[] }[]): ReasonEntry[] {
+  const seen = new Set<string>();
+  const out: ReasonEntry[] = [];
+  for (const r of reasons) {
+    const text = r.text.trim();
+    if (text === "" || seen.has(text)) continue;
+    seen.add(text);
+    out.push({ text, parts: r.parts });
+  }
+  return out;
+}
+
+/** Limitation codes the page already says in its own localized copy (footer, reference-levels caption, risk row). */
+const COVERED_CODES: ReadonlySet<string> = new Set(["compliance_footer", "levels_band", "stop_reference"]);
+
+/** A limitation to list: the English text (always) and its code item (when the API sent them). */
+export interface LimitationEntry {
+  text: string;
+  item: LimitationItem | undefined;
+}
+
+/**
+ * `visibleLimitations` with the codes kept. When `items` lines up with `limitations`, drops and de-duplicates by
+ * code (and parameters); otherwise, or for a code this UI does not know, by the English text as before.
+ */
+export function visibleLimitationEntries(
+  limitations: readonly string[],
+  items?: readonly LimitationItem[],
+): LimitationEntry[] {
+  const aligned = items !== undefined && items.length === limitations.length ? items : undefined;
+  const seen = new Set<string>();
+  const out: LimitationEntry[] = [];
+  limitations.forEach((raw, i) => {
+    const text = raw.trim();
+    const item = aligned?.[i];
+    if (text === "" || (item !== undefined && COVERED_CODES.has(item.code))) return;
+    if (COVERED_ELSEWHERE.some((prefix) => text.startsWith(prefix))) return;
+    const key = item ? `${item.code}|${JSON.stringify(item.params)}` : text;
+    if (seen.has(key) || seen.has(text)) return;
+    seen.add(key);
+    seen.add(text);
+    out.push({ text, item });
+  });
+  return out;
 }
 
 /** Confidence caps and the statement-age limit of signal-rules-2.2 (backend signals/rules.py). */

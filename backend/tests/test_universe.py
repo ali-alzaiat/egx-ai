@@ -16,6 +16,7 @@ from app.ingestion.egx.universe import (
     UniverseSnapshot,
     _normalise,
     create_universe_source,
+    decode_listing,
 )
 
 LISTING_HTML = """
@@ -214,3 +215,37 @@ class TestFreeFloatRatio:
         """Column is Numeric(10, 4); a raw share count would overflow it."""
         ratio = _free_float_ratio(Decimal("987654321000"), Decimal("1000000000000"))
         assert ratio == Decimal("0.9877")
+
+
+class TestDecodeListing:
+    """R51: a page with no declared charset is UTF-8, not requests' Latin-1 default."""
+
+    E_ACUTE = chr(0xE9)
+    NAME = f"Soci{E_ACUTE}t{E_ACUTE} Arabe Internationale"
+
+    def test_no_content_type_is_utf8(self):
+        assert decode_listing(self.NAME.encode("utf-8"), None) == self.NAME
+
+    def test_content_type_without_charset_is_utf8(self):
+        body = self.NAME.encode("utf-8")
+        assert decode_listing(body, "text/html") == self.NAME
+        assert decode_listing(body, "text/html; boundary=x") == self.NAME
+
+    def test_not_latin1_mojibake(self):
+        text = decode_listing(self.NAME.encode("utf-8"), "text/html")
+        assert chr(0xC3) not in text
+
+    def test_declared_charset_is_honoured(self):
+        assert decode_listing(self.NAME.encode("latin-1"), "text/html; charset=ISO-8859-1") == (
+            self.NAME
+        )
+        body = self.NAME.encode("utf-8")
+        assert decode_listing(body, 'text/html; charset="UTF-8"') == self.NAME
+
+    def test_unknown_charset_falls_back_to_utf8(self):
+        body = self.NAME.encode("utf-8")
+        assert decode_listing(body, "text/html; charset=nope-9") == self.NAME
+
+    def test_invalid_bytes_do_not_raise(self):
+        text = decode_listing(b"Soci\xe9t\xe9", "text/html")
+        assert text == "Soci" + chr(0xFFFD) + "t" + chr(0xFFFD)

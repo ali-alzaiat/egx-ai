@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  fmtAsPrinted,
   fmtChange,
   fmtCycle,
   fmtDate,
@@ -48,6 +49,29 @@ describe("missing values return null, never 0/NaN/Never", () => {
     expect(fmtPrice(EN, 0)).toBe("0.00");
     expect(fmtPct(EN, 0)).toBe("0.0%");
     expect(fmtScore(EN, 0)).toBe("0");
+  });
+});
+
+describe("fmtAsPrinted", () => {
+  it("keeps the decimals and the sign the API printed", () => {
+    expect(fmtAsPrinted(EN, "37.88")).toBe("37.88");
+    expect(fmtAsPrinted(EN, "78.20")).toBe("78.20");
+    expect(fmtAsPrinted(EN, "+0.5")).toBe("+0.5");
+    expect(fmtAsPrinted(EN, "-4.6")).toBe("−4.6");
+    expect(fmtAsPrinted(EN, "62")).toBe("62");
+  });
+  it("groups thousands and reads a grouped input", () => {
+    expect(fmtAsPrinted(EN, "50,000")).toBe("50,000");
+    expect(fmtAsPrinted(AR, "1234.50")).toMatch(/^1.234.50$/u);
+  });
+  it("keeps Western digits in Arabic", () => {
+    expect(fmtAsPrinted(AR, "37.88")).not.toMatch(/[٠-٩]/);
+    expect(fmtAsPrinted(AR, "-4.6")?.startsWith("−")).toBe(true);
+  });
+  it("returns null for anything that is not a printed decimal", () => {
+    for (const v of [null, undefined, "", "abc", "1e5", "--1", "1.2.3", " "]) {
+      expect(fmtAsPrinted(EN, v)).toBeNull();
+    }
   });
 });
 

@@ -245,7 +245,7 @@ class TestTechnicalView:
         bars[-1] = Bar(close=bars[-1].close, high=bars[-1].high, low=bars[-1].low, volume=500_000)
         view = technical_view(bars)
         assert view is not None
-        assert any("Unusual volume" in note for note in view.notes)
+        assert any("Unusual volume" in note.text for note in view.notes)
         assert all(c.name != "volume" for c in view.components)
 
 

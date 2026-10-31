@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KNOWN_RULES_VERSION, engineCoverage, engineWeight, isIndicatorType, isSwingHorizon, joinList, visibleLimitations, visibleReasons } from "./stanceModel";
+import { KNOWN_RULES_VERSION, engineCoverage, engineWeight, isIndicatorType, isSwingHorizon, joinList, visibleLimitationEntries, visibleLimitations, visibleReasonEntries, visibleReasons } from "./stanceModel";
 
 describe("engineCoverage", () => {
   it("splits composite engines into used and missing", () => {
@@ -39,6 +39,45 @@ describe("visibleLimitations", () => {
       "Missing inputs: valuation, score.",
     ]);
     expect(out).toEqual(["Technical-only stance: no fundamentals available yet.", "Missing inputs: valuation, score."]);
+  });
+});
+
+describe("visibleLimitationEntries", () => {
+  const item = (code: string, text: string, params: Record<string, string> = {}) => ({ code, params, text });
+
+  it("drops the footer, levels and stop items by code, whatever their text", () => {
+    const items = [
+      item("compliance_footer", "Some new footer wording"),
+      item("technical_only", "Technical-only stance: no fundamentals available yet."),
+      item("levels_band", "New levels wording"),
+      item("stop_reference", "New stop wording"),
+    ];
+    const out = visibleLimitationEntries(
+      items.map((i) => i.text),
+      items,
+    );
+    expect(out.map((e) => e.item?.code)).toEqual(["technical_only"]);
+  });
+
+  it("de-duplicates by code and parameters", () => {
+    const items = [item("statement_stale", "a", { days: "450" }), item("statement_stale", "b", { days: "450" }), item("statement_stale", "c", { days: "500" })];
+    expect(visibleLimitationEntries(["a", "b", "c"], items).map((e) => e.text)).toEqual(["a", "c"]);
+  });
+
+  it("falls back to the English text rules without items, or when the lengths differ", () => {
+    const texts = ["Research calculation — not investment advice", "Missing inputs: score.", "Missing inputs: score."];
+    expect(visibleLimitationEntries(texts)).toEqual([{ text: "Missing inputs: score.", item: undefined }]);
+    expect(visibleLimitationEntries(texts, [item("technical_only", "x")]).map((e) => e.item)).toEqual([undefined]);
+  });
+});
+
+describe("visibleReasonEntries", () => {
+  it("keeps the codes and removes duplicates and blanks", () => {
+    const parts = [{ code: "macd", params: { side: "flat" } }];
+    expect(visibleReasonEntries([{ text: "a", parts }, { text: " a " }, { text: "" }, { text: "b" }])).toEqual([
+      { text: "a", parts },
+      { text: "b", parts: undefined },
+    ]);
   });
 });
 
