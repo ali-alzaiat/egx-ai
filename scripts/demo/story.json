@@ -1,0 +1,42 @@
+{
+  "voice": "en-US-AndrewNeural",
+  "rate": "+4%",
+  "beats": [
+    {
+      "id": "hook",
+      "say": "Researching a stock on the Egyptian Exchange? EGX AI puts the data, the reasoning and the checks in one place."
+    },
+    {
+      "id": "market",
+      "say": "Every trading day it scores the most-traded stocks. Let's follow one: Commercial International Bank."
+    },
+    {
+      "id": "chart",
+      "say": "Its page starts with price. Any period, as candles, and chart patterns with how that shape played out before. History, not a forecast."
+    },
+    {
+      "id": "stance",
+      "say": "The stance is rule-based. Technicals and valuation are weighted into a score with a confidence, and every reason and limit is spelled out."
+    },
+    {
+      "id": "shariah",
+      "say": "Shariah status shows our own screen beside official EGX33 membership, and never merges the two."
+    },
+    {
+      "id": "checks",
+      "say": "The data checks itself too: filing backing, a second source, price sanity against the daily limit, and freshness."
+    },
+    {
+      "id": "assistant",
+      "say": "Ask the assistant. It reads the app's data through read-only tools, and every figure in its answer is checked before you see it."
+    },
+    {
+      "id": "arabic",
+      "say": "Everything works in Arabic too, right to left, and the assistant answers in Arabic."
+    },
+    {
+      "id": "outro",
+      "say": "EGX AI is open source. It's a research aid, not investment advice."
+    }
+  ]
+}

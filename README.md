@@ -4,9 +4,9 @@ A single-user research tool for Egyptian Exchange (EGX) companies: market data, 
 statements, metrics, Shariah screening, valuation, technical signals, theses, alerts and an AI
 assistant that only explains figures the app has computed.
 
-[![Demo: a 2-minute tour of EGX AI](docs/media/egx-ai-demo.gif)](docs/media/egx-ai-demo.mp4)
+[![Demo: a 90-second tour of EGX AI](docs/media/egx-ai-demo.gif)](docs/media/egx-ai-demo.mp4)
 
-*Click the preview for the full demo video (MP4, about 2 minutes, English and Arabic).*
+*Click the preview for the full demo video (MP4 with narration, about a minute and a half, English and Arabic).*
 
 > EGX AI is a research aid, not investment advice. It never places trades, and its stances and
 > fair values are model outputs under stated assumptions.
@@ -119,13 +119,13 @@ Useful data commands (from `backend/`):
 .venv/Scripts/python -m app.db.purge --status                    # inspect the dev database
 ```
 
-To re-record the demo video, run the app (with an AI key saved), then in a separate virtual
-environment `pip install -r scripts/demo/requirements.txt`, `python -m playwright install
-chromium`, `python scripts/demo/record.py`, and
-`python scripts/demo/post.py <path to ffmpeg> scripts/demo/out` (the `imageio-ffmpeg` package
-provides one; the captions use Windows' Segoe UI font, set in `post.py`). Copy the MP4 and GIF
-from `scripts/demo/out/` to `docs/media/`. The tour avoids
-screens that show statement amounts, which come from vendor files.
+To re-record the demo video, run the app (with an AI key saved). In a separate virtual environment,
+`pip install -r scripts/demo/requirements.txt` and `python -m playwright install chromium`, then run
+`python scripts/demo/narrate.py` (the narration in `scripts/demo/story.json`, read by Microsoft's edge-tts
+voice) and `python scripts/demo/record.py`. Render it with Remotion: in `scripts/demo/remotion`, `npm install`
+and `npx remotion render Demo out/egx-ai-demo.mp4` (`npm run studio` previews it). Copy the MP4 and a GIF
+made from it to `docs/media/`. The tour avoids screens that show statement amounts, which come from vendor
+files.
 
 ## Project layout
 

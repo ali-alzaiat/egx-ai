@@ -1,0 +1,20 @@
+{
+  "name": "egx-ai-demo",
+  "private": true,
+  "description": "Remotion composition for the EGX AI demo video (see scripts/demo/README in the repo README).",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render Demo out/egx-ai-demo.mp4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "5.9.3"
+  }
+}
