@@ -3,6 +3,7 @@ import "../components/hub/hubPages.css";
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useCompanyByTicker, useStance } from "../api/client";
+import { ExplainButton } from "../components/assistant/ExplainButton";
 import { useYearPrices } from "../components/hub/priceData";
 import { ReasonMissing } from "../components/hub/Reason";
 import { StanceBadge, Tag, isNotAssessed } from "../components/ui/Badges";
@@ -91,6 +92,7 @@ function StanceBlock({ s }: { s: StanceResult }) {
           </p>
         </>
       )}
+      <ExplainButton card="stance" ticker={s.ticker} />
     </div>
   );
 }

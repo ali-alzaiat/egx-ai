@@ -20,6 +20,8 @@ export default defineConfig(({ mode }) => {
           manualChunks(id: string) {
             if (/node_modules[\\/](radix-ui|@radix-ui|@floating-ui|tailwind-merge|class-variance-authority|clsx)[\\/]/.test(id)) return 'ui-kit'
             if (/node_modules[\\/]lightweight-charts[\\/]/.test(id)) return 'charts'
+            // React changes far less often than the app: its own cacheable chunk keeps the app chunk under 500 kB (R49 added the assistant and its copy).
+            if (/node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react'
             return undefined
           },
         },

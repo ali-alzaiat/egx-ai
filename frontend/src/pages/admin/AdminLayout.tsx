@@ -11,6 +11,7 @@ const SECTIONS: readonly { path: string; key: CopyKey }[] = [
   { path: "disclosures", key: "admin_disclosures" },
   { path: "peers", key: "admin_peers" },
   { path: "thesis", key: "admin_thesis" },
+  { path: "ai", key: "admin_ai" },
 ];
 
 // Per-company sections keep the picked company when switching between them.

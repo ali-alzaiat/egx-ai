@@ -28,6 +28,9 @@ dependencies = [
     "pdfplumber>=0.10,<1",
     "camelot-py>=0.11,<2",
     "python-multipart>=0.0.18,<1",
+    # R49 AI gateway: exact pin (PyPI has had compromised litellm releases); upgrade only on purpose.
+    "litellm==1.105.1",
+    "cryptography>=44,<51",
 ]
 
 [project.optional-dependencies]

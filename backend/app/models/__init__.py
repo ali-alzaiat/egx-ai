@@ -1,4 +1,5 @@
 from app.models.ai import AIAnalysis, AnalysisStatusDB, AnalysisTypeDB, ChunkTypeDB, DocumentChunk
+from app.models.assistant import AiConversation, AiMessage, AiProviderKey, AiSettings
 from app.models.compute import ComputeState
 from app.models.continuous import (
     ActorType,
@@ -72,6 +73,10 @@ from app.models.valuation import (
 
 __all__ = [
     "ActorType",
+    "AiConversation",
+    "AiMessage",
+    "AiProviderKey",
+    "AiSettings",
     "AIAnalysis",
     "AlertFamily",
     "AlertFired",

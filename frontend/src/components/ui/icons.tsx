@@ -119,3 +119,21 @@ export function BarIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** Four-point sparkle: the assistant. */
+export function SparkleIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M7 2.5c.4 2.6 1.9 4.1 4.5 4.5-2.6.4-4.1 1.9-4.5 4.5C6.6 8.9 5.1 7.4 2.5 7 5.1 6.6 6.6 5.1 7 2.5Z" />
+      <path d="M12 10.5c.2 1.1.9 1.8 2 2-1.1.2-1.8.9-2 2-.2-1.1-.9-1.8-2-2 1.1-.2 1.8-.9 2-2Z" />
+    </Svg>
+  );
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m3 8.5 3.2 3L13 4.5" />
+    </Svg>
+  );
+}

@@ -1,6 +1,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useLang } from "../../i18n/useLang";
+import { AssistantLauncher } from "../assistant/AssistantLauncher";
+import { AssistantProvider } from "../assistant/AssistantProvider";
 import type { CopyKey } from "../../i18n";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { useTheme, type Theme } from "../../theme/useTheme";
@@ -29,6 +31,7 @@ const NAV_GROUPS: readonly { label: CopyKey; items: readonly NavItem[] }[] = [
     items: [
       { to: "/companies", key: "nav_companies" },
       { to: "/screening", key: "nav_screening" },
+      { to: "/assistant", key: "nav_assistant" },
     ],
   },
   {
@@ -188,7 +191,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
 }
 
-export default function AppShell() {
+function ShellLayout() {
   const { pathname } = useLocation();
   const { t } = useLang();
   const desktop = useMediaQuery("(min-width: 1024px)");
@@ -283,6 +286,16 @@ export default function AppShell() {
           <Outlet />
         </Suspense>
       </main>
+      <AssistantLauncher />
     </div>
+  );
+}
+
+/** The assistant state sits above the whole layout so Explain buttons on any page can reach the side panel. */
+export default function AppShell() {
+  return (
+    <AssistantProvider>
+      <ShellLayout />
+    </AssistantProvider>
   );
 }

@@ -1,7 +1,18 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseQueryResult } from "@tanstack/react-query";
 import type {
   AlertFired,
+  AssistantChatRequest,
+  AssistantConversation,
+  AssistantConversationSummary,
+  AssistantExplainRequest,
+  AssistantKeyTest,
+  AssistantModelsResponse,
+  AssistantProviderId,
+  AssistantProviderRow,
+  AssistantSettings,
+  AssistantSettingsUpdate,
+  AssistantStreamEvent,
   AlertRule,
   Company,
   DailyPrice,
@@ -43,6 +54,9 @@ import type {
   Watchlist,
   WatchlistEntry,
 } from "../types";
+
+import { decodeAssistantEvent, parseApiErrorBody } from "../lib/assistant";
+import { createSseParser } from "../lib/sse";
 
 const API_BASE = "/api";
 
@@ -945,4 +959,196 @@ export function useChartPatterns(companyId: string | undefined, enabled = true) 
     enabled: !!companyId && enabled,
     retry: retryUnless404,
   });
+}
+
+// ---- AI assistant (R49): /api/assistant/* ----------------------------------------------------------------
+
+/** A failed assistant request. `message` is "API error: <status>" so `statusOf` still reads it; `code` is the backend's error code when it sent one. */
+export class AssistantApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly detail: string | null;
+  constructor(status: number, code: string | null, detail: string | null) {
+    super(`API error: ${status}`);
+    this.name = "AssistantApiError";
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+async function assistantError(res: Response): Promise<AssistantApiError> {
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    // no JSON body: the status alone is the error
+  }
+  const { code, detail } = parseApiErrorBody(body);
+  return new AssistantApiError(res.status, code, detail);
+}
+
+async function assistantJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}/assistant${path}`, init);
+  if (!res.ok) throw await assistantError(res);
+  if (res.status === 204) return undefined as T;
+  return res.json();
+}
+
+function jsonInit(method: "PUT" | "POST", body?: unknown): RequestInit {
+  return body === undefined ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+
+const ASSISTANT_KEYS = {
+  models: ["assistant", "models"] as const,
+  settings: ["assistant", "settings"] as const,
+  conversations: ["assistant", "conversations"] as const,
+  conversation: (id: string) => ["assistant", "conversation", id] as const,
+};
+
+/** GET /api/assistant/models: the curated list; `available` means the provider has a key. */
+export function useAssistantModels() {
+  return useQuery({
+    queryKey: ASSISTANT_KEYS.models,
+    queryFn: () => assistantJson<AssistantModelsResponse>("/models"),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/** GET /api/assistant/settings: provider rows (masked), default model, cap and month spend. Never cached long: it holds the live spend. */
+export function useAssistantSettings() {
+  return useQuery({
+    queryKey: ASSISTANT_KEYS.settings,
+    queryFn: () => assistantJson<AssistantSettings>("/settings"),
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+export function useConversations(limit = 50) {
+  return useQuery({
+    queryKey: [...ASSISTANT_KEYS.conversations, limit],
+    queryFn: () => assistantJson<AssistantConversationSummary[]>(`/conversations?limit=${limit}`),
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+export function useConversation(id: string | null) {
+  return useQuery({
+    queryKey: ASSISTANT_KEYS.conversation(id ?? ""),
+    queryFn: () => assistantJson<AssistantConversation>(`/conversations/${encodeURIComponent(id ?? "")}`),
+    enabled: id !== null,
+    retry: false,
+  });
+}
+
+/** Query families the assistant streams touch: spend and the conversation list change after every call. */
+export function useRefreshAssistantData(): () => void {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.settings });
+    void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.conversations });
+  };
+}
+
+/** PUT /api/assistant/settings: default model and monthly cap. */
+export function useSaveAssistantSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AssistantSettingsUpdate) => assistantJson<AssistantSettings>("/settings", jsonInit("PUT", body)),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(ASSISTANT_KEYS.settings, settings);
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.models });
+    },
+  });
+}
+
+/** PUT /api/assistant/keys/{provider}: the server tests the key first and saves only a working one. The key is sent once and never kept. */
+export function useSaveProviderKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // The request variables hold the key: keep nothing once it settles.
+    gcTime: 0,
+    mutationFn: (v: { provider: AssistantProviderId; apiKey: string }) =>
+      assistantJson<AssistantProviderRow>(`/keys/${v.provider}`, jsonInit("PUT", { api_key: v.apiKey })),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.settings });
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.models });
+    },
+  });
+}
+
+/** POST /api/assistant/keys/{provider}/test: checks the active key without changing anything. */
+export function useTestProviderKey() {
+  return useMutation({
+    mutationFn: (provider: AssistantProviderId) => assistantJson<AssistantKeyTest>(`/keys/${provider}/test`, jsonInit("POST")),
+  });
+}
+
+/** DELETE /api/assistant/keys/{provider}: removes the saved key; a .env key becomes active again. */
+export function useRemoveProviderKey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: AssistantProviderId) => assistantJson<AssistantProviderRow>(`/keys/${provider}`, { method: "DELETE" }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.settings });
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.models });
+    },
+  });
+}
+
+/** DELETE /api/assistant/conversations/{id}. */
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => assistantJson<void>(`/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: ASSISTANT_KEYS.conversation(id) });
+      void queryClient.invalidateQueries({ queryKey: ASSISTANT_KEYS.conversations });
+    },
+  });
+}
+
+/**
+ * POST /api/assistant/chat or /explain over fetch + ReadableStream (server-sent events). The dev proxy adds the
+ * bearer token server-side, so nothing secret is in the bundle. Resolves when the stream ends; rejects with an
+ * AssistantApiError when the request fails before the stream starts, or with the fetch error (AbortError on Stop).
+ */
+export async function streamAssistant(
+  path: "/chat" | "/explain",
+  body: AssistantChatRequest | AssistantExplainRequest,
+  onEvent: (event: AssistantStreamEvent) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/assistant${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) throw await assistantError(res);
+  if (!res.body) throw new AssistantApiError(res.status, null, null);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  const parser = createSseParser();
+  const emit = (messages: ReturnType<typeof parser.push>): void => {
+    for (const message of messages) {
+      const event = decodeAssistantEvent(message);
+      if (event !== null) onEvent(event);
+    }
+  };
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      emit(parser.push(decoder.decode(value, { stream: true })));
+    }
+    emit(parser.push(decoder.decode()));
+    emit(parser.flush());
+  } finally {
+    reader.releaseLock();
+  }
 }

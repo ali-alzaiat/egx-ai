@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useCompanyByTicker, useScore } from "../api/client";
+import { ExplainButton } from "../components/assistant/ExplainButton";
 import { SCORE_COMPONENTS, SCORE_COMPONENT_KEYS, confidenceLabelKey, type ScoreComponentKey } from "../components/research/labels";
 import { ProvisionalTag, ResearchSection, TechnicalDetails } from "../components/research/parts";
 import { MissingReason, Reason } from "../components/research/reasons";
@@ -21,7 +22,7 @@ function oneDecimal(locale: string, value: number | null | undefined): string | 
   return fmtNum(locale, value, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-function ScoreBody({ assessment, provisional }: { assessment: ScoreAssessment; provisional: boolean }) {
+function ScoreBody({ assessment, provisional, ticker }: { assessment: ScoreAssessment; provisional: boolean; ticker: string }) {
   const { t, locale } = useLang();
   const headline = assessment.headline;
   const total = oneDecimal(locale, headline.value);
@@ -77,6 +78,7 @@ function ScoreBody({ assessment, provisional }: { assessment: ScoreAssessment; p
             <ProvisionalTag />
           </div>
         )}
+        <ExplainButton card="score" ticker={ticker} />
       </div>
 
       <div className="rs-wrap-table">
@@ -142,7 +144,7 @@ export default function InvestmentScore() {
     <ResearchSection title={t("rc_title")}>
       {score?.compute_status === "failed" && assessment && <Notice variant="warning">{t("rs_compute_failed")}</Notice>}
       {assessment ? (
-        <ScoreBody assessment={assessment} provisional={score?.provisional === true} />
+        <ScoreBody assessment={assessment} provisional={score?.provisional === true} ticker={company.ticker} />
       ) : (
         <>
           <EmptyState>{t("rc_empty", { ticker: company.ticker })}</EmptyState>

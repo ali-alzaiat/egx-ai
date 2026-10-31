@@ -7,6 +7,7 @@ import { LangProvider } from "./i18n/useLang";
 import { ThemeProvider } from "./theme/useTheme";
 
 // Route-level code splitting: each page loads on first visit.
+const Assistant = lazy(() => import("./pages/Assistant"));
 const Alerts = lazy(() => import("./pages/Alerts"));
 const Companies = lazy(() => import("./pages/Companies"));
 const CompanyDetail = lazy(() => import("./pages/CompanyDetail"));
@@ -23,6 +24,7 @@ const Screening = lazy(() => import("./pages/Screening"));
 const ShariahScreening = lazy(() => import("./pages/ShariahScreening"));
 const Statements = lazy(() => import("./pages/Statements"));
 const Watchlists = lazy(() => import("./pages/Watchlists"));
+const AdminAi = lazy(() => import("./pages/admin/AdminAi"));
 const AdminCompanySection = lazy(() => import("./pages/admin/AdminCompanySection"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminMarket = lazy(() => import("./pages/admin/AdminMarket"));
@@ -46,6 +48,7 @@ function App() {
               <Route path="/watchlists" element={<Watchlists />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/events" element={<Events />} />
+              <Route path="/assistant" element={<Assistant />} />
 
               {/* Company hub: one header, seven tabs. Old paths redirect (spec 1.1). */}
               <Route path="/companies/:ticker" element={<CompanyHub />}>
@@ -77,6 +80,7 @@ function App() {
               <Route path="/intake" element={<Navigate to="/admin/intake" replace />} />
               <Route path="/admin" element={<AdminLayout />}>
                 <Route path="market" element={<AdminMarket />} />
+                <Route path="ai" element={<AdminAi />} />
                 <Route path="intake" element={<FilingsIntake />} />
                 <Route path="disclosures" element={<AdminCompanySection />} />
                 <Route path="peers" element={<AdminCompanySection />} />

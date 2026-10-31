@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useCompanyByTicker, useEgxMembership, usePurification, useScreeningResult } from "../api/client";
+import { ExplainButton } from "../components/assistant/ExplainButton";
 import { joinList, lineLabelKey, purificationInputKey, ruleInputKey, ruleLabelKey } from "../components/research/labels";
 import { ExternalLink, ProvisionalTag, ResearchSection, TechnicalDetails } from "../components/research/parts";
 import { MissingReason, Reason } from "../components/research/reasons";
@@ -233,6 +234,7 @@ export default function ShariahScreening() {
                 <Reason reason={result.overall_reason} />
               </p>
             )}
+            <ExplainButton card="shariah" ticker={company.ticker} />
           </div>
           <EgxBlock membership={membership} />
         </div>

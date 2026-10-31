@@ -1,4 +1,5 @@
 import { ADMIN_COPY } from "./admin";
+import { ASSISTANT_COPY } from "./assistant";
 import { COMPANIES_COPY } from "./companies";
 import { HUB_COPY } from "./hub";
 import { HUB_RESEARCH_COPY } from "./hubResearch";
@@ -29,6 +30,7 @@ export const SHORT_COPY = {
   ...SCORE_EXTRAS_COPY,
   ...TRACKING_COPY,
   ...ADMIN_COPY,
+  ...ASSISTANT_COPY,
 } as const;
 
 /** The per-area modules, exposed for the uniqueness test. */
@@ -43,6 +45,7 @@ export const COPY_MODULES: Record<string, Record<string, CopyEntry>> = {
   scoreExtras: SCORE_EXTRAS_COPY,
   tracking: TRACKING_COPY,
   admin: ADMIN_COPY,
+  assistant: ASSISTANT_COPY,
 };
 
 export type CopyKey = keyof typeof SHORT_COPY;

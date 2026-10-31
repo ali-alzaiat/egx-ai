@@ -1478,3 +1478,115 @@ export interface FormingStatsMissing extends FormingStatsBase {
 
 export type FormingStats = FormingStatsOk | FormingStatsMissing;
 
+
+// ---- AI assistant (R49 contract: .workflow/design/R49-ai-assistant-contract.md) ----
+
+export type AssistantProviderId = "anthropic" | "openai" | "gemini";
+export type AssistantLang = "en" | "ar";
+export type AssistantCard = "score" | "valuation" | "stance" | "shariah";
+
+export interface AssistantModel {
+  id: string;
+  label: string;
+  provider: AssistantProviderId;
+  /** The provider has a key (saved in the UI or in .env). */
+  available: boolean;
+}
+
+export interface AssistantModelsResponse {
+  default_model: string | null;
+  models: AssistantModel[];
+}
+
+export interface AssistantProviderRow {
+  provider: AssistantProviderId;
+  label: string;
+  configured: boolean;
+  source: "ui" | "env" | null;
+  last4: string | null;
+  set_at: string | null;
+  /** Free-tier key (R49 A10): calls are stored at $0 and skip the monthly cap. */
+  free_tier: boolean;
+}
+
+export interface AssistantSettings {
+  providers: AssistantProviderRow[];
+  default_model: string | null;
+  /** Decimal string; null = no cap. */
+  monthly_cap_usd: string | null;
+  month_spend_usd: string | number | null;
+  secrets_key_set: boolean;
+}
+
+export interface AssistantSettingsUpdate {
+  default_model?: string;
+  /** Decimal string, or null to switch the cap off. */
+  monthly_cap_usd?: string | null;
+  /** The full list of free-tier providers. */
+  free_tier_providers?: AssistantProviderId[];
+}
+
+export interface AssistantKeyTest {
+  ok: boolean;
+  detail: string | null;
+}
+
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  ticker: string | null;
+  updated_at: string;
+}
+
+export interface AssistantStoredMessage {
+  role: "user" | "assistant";
+  content: string;
+  status: "answered" | "unverified" | "error" | "cap_reached" | null;
+  model: string | null;
+  /** Shape is owned by the backend verifier; read defensively. */
+  verification: unknown;
+  created_at: string;
+}
+
+export interface AssistantConversation {
+  id: string;
+  title: string;
+  ticker: string | null;
+  messages: AssistantStoredMessage[];
+}
+
+export interface AssistantChatRequest {
+  message: string;
+  conversation_id?: string;
+  model?: string;
+  ticker?: string;
+  lang: AssistantLang;
+}
+
+export interface AssistantExplainRequest {
+  ticker: string;
+  card: AssistantCard;
+  model?: string;
+  lang: AssistantLang;
+}
+
+export type AssistantStage = "thinking" | "tool" | "verifying" | "retrying";
+
+export interface AssistantSource {
+  tool: string;
+  ticker?: string | null;
+}
+
+export type AssistantStreamEvent =
+  | { type: "meta"; conversation_id: string | null; model: string | null }
+  | { type: "status"; stage: AssistantStage; tool: string | null }
+  | { type: "answer"; text: string; checked: number; sources: AssistantSource[] }
+  | { type: "unverified"; checked: number; unverified: string[]; sources: AssistantSource[] }
+  | { type: "error"; code: string; detail: string | null }
+  | {
+      type: "done";
+      input_tokens: number | null;
+      output_tokens: number | null;
+      cost_usd: string | number | null;
+      month_spend_usd: string | number | null;
+    };

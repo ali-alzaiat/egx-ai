@@ -2,7 +2,9 @@
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -11,8 +13,59 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.metrics import FinancialMetric, FinancialMetricInput, MetricStatusDB
 
 
+@dataclass(frozen=True)
+class LatestMetric:
+    """A company's newest AVAILABLE value of one metric (stored snapshot, not recomputed)."""
+
+    value: Decimal
+    unit: str
+    fiscal_year: int
+    source_tier: str | None
+    provisional: bool
+
+
 class MetricRepository:
     """Repository for financial metric CRUD operations."""
+
+    async def latest_available_values(
+        self, company_ids: Sequence[uuid.UUID], metric_codes: Sequence[str]
+    ) -> dict[tuple[uuid.UUID, str], LatestMetric]:
+        """Newest stored AVAILABLE value per (company, metric), by period end date."""
+        from app.models.financial import FinancialPeriod
+
+        if not company_ids or not metric_codes:
+            return {}
+        query = (
+            select(
+                FinancialMetric.company_id,
+                FinancialMetric.metric_code,
+                FinancialMetric.value,
+                FinancialMetric.unit,
+                FinancialPeriod.fiscal_year,
+                FinancialMetric.source_tier,
+                FinancialMetric.provisional,
+            )
+            .join(FinancialPeriod, FinancialPeriod.id == FinancialMetric.period_id)
+            .where(
+                FinancialMetric.company_id.in_(list(company_ids)),
+                FinancialMetric.metric_code.in_(list(metric_codes)),
+                FinancialMetric.status == MetricStatusDB.AVAILABLE,
+                FinancialMetric.value.is_not(None),
+            )
+            .order_by(FinancialPeriod.end_date.desc())
+        )
+        latest: dict[tuple[uuid.UUID, str], LatestMetric] = {}
+        for row in (await self.session.execute(query)).all():
+            key = (row.company_id, row.metric_code)
+            if key not in latest:
+                latest[key] = LatestMetric(
+                    value=row.value,
+                    unit=row.unit,
+                    fiscal_year=int(row.fiscal_year),
+                    source_tier=row.source_tier,
+                    provisional=bool(row.provisional),
+                )
+        return latest
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session

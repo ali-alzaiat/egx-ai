@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { useLang } from "../i18n/useLang";
+import { ExplainButton } from "./assistant/ExplainButton";
 import { fmtDate, fmtPct, fmtPrice, toNumber } from "../lib/format";
 import type { FairValueLeg, FairValueResponse } from "../types";
 import {
@@ -166,6 +167,7 @@ function FairValueCard({ fairValue }: { fairValue: FairValueResponse }) {
             })}
           </p>
           {basisNote !== null && <p className="rs-note">{basisNote}</p>}
+          <ExplainButton card="valuation" ticker={fairValue.ticker} />
         </div>
         {mismatch && currency && (
           <Notice variant="warning">

@@ -30,8 +30,15 @@ class Settings(BaseSettings):
     # AI Provider
     AI_PROVIDER: str = "ollama"
     AI_MODEL: str = "llama3"
-    OPENAI_API_KEY: str = ""
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+
+    # R49 AI assistant. Keys saved from the UI are encrypted with AI_SECRETS_KEY (a Fernet key,
+    # env-only); the three provider keys below are the fallback when none is saved in the UI.
+    # Unset AI_SECRETS_KEY = saving a key from the UI fails closed; env keys still work.
+    AI_SECRETS_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
 
     # Market refresh job
     SYNC_JOB_TIMEOUT_SECONDS: int = 1800

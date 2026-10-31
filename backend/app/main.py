@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
 
     from app.api.ai import router as ai_router
     from app.api.alerts import router as alerts_router
+    from app.api.assistant import router as assistant_router
     from app.api.companies import router as companies_router
     from app.api.data_quality import router as data_quality_router
     from app.api.data_sources import router as data_sources_router
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(statements_router, dependencies=protected)
     app.include_router(ai_router, dependencies=protected)
     app.include_router(alerts_router, dependencies=protected)
+    app.include_router(assistant_router, dependencies=protected)
     app.include_router(companies_router, dependencies=protected)
     app.include_router(data_quality_router, dependencies=protected)
     app.include_router(data_sources_router, dependencies=protected)
