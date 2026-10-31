@@ -91,7 +91,7 @@ export function fmtInt(locale: string, value: Numeric): string | null {
   return n === null ? null : unicodeMinus(nf(locale, { maximumFractionDigits: 0 }).format(n));
 }
 
-/** Full EGP units divided by 1e6, 1 dp, grouped: [removed]. */
+/** Full EGP units divided by 1e6, 1 dp, grouped: 2,450.0. */
 export function fmtEgpMillions(locale: string, value: Numeric): string | null {
   const n = toNumber(value);
   return n === null ? null : fixed(locale, n / 1e6, 1);

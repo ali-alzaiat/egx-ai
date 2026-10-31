@@ -280,7 +280,7 @@ These are the research values, which I kept unchanged. The tokens I added were c
 | `fmtSignedPct(v)` | sign always, U+2212 | +63.1% / −14.3% | same |
 | `fmtRatio(v)` (x-multiples) | 2 dp | 1.18 / 0.51 | same |
 | `fmtInt(v)` | grouping, 0 dp | 4,461,086 | 4,461,086 |
-| `fmtEgpMillions(v)` | full units ÷ 1e6, 1 dp, grouping | [removed] | same |
+| `fmtEgpMillions(v)` | full units ÷ 1e6, 1 dp, grouping | 2,450.0 | same |
 | `fmtEgpCompact(v)` | ≥1e9 "bn" 2 dp, ≥1e6 "m" 1 dp, else K | EGP 237.9m | 237.9 مليون ج.م |
 | `fmtScore(v)` (composite) | signed integer | +40 / −20 | same |
 | `fmtDate(iso)` | `Intl.DateTimeFormat(locale,{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})`; date-only strings parsed as UTC | 22 Oct 2026 | 22 أكتوبر 2026 |
